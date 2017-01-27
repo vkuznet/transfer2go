@@ -1,4 +1,9 @@
 # transfer2go
+
+[![Build Status](https://travis-ci.org/vkuznet/transfer2go.svg?branch=master)](https://travis-ci.org/vkuznet/transfer2go)
+[![Go Report Card](https://goreportcard.com/badge/github.com/vkuznet/transfer2go)](https://goreportcard.com/report/github.com/vkuznet/transfer2go)
+[![GoDoc](https://godoc.org/github.com/vkuznet/transfer2go?status.svg)](https://godoc.org/github.com/vkuznet/transfer2go)
+
 Go implementation of CMS
 [PhEDEx](https://www.researchgate.net/publication/228732867_Data_transfer_infrastructure_for_CMS_data_taking)
 distributed, loosly coupled agents for CMS transfering data.
