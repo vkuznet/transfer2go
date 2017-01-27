@@ -76,18 +76,28 @@ transfer LFN_a to siteX
 
 ### Examples
 ```
+# start the server on port 8989
+transfer2go -uri :8989
+
+# place request from a client via HTTP
+curl -v -H "Content-Type: application/json" -d '{"version":"123",
+"data":[{"file":"fileA", "source":"source", "destination":"destination",
+"latency":0}, {"file":"file2", "source":"source", "destination":"destination",
+"latency":1}]}' http://localhost:8989
+
+# start server mode and register agent with another one
+transfer2go -uri :8989 -register http://cern.ch/agent
+
+# will register with given agents
+transfer2go -uri :8989 -register http://cern.ch/agent,http://fnal.gov,MyFriend
+
+# request to transfer
 transfer2go -agent http://cern.ch/agent -transfer fileA -to T1_CH_CERN
 transfer2go -agent http://fnal.gov/agent -transfer fileA -to http://localhost
 transfer2go -agent T1_CH_CERN -transfer fileA -to MyFriend
 
 # return URIs of agents who has the file
 transfer2go -agent MyFriend -find /fileA
-
-# start server mode and register agent with another one
-transfer2go -server -register http://cern.ch/agent
-
-# will register with given agents
-transfer2go -server -register http://cern.ch/agent,http://fnal.gov,MyFriend
 
 # return status of transfers and pending requests
 transfer2go -agent http://fnal.gov -status

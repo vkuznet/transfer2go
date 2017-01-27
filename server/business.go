@@ -167,16 +167,6 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) {
 	// Go through each payload and queue items individually to run job over the payload
 	for _, rdoc := range content.Requests {
 
-		log.Printf("### rdoc %v\n", rdoc)
-
-		// rdoc represents TransferRequest
-		//         var tr TransferRequest
-		//         err := json.Unmarshal([]byte(rdoc), &tr)
-		//         if err != nil {
-		//             log.Println("ERROR json.Unmarshal", rdoc, "error", err)
-		//             continue
-		//         }
-
 		// let's create a job with the payload
 		work := Job{TransferRequest: rdoc}
 
