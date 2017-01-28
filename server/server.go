@@ -102,6 +102,14 @@ func Server(port, url, alias, aName, catalog string, interval int64) {
 		}
 	}
 
+	// complete registration with other agents
+	for alias, agent := range _agents {
+		if alias == aName || alias == _alias {
+			continue
+		}
+		register(agent, _alias, _myself) // submit remote registration of given agent name
+	}
+
 	// define catalog
 	if stat, err := os.Stat(catalog); err == nil && stat.IsDir() {
 		_catalog = Catalog{Type: "filesystem", Uri: catalog}
