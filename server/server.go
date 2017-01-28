@@ -45,7 +45,7 @@ type Metrics struct {
 // ServerMetrics defines various metrics about the agent
 var ServerMetrics Metrics
 
-// globals
+// globals used in server/handlers
 var _myself, _alias string
 var _agents map[string]string
 var _catalog Catalog
@@ -55,7 +55,7 @@ func init() {
 	_agents = make(map[string]string)
 }
 
-// register a new agent
+// register a new (alias, agent) pair in agent (register)
 func register(register, alias, agent string) error {
 	log.Printf("Register %s as %s on %s\n", agent, alias, register)
 	// register myself with another agent
@@ -69,26 +69,11 @@ func register(register, alias, agent string) error {
 	return resp.Error
 }
 
-// Server implementation
-func Server(port, url, alias, aName, catalog string, interval int64) {
-	_myself = url
-	_alias = alias
-	arr := strings.Split(url, "/")
-	base := ""
-	if len(arr) > 3 {
-		base = fmt.Sprintf("/%s", strings.Join(arr[3:], "/"))
-	}
-	log.Printf("Start agent: url=%s, port=%s, base=%s", url, port, base)
-
-	// register self agent URI in remote agent and vice versa
-	_agents[_alias] = _myself
-
-	if aName != "" {
-		register(aName, _alias, _myself) // submit remote registration of given agent name
-	}
-
+// helper function to register agent with all distributed agents
+func registerAgents(aName string) {
 	// now ask remote server for its list of agents and update internal map
-	if len(aName) > 0 {
+	if aName != "" && len(aName) > 0 {
+		register(aName, _alias, _myself) // submit remote registration of given agent name
 		aurl := fmt.Sprintf("%s/agents", aName)
 		resp := client.FetchResponse(aurl, []byte{})
 		var remoteAgents map[string]string
@@ -104,11 +89,27 @@ func Server(port, url, alias, aName, catalog string, interval int64) {
 
 	// complete registration with other agents
 	for alias, agent := range _agents {
-		if alias == aName || alias == _alias {
+		if agent == aName || alias == _alias {
 			continue
 		}
 		register(agent, _alias, _myself) // submit remote registration of given agent name
 	}
+}
+
+// Server implementation
+func Server(port, url, alias, aName, catalog string, interval int64) {
+	_myself = url
+	_alias = alias
+	arr := strings.Split(url, "/")
+	base := ""
+	if len(arr) > 3 {
+		base = fmt.Sprintf("/%s", strings.Join(arr[3:], "/"))
+	}
+	log.Printf("Start agent: url=%s, port=%s, base=%s", url, port, base)
+
+	// register self agent URI in remote agent and vice versa
+	_agents[_alias] = _myself
+	registerAgents(aName)
 
 	// define catalog
 	if stat, err := os.Stat(catalog); err == nil && stat.IsDir() {

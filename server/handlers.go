@@ -34,7 +34,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	var params AgentInfo
 	err := json.NewDecoder(r.Body).Decode(&params)
 	if err != nil {
-		log.Println("ERROR, unable to unmarshal params %v", params)
+		log.Println("ERROR, RegisterHandler unable to unmarshal params %v", params)
 	}
 	agent := params.Agent
 	alias := params.Alias
