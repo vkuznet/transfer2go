@@ -76,8 +76,8 @@ transfer LFN_a to siteX
 
 ### Examples
 ```
-# start the server on port 8989
-transfer2go -uri :8989
+# start the server on port 8989 and use /tmp dir as catalog
+transfer2go -uri :8989 -catalog /tmp
 
 # place request from a client via HTTP
 curl -v -H "Content-Type: application/json" -d '{"version":"123",
@@ -85,8 +85,9 @@ curl -v -H "Content-Type: application/json" -d '{"version":"123",
 "latency":0}, {"file":"file2", "source":"source", "destination":"destination",
 "latency":1}]}' http://localhost:8989
 
-# start server mode and register agent with another one
-transfer2go -uri :8989 -register http://cern.ch/agent
+# start server mode and register agent with another one and use catalog
+# from file.db (e.g. SQLite DB)
+transfer2go -uri :8989 -register http://cern.ch/agent -catalog file.db
 
 # will register with given agents
 transfer2go -uri :8989 -register http://cern.ch/agent,http://fnal.gov,MyFriend
