@@ -97,7 +97,7 @@ func registerAgents(aName string) {
 }
 
 // Server implementation
-func Server(port, url, alias, aName, catalog string, interval int64) {
+func Server(port, url, alias, aName, catalog, mfile string, minterval int64) {
 	_myself = url
 	_alias = alias
 	arr := strings.Split(url, "/")
@@ -133,9 +133,15 @@ func Server(port, url, alias, aName, catalog string, interval int64) {
 	http.HandleFunc(fmt.Sprintf("%s/", base), RequestHandler)
 
 	// register metrics
+	f, e := os.OpenFile(mfile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if e != nil {
+		log.Fatalf("error opening file: %v", e)
+	}
+	defer f.Close()
+
 	r := metrics.DefaultRegistry
 	m := metrics.GetOrRegisterMeter("requests", r)
-	go metrics.Log(r, time.Duration(interval)*time.Second, log.New(os.Stderr, "metrics: ", log.Lmicroseconds))
+	go metrics.Log(r, time.Duration(minterval)*time.Second, log.New(f, "metrics: ", log.Lmicroseconds))
 
 	// start dispatcher for incoming requests
 	var workerMeters []metrics.Meter

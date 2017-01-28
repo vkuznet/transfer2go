@@ -150,19 +150,19 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
+	defer r.Body.Close()
+	log.Println("RequestHandler received request", r)
 
 	// Read the body into a string for json decoding
 	var content = &TransferCollection{}
-	log.Println("request", r)
 	//     err := json.NewDecoder(io.LimitReader(r.Body, MaxLength)).Decode(&content)
 	err := json.NewDecoder(r.Body).Decode(&content)
 	if err != nil {
-		log.Println("ERROR TransferCollection", err)
+		log.Println("ERROR RequestHandler unable to decode TransferCollection", err)
 		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	defer r.Body.Close()
 
 	// Go through each payload and queue items individually to run job over the payload
 	for _, rdoc := range content.Requests {

@@ -37,15 +37,17 @@ func main() {
 	flag.StringVar(&port, "port", "", "Server port number, default 8989")
 	var alias string
 	flag.StringVar(&alias, "alias", makeSiteName(), "Server alias name, e.g. T3_US_Name")
-	var interval int64
-	flag.Int64Var(&interval, "interval", 600, "Server metrics interval, default 600 seconds")
+	var mfile string
+	flag.StringVar(&mfile, "mfile", "metrics.log", "Server metrics file")
+	var minterval int64
+	flag.Int64Var(&minterval, "minterval", 60, "Server metrics interval")
 	var verbose int
-	flag.IntVar(&verbose, "verbose", 0, "Verbosity level, default 0")
+	flag.IntVar(&verbose, "verbose", 0, "Verbosity level")
 	flag.Parse()
 	checkX509()
 	client.VERBOSE = verbose
 	if url != "" {
-		server.Server(port, url, alias, register, catalog, interval)
+		server.Server(port, url, alias, register, catalog, mfile, minterval)
 	} else {
 		if status {
 			client.Status(agent)
