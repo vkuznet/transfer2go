@@ -12,7 +12,6 @@ import (
 	"os"
 	"os/user"
 	"regexp"
-	"strings"
 	"time"
 )
 
@@ -84,6 +83,10 @@ type ResponseType struct {
 	Error error
 }
 
+func (r *ResponseType) String() string {
+	return fmt.Sprintf("<Response: url=%s, data=%s, error=%v>", r.Url, string(r.Data), r.Error)
+}
+
 // UrlRequest structure holds details about url request's attributes
 type UrlRequest struct {
 	rurl string
@@ -93,7 +96,7 @@ type UrlRequest struct {
 }
 
 // FetchResponse fetches data for provided URL, args is a json dump of arguments
-func FetchResponse(rurl, args string) ResponseType {
+func FetchResponse(rurl string, args []byte) ResponseType {
 	startTime := time.Now()
 	var response ResponseType
 	response.Url = rurl
@@ -102,22 +105,29 @@ func FetchResponse(rurl, args string) ResponseType {
 		return response
 	}
 	var req *http.Request
+	var e error
 	if len(args) > 0 {
-		jsonStr := []byte(args)
-		req, _ = http.NewRequest("POST", rurl, bytes.NewBuffer(jsonStr))
+		req, e = http.NewRequest("POST", rurl, bytes.NewBuffer(args))
 		req.Header.Set("Content-Type", "application/json")
 	} else {
-		req, _ = http.NewRequest("GET", rurl, nil)
-		req.Header.Add("Accept-Encoding", "identity")
-		if strings.Contains(rurl, "sitedb") || strings.Contains(rurl, "reqmgr") {
-			req.Header.Add("Accept", "application/json")
+		req, e = http.NewRequest("GET", rurl, nil)
+		if e != nil {
+			fmt.Println("Unable to make GET request", e)
 		}
+		req.Header.Add("Accept", "*/*")
 	}
 	if VERBOSE > 1 {
 		dump1, err1 := httputil.DumpRequestOut(req, true)
 		fmt.Println("### HTTP request", req, string(dump1), err1)
 	}
 	resp, err := client.Do(req)
+	if VERBOSE > 0 {
+		if len(args) > 0 {
+			fmt.Println("TRANSFER2GO POST", rurl, string(args), err, time.Now().Sub(startTime))
+		} else {
+			fmt.Println("TRANSFER2GO GET", rurl, string(args), err, time.Now().Sub(startTime))
+		}
+	}
 	if VERBOSE > 1 {
 		dump2, err2 := httputil.DumpResponse(resp, true)
 		fmt.Println("### HTTP response", string(dump2), err2)
@@ -131,18 +141,11 @@ func FetchResponse(rurl, args string) ResponseType {
 	if err != nil {
 		response.Error = err
 	}
-	if VERBOSE > 0 {
-		if args == "" {
-			fmt.Println("TRANSFER2GO GET", rurl, time.Now().Sub(startTime))
-		} else {
-			fmt.Println("TRANSFER2GO POST", rurl, args, time.Now().Sub(startTime))
-		}
-	}
 	return response
 }
 
 // Fetch data for provided URL and redirect results to given channel
-func Fetch(rurl string, args string, ch chan<- ResponseType) {
+func Fetch(rurl string, args []byte, ch chan<- ResponseType) {
 	urlRetry := 3
 	var resp, r ResponseType
 	resp = FetchResponse(rurl, args)

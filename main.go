@@ -16,6 +16,13 @@ import (
 func main() {
 	var agent string
 	flag.StringVar(&agent, "agent", "", "Remote agent end-point")
+	pwd, err := os.Getwd()
+	if err != nil {
+		fmt.Errorf("Unable to get current directory, error=%v\n", err)
+		os.Exit(1)
+	}
+	var catalog string
+	flag.StringVar(&catalog, "catalog", pwd, "Agent catalog, e.g. dir name or DB uri")
 	var status bool
 	flag.BoolVar(&status, "status", false, "Return status info about the agent")
 	var src string
@@ -24,24 +31,37 @@ func main() {
 	flag.StringVar(&dst, "dst", "", "Destination end-point")
 	var register string
 	flag.StringVar(&register, "register", "", "Registration end-point")
-	var uri string
-	flag.StringVar(&uri, "uri", "", "Server end-point URI, e.g. localhost:8989")
+	var url string
+	flag.StringVar(&url, "url", "", "Server end-point url, e.g. https://a.b.com/transfer2go")
+	var port string
+	flag.StringVar(&port, "port", "", "Server port number, default 8989")
+	var alias string
+	flag.StringVar(&alias, "alias", makeSiteName(), "Server alias name, e.g. T3_US_Name")
 	var interval int64
-	flag.Int64Var(&interval, "interval", 60, "Server metrics interval, default 60 seconds")
+	flag.Int64Var(&interval, "interval", 600, "Server metrics interval, default 600 seconds")
 	var verbose int
 	flag.IntVar(&verbose, "verbose", 0, "Verbosity level, default 0")
 	flag.Parse()
 	checkX509()
-	if uri != "" {
-		server.Server(uri, register, interval)
+	client.VERBOSE = verbose
+	if url != "" {
+		server.Server(port, url, alias, register, catalog, interval)
 	} else {
-		client.VERBOSE = verbose
 		if status {
 			client.Status(agent)
 		} else {
 			client.Process(agent, src, dst)
 		}
 	}
+}
+
+// helper function to construct site name
+func makeSiteName() string {
+	host, err := os.Hostname()
+	if err != nil {
+		panic(fmt.Sprintf("Unable to get hostname, error=%v", err))
+	}
+	return fmt.Sprintf("T4_%s_%v", host, os.Getuid())
 }
 
 // helper function to check X509 settings

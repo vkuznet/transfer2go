@@ -4,7 +4,10 @@
 package server
 
 import (
+	//     "bytes"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -19,9 +22,19 @@ import (
 // profiler, see https://golang.org/pkg/net/http/pprof/
 import _ "net/http/pprof"
 
-// globals
-var _myself string
-var _agents []string
+// AgentInfo type
+type AgentInfo struct {
+	Agent string
+	Alias string
+}
+
+// Catalog type
+type Catalog struct {
+	Type     string `json:type`
+	Uri      string `json:uri`
+	Login    string `json:login`
+	Password string `json:password`
+}
 
 // Metrics of the agent
 type Metrics struct {
@@ -32,66 +45,81 @@ type Metrics struct {
 // ServerMetrics defines various metrics about the agent
 var ServerMetrics Metrics
 
-// StatusHandler provides information about the agent
-func StatusHandler(w http.ResponseWriter, r *http.Request) {
+// globals
+var _myself, _alias string
+var _agents map[string]string
+var _catalog Catalog
 
-	if r.Method != "GET" {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
-	w.WriteHeader(http.StatusOK)
-	msg := fmt.Sprintf("Status content: %v\nagents: %v\n", time.Now(), _agents)
-	w.Write([]byte(msg))
+// init
+func init() {
+	_agents = make(map[string]string)
 }
 
 // register a new agent
-func register(agent string) error {
-	log.Printf("Register %s\n", agent)
-	// add given agent to internal list of agents
-	_agents = append(_agents, agent)
+func register(register, alias, agent string) error {
+	log.Printf("Register %s as %s on %s\n", agent, alias, register)
 	// register myself with another agent
-	url := fmt.Sprintf("%s/register?agent=%s", agent, _myself)
-	resp := client.FetchResponse(url, "")
+	params := AgentInfo{Agent: _myself, Alias: _alias}
+	data, err := json.Marshal(params)
+	if err != nil {
+		log.Println("ERROR, unable to marshal params %v", params)
+	}
+	url := fmt.Sprintf("%s/register", register)
+	resp := client.FetchResponse(url, data) // POST request
 	return resp.Error
 }
 
-// RegisterHandler registers current agent with another one
-func RegisterHandler(w http.ResponseWriter, r *http.Request) {
-
-	if r.Method != "GET" {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
-	uri := r.FormValue("agent")  // read agent parameter value
-	err := register(string(uri)) // perform agent registration
-	if err != nil {
-		// the order is important we first need to write header and then (!!!) the body
-		// see http://stackoverflow.com/questions/27972715/multiple-response-writeheader-calls-in-really-simple-example
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Unable to regiser uri"))
-		return
-	}
-	w.WriteHeader(http.StatusOK)
-}
-
 // Server implementation
-func Server(agent, aName string, interval int64) {
-	log.Printf("Start agent %s", agent)
-	arr := strings.Split(agent, ":")
-	base := arr[0]
-	port := arr[1]
-	if base != "" {
-		base = fmt.Sprintf("/%s", base)
+func Server(port, url, alias, aName, catalog string, interval int64) {
+	_myself = url
+	_alias = alias
+	arr := strings.Split(url, "/")
+	base := ""
+	if len(arr) > 3 {
+		base = fmt.Sprintf("/%s", strings.Join(arr[3:], "/"))
 	}
-	hostname, e := os.Hostname()
-	if e != nil {
-		log.Fatalf("Unable to get hostname, error=%v\n", e)
-	}
-	_myself = fmt.Sprintf("http://%s%s:%s", hostname, base, port)
+	log.Printf("Start agent: url=%s, port=%s, base=%s", url, port, base)
+
+	// register self agent URI in remote agent and vice versa
+	_agents[_alias] = _myself
+
 	if aName != "" {
-		register(aName) // submit remote registration of given agent name
+		register(aName, _alias, _myself) // submit remote registration of given agent name
 	}
+
+	// now ask remote server for its list of agents and update internal map
+	if len(aName) > 0 {
+		aurl := fmt.Sprintf("%s/agents", aName)
+		resp := client.FetchResponse(aurl, []byte{})
+		var remoteAgents map[string]string
+		e := json.Unmarshal(resp.Data, &remoteAgents)
+		if e == nil {
+			for key, val := range remoteAgents {
+				if _, ok := _agents[key]; !ok {
+					_agents[key] = val // register remote agent/alias pair internally
+				}
+			}
+		}
+	}
+
+	// define catalog
+	if stat, err := os.Stat(catalog); err == nil && stat.IsDir() {
+		_catalog = Catalog{Type: "filesystem", Uri: catalog}
+	} else {
+		c, e := ioutil.ReadFile(catalog)
+		if e != nil {
+			log.Fatalf("Unable to read catalog file, error=%v\n", err)
+		}
+		err := json.Unmarshal([]byte(c), &_catalog)
+		if err != nil {
+			log.Fatalf("Unable to parse catalog JSON file, error=%v\n", err)
+		}
+	}
+	log.Println("Catalog", _catalog)
+
+	// define handlers
 	http.HandleFunc(fmt.Sprintf("%s/status", base), StatusHandler)
+	http.HandleFunc(fmt.Sprintf("%s/agents", base), AgentsHandler)
 	http.HandleFunc(fmt.Sprintf("%s/register", base), RegisterHandler)
 	http.HandleFunc(fmt.Sprintf("%s/", base), RequestHandler)
 

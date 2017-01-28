@@ -16,7 +16,7 @@ func Process(agent, src, dst string) error {
 }
 
 func Status(agent string) error {
-	resp := FetchResponse(agent+"/status", "")
+	resp := FetchResponse(agent+"/status", []byte{})
 	fmt.Println("### Status", agent, string(resp.Data))
 	return resp.Error
 }
