@@ -41,11 +41,10 @@ type TransferRequest struct {
 
 // Method to do a job on payload
 func (t *TransferRequest) Run() error {
-	interval := time.Duration(RAND.Int63n(10)) * time.Second
-	// Usage example
+	interval := time.Duration(t.Latency) * time.Second
 	request := Decorate(DefaultProcessor,
-		Pause(interval),
-		Logging(log.New(os.Stdout, "request: ", log.LstdFlags)),
+		Pause(interval), // will pause a given request for a given interval
+		Transfer(),
 	)
 	request.Process(t)
 	return nil

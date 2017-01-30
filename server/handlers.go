@@ -93,7 +93,9 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer r.Body.Close()
-	log.Println("RequestHandler received request", r)
+	if client.VERBOSE > 0 {
+		log.Println("RequestHandler received request", r)
+	}
 
 	// Read the body into a string for json decoding
 	var content = &model.TransferCollection{}

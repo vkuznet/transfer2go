@@ -36,6 +36,18 @@ func (f RequestFunc) Process(t *TransferRequest) error {
 // Decorator wraps a request with extra behavior
 type Decorator func(Request) Request
 
+// Transfer returns a Decorator that performs request transfers
+func Transfer() Decorator {
+	return func(r Request) Request {
+		return RequestFunc(func(t *TransferRequest) error {
+			// TODO: main Transfer logic would be implemented here
+			// so far we call simple log.Println and later we'll transfer the request here
+			log.Println("Transfer", t) // REPLACE WITH ACTUAL CODE
+			return r.Process(t)
+		})
+	}
+}
+
 // Logging returns a Decorator that logs client requests
 func Logging(l *log.Logger) Decorator {
 	return func(r Request) Request {
@@ -50,8 +62,10 @@ func Logging(l *log.Logger) Decorator {
 func Pause(interval time.Duration) Decorator {
 	return func(r Request) Request {
 		return RequestFunc(func(t *TransferRequest) error {
-			log.Println("TransferRequest", t, "is paused by", interval)
-			time.Sleep(interval)
+			if interval > 0 {
+				log.Println("TransferRequest", t, "is paused by", interval)
+				time.Sleep(interval)
+			}
 			return r.Process(t)
 		})
 	}
