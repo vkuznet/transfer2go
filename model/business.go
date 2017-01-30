@@ -1,19 +1,15 @@
+package model
+
 // transfer2go data model module
 // Copyright (c) 2017 - Valentin Kuznetsov <vkuznet@gmail.com>
-//
-package model
 
 import (
 	"fmt"
 	"github.com/rcrowley/go-metrics"
 	"log"
-	"math/rand"
 	"os"
 	"time"
 )
-
-// a random number generator
-var RAND *rand.Rand
 
 // Metrics of the agent
 type Metrics struct {
@@ -55,7 +51,7 @@ type Job struct {
 	TransferRequest TransferRequest
 }
 
-// A buffered channel that we can send work requests on.
+// JobQueue is a buffered channel that we can send work requests on.
 var JobQueue chan Job
 
 // Worker represents the worker that executes the job
@@ -66,6 +62,7 @@ type Worker struct {
 	quit       chan bool
 }
 
+// NewWorker return a new instance of the Worker type
 func NewWorker(wid int, jobPool chan chan Job) Worker {
 	return Worker{
 		Id:         wid,
@@ -112,6 +109,7 @@ type Dispatcher struct {
 	MaxWorkers int
 }
 
+// NewDispatcher returns new instance of Dispatcher type
 func NewDispatcher(maxWorkers, maxQueue int, mfile string, minterval int64) *Dispatcher {
 	// register metrics
 	f, e := os.OpenFile(mfile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
@@ -135,10 +133,10 @@ func NewDispatcher(maxWorkers, maxQueue int, mfile string, minterval int64) *Dis
 	// define pool of workers and jobqueue
 	pool := make(chan chan Job, maxWorkers)
 	JobQueue = make(chan Job, maxQueue)
-	RAND = rand.New(rand.NewSource(99))
 	return &Dispatcher{JobPool: pool, MaxWorkers: maxWorkers}
 }
 
+// Run function starts the worker and dispatch it as go-routine
 func (d *Dispatcher) Run() {
 	// starting n number of workers
 	for i := 0; i < d.MaxWorkers; i++ {

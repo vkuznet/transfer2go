@@ -1,7 +1,7 @@
+package model
+
 // transfer2go data model implementation
 // Copyright (c) 2017 - Valentin Kuznetsov <vkuznet@gmail.com>
-//
-package model
 
 import (
 	"log"
@@ -18,6 +18,7 @@ func (e *Processor) Process(t *TransferRequest) error {
 	return nil
 }
 
+// DefaultProcess is a default processor instance
 var DefaultProcessor = &Processor{}
 
 // Request interface defines a task process

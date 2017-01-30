@@ -1,8 +1,9 @@
+package client
+
 // transfer2go/client - Go implementation transfer2go client
 //
 // Copyright (c) 2017 - Valentin Kuznetsov <vkuznet@gmail.com>
 //
-package client
 
 import (
 	"crypto/sha256"
@@ -17,6 +18,7 @@ import (
 	"github.com/vkuznet/transfer2go/model"
 )
 
+// VERBOSE variable control verbosity level of client's utilities
 var VERBOSE int
 
 // TransferData struct holds all attributes of transfering data, such as name, checksum, data, etc.
@@ -113,7 +115,7 @@ func Transfer(agent, src, dst string) error {
 	return resp.Error
 }
 
-// Transfer client function is responsible to initiate transfer request from
+// TransferClientBased function is responsible to initiate transfer request from
 // source to destination. So far I wrote code for transfer implementation
 // on a client side, but this code should be move to a server side.
 // TODO: I need to compose a TransferData JSON
@@ -185,6 +187,7 @@ func TransferClientBased(agent, src, dst string) error {
 	return resp.Error
 }
 
+// Status function provides status about given agent
 func Status(agent string) error {
 	resp := FetchResponse(agent+"/status", []byte{})
 	fmt.Println("### Status", agent, string(resp.Data))
