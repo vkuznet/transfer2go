@@ -26,13 +26,13 @@ var AgentMetrics Metrics
 
 // TransferCollection holds data about transfer requests
 type TransferCollection struct {
-	Version  string            `json:"version"`
-	Requests []TransferRequest `json:"data"`
-	//     Requests []string `json:"data"`
+	TimeStamp int64             `json:"ts"`
+	Requests  []TransferRequest `json:"data"`
 }
 
 // TransferRequest
 type TransferRequest struct {
+	TimeStamp   int64  `json:"ts"`
 	File        string `json:"file"`
 	Source      string `json:"source"`
 	Destination string `json:"destination"`

@@ -12,6 +12,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"time"
 
 	"github.com/vkuznet/transfer2go/model"
 )
@@ -95,13 +96,16 @@ func Transfer(agent, src, dst string) error {
 	// form transfer request
 	source := fmt.Sprintf("%s:%s", agentAlias, agent)
 	destination := fmt.Sprintf("%s:%s", dst, dstUrl)
-	var request []model.TransferRequest
+	var requests []model.TransferRequest
 	for _, fname := range files {
-		request = append(request, model.TransferRequest{Source: source, Destination: destination, File: fname})
+		ts := time.Now().Unix()
+		requests = append(requests, model.TransferRequest{Source: source, Destination: destination, File: fname, TimeStamp: ts})
 	}
+	ts := time.Now().Unix()
+	transferCollection := model.TransferCollection{TimeStamp: ts, Requests: requests}
 
 	url = fmt.Sprintf("%s", dstUrl)
-	d, e := json.Marshal(request)
+	d, e := json.Marshal(transferCollection)
 	if e != nil {
 		return e
 	}
