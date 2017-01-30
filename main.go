@@ -52,7 +52,11 @@ func main() {
 		if status {
 			client.Status(agent)
 		} else {
-			client.Process(agent, src, dst)
+			err := client.Transfer(agent, src, dst)
+			if err != nil {
+				fmt.Printf("Unable to transfer %s/%s to %s", agent, src, dst)
+				os.Exit(1)
+			}
 		}
 	}
 }

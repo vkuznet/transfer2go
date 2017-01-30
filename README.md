@@ -106,3 +106,33 @@ transfer2go -agent http://fnal.gov -status
 # will shutdown a given agent
 transfer2go -agent T1_CH_CERN -shutdown
 ```
+
+## Dependencies
+transfer2go depends on few packages:
+- go get github.com/vkuznet/x509proxy # provides x509 support
+- go get github.com/buger/jsonparser # provides fast json parser
+- go get github.com/pkg/profile # provides profile info
+- go get github.com/rcrowley/go-metrics # provides various metrics
+- go get github.com/go-sql-driver/mysql # MySQL driver
+- go get github.com/mattn/go-sqlite3 # SQLiteDB driver
+- go get gopkg.in/rana/ora.v3 # ORACLE driver
+
+
+### Installation instruction for ora Oracle driver
+
+- Download oracle client libraries and sdk from Oracle web site
+- Setup the environment and build ora.v3 package
+```
+export CGO_CFLAGS=-I/path/Oracle/instantclient_12_1/sdk/include
+# for Linux
+export CGO_LDFLAGS="-L/path/Oracle/instantclient_12_1/ -locci -lclntsh -lipc1 -lmql1 -lnnz12 -lclntshcore -lons"
+# for OSX
+export CGO_LDFLAGS="-L/opt/Oracle/instantclient_11_2/ -locci -lclntsh -lnnz11"
+go get gopkg.in/rana/ora.v3
+```
+
+To use this driver we define dbfile with *ora* entry
+```
+ora oracleLogin/oraclePassword@DB
+```
+

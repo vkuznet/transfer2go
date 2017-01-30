@@ -4,7 +4,7 @@
 package server
 
 import (
-	//     "bytes"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/rcrowley/go-metrics"
 	"github.com/vkuznet/transfer2go/client"
 )
@@ -34,6 +35,43 @@ type Catalog struct {
 	Uri      string `json:uri`
 	Login    string `json:login`
 	Password string `json:password`
+}
+
+func filePath(idir, fname string) string {
+	return fmt.Sprintf("%s/%s", idir, fname)
+}
+
+// Files method of catalog returns list of files known in catalog
+func (c *Catalog) Files(pattern string) []string {
+	var files []string
+	if c.Type == "filesystem" {
+		filesInfo, err := ioutil.ReadDir(c.Uri)
+		if err != nil {
+			log.Println("ERROR: unable to list files in catalog", c.Uri, err)
+			return []string{}
+		}
+		for _, f := range filesInfo {
+			if pattern != "" {
+				if strings.Contains(f.Name(), pattern) {
+					files = append(files, filePath(c.Uri, f.Name()))
+				}
+			} else {
+				files = append(files, filePath(c.Uri, f.Name()))
+			}
+		}
+		return files
+	} else if c.Type == "sqlitedb" {
+		db, err := sql.Open(c.Type, c.Uri)
+		defer db.Close()
+		if err != nil {
+			log.Println("ERROR: unable to list files in catalog", c.Uri, err)
+			return []string{}
+		}
+		db.SetMaxOpenConns(100)
+		db.SetMaxIdleConns(100)
+		return files
+	}
+	return files
 }
 
 // Metrics of the agent
@@ -130,6 +168,8 @@ func Server(port, url, alias, aName, catalog, mfile string, minterval int64) {
 	http.HandleFunc(fmt.Sprintf("%s/status", base), StatusHandler)
 	http.HandleFunc(fmt.Sprintf("%s/agents", base), AgentsHandler)
 	http.HandleFunc(fmt.Sprintf("%s/register", base), RegisterHandler)
+	http.HandleFunc(fmt.Sprintf("%s/files", base), FilesHandler)
+	http.HandleFunc(fmt.Sprintf("%s/transfer", base), TransferHandler)
 	http.HandleFunc(fmt.Sprintf("%s/", base), RequestHandler)
 
 	// register metrics
