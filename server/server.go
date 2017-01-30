@@ -18,10 +18,10 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/vkuznet/transfer2go/client"
 	"github.com/vkuznet/transfer2go/model"
-)
 
-// _ "net/http/pprof" is a web profiler, see https://golang.org/pkg/net/http/pprof
-import _ "net/http/pprof"
+	// web profiler, see https://golang.org/pkg/net/http/pprof
+	_ "net/http/pprof"
+)
 
 // AgentInfo type
 type AgentInfo struct {
