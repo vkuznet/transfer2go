@@ -1,20 +1,28 @@
-// transfer2go agent server implementation
+// transfer2go data model module
 // Copyright (c) 2017 - Valentin Kuznetsov <vkuznet@gmail.com>
 //
-package server
+package model
 
 import (
-	"encoding/json"
-	//     "io"
+	"fmt"
+	"github.com/rcrowley/go-metrics"
 	"log"
 	"math/rand"
-	"net/http"
 	"os"
 	"time"
 )
 
 // a random number generator
 var RAND *rand.Rand
+
+// Metrics of the agent
+type Metrics struct {
+	Meter        metrics.Meter
+	WorkerMeters []metrics.Meter
+}
+
+// AgentMetrics defines various metrics about the agent work
+var AgentMetrics Metrics
 
 // TransferCollection holds data about transfer requests
 type TransferCollection struct {
@@ -77,7 +85,7 @@ func (w Worker) Start() {
 
 			select {
 			case job := <-w.JobChannel:
-				ServerMetrics.WorkerMeters[w.Id].Mark(1)
+				AgentMetrics.WorkerMeters[w.Id].Mark(1)
 				// we have received a work request.
 				if err := job.TransferRequest.Run(); err != nil {
 					log.Println("Error in job.TransferRequest.Run:", err.Error())
@@ -105,7 +113,27 @@ type Dispatcher struct {
 	MaxWorkers int
 }
 
-func NewDispatcher(maxWorkers, maxQueue int) *Dispatcher {
+func NewDispatcher(maxWorkers, maxQueue int, mfile string, minterval int64) *Dispatcher {
+	// register metrics
+	f, e := os.OpenFile(mfile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if e != nil {
+		log.Fatalf("error opening file: %v", e)
+	}
+	defer f.Close()
+
+	r := metrics.DefaultRegistry
+	m := metrics.GetOrRegisterMeter("requests", r)
+	go metrics.Log(r, time.Duration(minterval)*time.Second, log.New(f, "metrics: ", log.Lmicroseconds))
+
+	// define agent metrics
+	var workerMeters []metrics.Meter
+	for i := 0; i < maxWorkers; i++ {
+		wm := metrics.GetOrRegisterMeter(fmt.Sprintf("worker_%d", i), r)
+		workerMeters = append(workerMeters, wm)
+	}
+	AgentMetrics = Metrics{Meter: m, WorkerMeters: workerMeters}
+
+	// define pool of workers and jobqueue
 	pool := make(chan chan Job, maxWorkers)
 	JobQueue = make(chan Job, maxQueue)
 	RAND = rand.New(rand.NewSource(99))
@@ -116,7 +144,7 @@ func (d *Dispatcher) Run() {
 	// starting n number of workers
 	for i := 0; i < d.MaxWorkers; i++ {
 		worker := NewWorker(i, d.JobPool)
-		ServerMetrics.WorkerMeters[i].Mark(0)
+		AgentMetrics.WorkerMeters[i].Mark(0)
 		worker.Start()
 	}
 
@@ -127,7 +155,7 @@ func (d *Dispatcher) dispatch() {
 	for {
 		select {
 		case job := <-JobQueue:
-			ServerMetrics.Meter.Mark(1)
+			AgentMetrics.Meter.Mark(1)
 			// a job request has been received
 			go func(job Job) {
 				// try to obtain a worker job channel that is available.
@@ -141,38 +169,4 @@ func (d *Dispatcher) dispatch() {
 			time.Sleep(time.Duration(10) * time.Millisecond) // wait for a job
 		}
 	}
-}
-
-// TransferRequest
-func RequestHandler(w http.ResponseWriter, r *http.Request) {
-
-	if r.Method != "POST" {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
-	defer r.Body.Close()
-	log.Println("RequestHandler received request", r)
-
-	// Read the body into a string for json decoding
-	var content = &TransferCollection{}
-	//     err := json.NewDecoder(io.LimitReader(r.Body, MaxLength)).Decode(&content)
-	err := json.NewDecoder(r.Body).Decode(&content)
-	if err != nil {
-		log.Println("ERROR RequestHandler unable to decode TransferCollection", err)
-		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	// Go through each payload and queue items individually to run job over the payload
-	for _, rdoc := range content.Requests {
-
-		// let's create a job with the payload
-		work := Job{TransferRequest: rdoc}
-
-		// Push the work onto the queue.
-		JobQueue <- work
-	}
-
-	w.WriteHeader(http.StatusOK)
 }

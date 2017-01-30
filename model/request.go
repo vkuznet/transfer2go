@@ -1,7 +1,7 @@
-// transfer2go agent server implementation
+// transfer2go data model implementation
 // Copyright (c) 2017 - Valentin Kuznetsov <vkuznet@gmail.com>
 //
-package server
+package model
 
 import (
 	"log"

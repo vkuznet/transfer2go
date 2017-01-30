@@ -52,7 +52,8 @@ func main() {
 		if status {
 			client.Status(agent)
 		} else {
-			err := client.Transfer(agent, src, dst)
+			// TODO: replace TransferClientBased to Transfer (which is server based one)
+			err := client.TransferClientBased(agent, src, dst)
 			if err != nil {
 				fmt.Printf("Unable to transfer %s/%s to %s", agent, src, dst)
 				os.Exit(1)

@@ -13,11 +13,10 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/rcrowley/go-metrics"
 	"github.com/vkuznet/transfer2go/client"
+	"github.com/vkuznet/transfer2go/model"
 )
 
 // profiler, see https://golang.org/pkg/net/http/pprof/
@@ -42,6 +41,8 @@ func filePath(idir, fname string) string {
 }
 
 // Files method of catalog returns list of files known in catalog
+// TODO: implement sqlitedb catalog logic, e.g. we need to make
+// a transfer and then record in DB catalog file's hash and transfer details
 func (c *Catalog) Files(pattern string) []string {
 	var files []string
 	if c.Type == "filesystem" {
@@ -73,15 +74,6 @@ func (c *Catalog) Files(pattern string) []string {
 	}
 	return files
 }
-
-// Metrics of the agent
-type Metrics struct {
-	Meter        metrics.Meter
-	WorkerMeters []metrics.Meter
-}
-
-// ServerMetrics defines various metrics about the agent
-var ServerMetrics Metrics
 
 // globals used in server/handlers
 var _myself, _alias string
@@ -169,42 +161,23 @@ func Server(port, url, alias, aName, catalog, mfile string, minterval int64) {
 	http.HandleFunc(fmt.Sprintf("%s/agents", base), AgentsHandler)
 	http.HandleFunc(fmt.Sprintf("%s/register", base), RegisterHandler)
 	http.HandleFunc(fmt.Sprintf("%s/files", base), FilesHandler)
-	http.HandleFunc(fmt.Sprintf("%s/transfer", base), TransferHandler)
+	http.HandleFunc(fmt.Sprintf("%s/transfer", base), TransferClientBasedHandler)
 	http.HandleFunc(fmt.Sprintf("%s/", base), RequestHandler)
 
-	// register metrics
-	f, e := os.OpenFile(mfile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	if e != nil {
-		log.Fatalf("error opening file: %v", e)
-	}
-	defer f.Close()
-
-	r := metrics.DefaultRegistry
-	m := metrics.GetOrRegisterMeter("requests", r)
-	go metrics.Log(r, time.Duration(minterval)*time.Second, log.New(f, "metrics: ", log.Lmicroseconds))
-
-	// start dispatcher for incoming requests
-	var workerMeters []metrics.Meter
-	var maxWorker, maxQueue int
+	// define size of workers and queue, I may read it from input parameters later
+	var maxWorkers, maxQueue int
 	var err error
-	maxWorker, err = strconv.Atoi(os.Getenv("MAX_WORKERS"))
+	maxWorkers, err = strconv.Atoi(os.Getenv("MAX_WORKERS"))
 	if err != nil {
-		maxWorker = 10
+		maxWorkers = 10
 	}
 	maxQueue, err = strconv.Atoi(os.Getenv("MAX_QUEUE"))
 	if err != nil {
 		maxQueue = 100
 	}
-
-	for i := 0; i < maxWorker; i++ {
-		wm := metrics.GetOrRegisterMeter(fmt.Sprintf("worker_%d", i), r)
-		workerMeters = append(workerMeters, wm)
-	}
-	ServerMetrics = Metrics{Meter: m, WorkerMeters: workerMeters}
-
-	dispatcher := NewDispatcher(maxWorker, maxQueue)
+	dispatcher := model.NewDispatcher(maxWorkers, maxQueue, mfile, minterval)
 	dispatcher.Run()
-	log.Println("Start dispatcher with", maxWorker, "workers, queue size", maxQueue)
+	log.Println("Start dispatcher with", maxWorkers, "workers, queue size", maxQueue)
 
 	// start server
 	err = http.ListenAndServe(":"+port, nil)
