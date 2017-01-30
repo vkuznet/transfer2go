@@ -31,10 +31,10 @@ type AgentInfo struct {
 
 // Catalog type
 type Catalog struct {
-	Type     string `json:type`
-	Uri      string `json:uri`
-	Login    string `json:login`
-	Password string `json:password`
+	Type     string `json:"type"`
+	Uri      string `json:"uri"`
+	Login    string `json:"login"`
+	Password string `json:"password"`
 }
 
 func filePath(idir, fname string) string {

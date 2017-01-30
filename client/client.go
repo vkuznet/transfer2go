@@ -23,12 +23,12 @@ var VERBOSE int
 
 // TransferData struct holds all attributes of transfering data, such as name, checksum, data, etc.
 type TransferData struct {
-	Source      string `json:source`
-	Destination string `json:destination`
-	Name        string `json:name`
-	Data        []byte `json:data`
-	Hash        string `json:hash`
-	Bytes       int64  `json:bytes`
+	Source      string `json:"source"`
+	Destination string `json:"destination"`
+	Name        string `json:"name"`
+	Data        []byte `json:"data"`
+	Hash        string `json:"hash"`
+	Bytes       int64  `json:"bytes"`
 }
 
 // Hash implements hash function for given file name, it returns a hash and number of bytes in a file

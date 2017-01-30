@@ -57,7 +57,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	var params AgentInfo
 	err := json.NewDecoder(r.Body).Decode(&params)
 	if err != nil {
-		log.Println("ERROR, RegisterHandler unable to unmarshal params %v", params)
+		log.Println("ERROR, RegisterHandler unable to unmarshal params", params)
 	}
 	agent := params.Agent
 	alias := params.Alias
@@ -135,7 +135,7 @@ func TransferClientBasedHandler(w http.ResponseWriter, r *http.Request) {
 	var transferData []client.TransferData
 	err := json.NewDecoder(r.Body).Decode(&transferData)
 	if err != nil {
-		log.Println("ERROR, TransferHandler unable to unmarshal incoming data %v", err)
+		log.Println("ERROR, TransferHandler unable to unmarshal incoming data", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}

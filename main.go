@@ -18,7 +18,7 @@ func main() {
 	flag.StringVar(&agent, "agent", "", "Remote agent end-point")
 	pwd, err := os.Getwd()
 	if err != nil {
-		fmt.Errorf("Unable to get current directory, error=%v\n", err)
+		fmt.Println("Unable to get current directory", err)
 		os.Exit(1)
 	}
 	var catalog string
