@@ -93,7 +93,7 @@ func register(register, alias, agent string) error {
 	params := AgentInfo{Agent: _myself, Alias: _alias}
 	data, err := json.Marshal(params)
 	if err != nil {
-		log.Println("ERROR, unable to marshal params %v", params)
+		log.Println("ERROR, unable to marshal params", params)
 	}
 	url := fmt.Sprintf("%s/register", register)
 	resp := client.FetchResponse(url, data) // POST request
