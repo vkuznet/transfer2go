@@ -26,7 +26,7 @@ type TransferCollection struct {
 	Requests  []TransferRequest `json:"data"`
 }
 
-// TransferRequest
+// TransferRequest data type
 type TransferRequest struct {
 	TimeStamp   int64  `json:"ts"`
 	File        string `json:"file"`
@@ -35,7 +35,7 @@ type TransferRequest struct {
 	Latency     int    `json:"latency"`
 }
 
-// Method to do a job on payload
+// Run method perform a job on transfer request
 func (t *TransferRequest) Run() error {
 	interval := time.Duration(t.Latency) * time.Second
 	request := Decorate(DefaultProcessor,
