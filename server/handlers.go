@@ -6,14 +6,16 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/vkuznet/transfer2go/client"
 	"github.com/vkuznet/transfer2go/model"
+	"github.com/vkuznet/transfer2go/utils"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"strings"
 	"time"
 )
+
+// GET methods
 
 // FilesHandler provides information about files in catalog
 func FilesHandler(w http.ResponseWriter, r *http.Request) {
@@ -23,7 +25,7 @@ func FilesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	pattern := r.FormValue("pattern")
-	files := _catalog.Files(pattern)
+	files := model.TFC.Files(pattern)
 	data, err := json.Marshal(files)
 	if err != nil {
 		log.Println("ERROR AgentsHandler", err)
@@ -45,6 +47,39 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 	msg := fmt.Sprintf("Status content: %v\nagents: %v\n", time.Now(), _agents)
 	w.Write([]byte(msg))
 }
+
+// AgentsHandler serves list of known agents
+func AgentsHandler(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != "GET" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	data, err := json.Marshal(_agents)
+	if err != nil {
+		log.Println("ERROR AgentsHandler", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	} else {
+		w.WriteHeader(http.StatusOK)
+	}
+	w.Write(data)
+}
+
+// DefaultHandler provides information about the agent
+func DefaultHandler(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != "GET" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	// TODO: implement here default page for data-service
+	// should be done via templates
+	msg := fmt.Sprintf("Default page: %v\nagents: %v\n", time.Now(), _agents)
+	w.Write([]byte(msg))
+}
+
+// POST methods
 
 // RegisterHandler registers current agent with another one
 func RegisterHandler(w http.ResponseWriter, r *http.Request) {
@@ -68,23 +103,6 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// AgentsHandler serves list of known agents
-func AgentsHandler(w http.ResponseWriter, r *http.Request) {
-
-	if r.Method != "GET" {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
-	data, err := json.Marshal(_agents)
-	if err != nil {
-		log.Println("ERROR AgentsHandler", err)
-		w.WriteHeader(http.StatusInternalServerError)
-	} else {
-		w.WriteHeader(http.StatusOK)
-	}
-	w.Write(data)
-}
-
 // RequestHandler initiate transfer work for given request
 func RequestHandler(w http.ResponseWriter, r *http.Request) {
 
@@ -93,7 +111,7 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer r.Body.Close()
-	if client.VERBOSE > 0 {
+	if utils.VERBOSE > 0 {
 		log.Println("RequestHandler received request", r)
 	}
 
@@ -120,48 +138,49 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// TransferClientBasedHandler performs file transfer
-// TODO: so far it is implementation of writing transfer chunk
-// from one end to another. Instead, TransferHandler should handle
-// transfer requests, it will get a request to transfer, the TransferData JSON
-// and fire up go-routine in worker node to initiate the transfer.
-func TransferClientBasedHandler(w http.ResponseWriter, r *http.Request) {
+// TransferDataHandler handles TransferData type received over HTTP
+func TransferDataHandler(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != "POST" {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
 	defer r.Body.Close()
-	var transferData []client.TransferData
-	err := json.NewDecoder(r.Body).Decode(&transferData)
+	var td model.TransferData
+	err := json.NewDecoder(r.Body).Decode(&td)
 	if err != nil {
 		log.Println("ERROR, TransferHandler unable to unmarshal incoming data", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	for _, chunk := range transferData {
-		arr := strings.Split(chunk.Name, "/")
+
+	// So far we call catalog.Uri to handle the file path and use simple file writer
+	// to write directly to filesystem. Instead, I need to handle data via catalog
+	if model.TFC.Type == "filesystem" {
+		arr := strings.Split(td.Name, "/")
 		fname := arr[len(arr)-1]
-		filePath := fmt.Sprintf("%s/%s", _catalog.Uri, fname)
-		err := ioutil.WriteFile(filePath, chunk.Data, 0666)
+		filePath := fmt.Sprintf("%s/%s", model.TFC.Uri, fname)
+		err := ioutil.WriteFile(filePath, td.Data, 0666)
 		if err != nil {
 			log.Println("ERROR, TransferHandler unable to write file", fname)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 		// read back the file and verify its hash
-		hash, bytes := client.Hash(filePath)
-		if hash != chunk.Hash {
-			log.Println("ERROR, TransferHandler written file has different hash", hash, chunk.Hash)
+		hash, bytes := model.Hash(filePath)
+		if hash != td.Hash {
+			log.Println("ERROR, TransferHandler written file has different hash", hash, td.Hash)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		if bytes != chunk.Bytes {
-			log.Println("ERROR, TransferHandler written file has different number of bytes", bytes, chunk.Bytes)
+		if bytes != td.Bytes {
+			log.Println("ERROR, TransferHandler written file has different number of bytes", bytes, td.Bytes)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		log.Printf("wrote %s/%s %s/%s hash=%s, bytes=%v\n", chunk.Source, fname, chunk.Destination, filePath, chunk.Hash, chunk.Bytes)
+		log.Printf("wrote %s/%s %s/%s hash=%s, bytes=%v\n", td.Source, fname, td.Destination, filePath, td.Hash, td.Bytes)
+	} else if model.TFC.Type == "sqlitedb" {
+		log.Println("Not implemented")
 	}
 	w.WriteHeader(http.StatusOK)
 }

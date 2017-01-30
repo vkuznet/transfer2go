@@ -1,4 +1,4 @@
-package client
+package utils
 
 import (
 	"bytes"
@@ -14,6 +14,9 @@ import (
 	"regexp"
 	"time"
 )
+
+// VERBOSE variable control verbosity level of client's utilities
+var VERBOSE int
 
 // client X509 certificates
 func tlsCerts() ([]tls.Certificate, error) {

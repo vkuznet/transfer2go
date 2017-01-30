@@ -4,8 +4,14 @@ package model
 // Copyright (c) 2017 - Valentin Kuznetsov <vkuznet@gmail.com>
 
 import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"log"
+	"strings"
 	"time"
+
+	"github.com/vkuznet/transfer2go/utils"
 )
 
 // Processor is an object who process' given task
@@ -44,6 +50,36 @@ func Transfer() Decorator {
 			// TODO: main Transfer logic would be implemented here
 			// so far we call simple log.Println and later we'll transfer the request here
 			log.Println("Transfer", t) // REPLACE WITH ACTUAL CODE
+
+			fname, fhash, fbytes := TFC.FileInfo(t.File)
+			if TFC.Type == "filesystem" {
+				arr := strings.Split(t.Destination, ":")
+				dstUrl := arr[1]
+				// TODO: I need to change model.Hash to return []byte or Reader/Writer to
+				// properly stream data via json encoder
+				hash, b := Hash(fname)
+				if hash != fhash {
+					return fmt.Errorf("File hash mismatch")
+				}
+				if b != fbytes {
+					return fmt.Errorf("File bytes mismatch")
+				}
+				data, err := ioutil.ReadFile(fname)
+				if err != nil {
+					return err
+				}
+				url := fmt.Sprintf("%s/transfer", dstUrl)
+				td := TransferData{Name: fname, Data: data, Hash: hash, Bytes: b, Source: t.Source, Destination: t.Destination}
+				d, e := json.Marshal(td)
+				if e != nil {
+					return e
+				}
+				resp := utils.FetchResponse(url, d)
+				return resp.Error
+			} else if TFC.Type == "sqlitedb" {
+				log.Println("Not Implemented Yet")
+			}
+
 			return r.Process(t)
 		})
 	}

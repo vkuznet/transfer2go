@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/vkuznet/transfer2go/client"
 	"github.com/vkuznet/transfer2go/server"
+	"github.com/vkuznet/transfer2go/utils"
 	"os"
 	"os/user"
 )
@@ -45,15 +46,15 @@ func main() {
 	flag.IntVar(&verbose, "verbose", 0, "Verbosity level")
 	flag.Parse()
 	checkX509()
-	client.VERBOSE = verbose
+	utils.VERBOSE = verbose
 	if url != "" {
 		server.Server(port, url, alias, register, catalog, mfile, minterval)
 	} else {
 		if status {
 			client.Status(agent)
 		} else {
-			// TODO: replace TransferClientBased to Transfer (which is server based one)
-			//             err := client.TransferClientBased(agent, src, dst)
+			// TODO: replace TransferData to Transfer (which is server based one)
+			//             err := client.TransferData(agent, src, dst)
 			err := client.Transfer(agent, src, dst)
 			if err != nil {
 				fmt.Printf("Unable to transfer %s/%s to %s", agent, src, dst)
