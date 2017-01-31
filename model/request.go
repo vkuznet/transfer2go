@@ -8,10 +8,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"sync/atomic"
 	"time"
 
 	"github.com/vkuznet/transfer2go/utils"
 )
+
+// TransferCounter is a global atomic counter which keep tracks of transfers in the agent
+var TransferCounter int32
 
 // Processor is an object who process' given task
 // The logic of the Processor should be implemented.
@@ -46,6 +50,8 @@ type Decorator func(Request) Request
 func Transfer() Decorator {
 	return func(r Request) Request {
 		return RequestFunc(func(t *TransferRequest) error {
+			// increment number of transfers
+			atomic.AddInt32(&TransferCounter, 1)
 			// TODO: main Transfer logic would be implemented here
 			// so far we call simple log.Println and later we'll transfer the request here
 			log.Println("Transfer", t) // REPLACE WITH ACTUAL CODE
@@ -74,6 +80,9 @@ func Transfer() Decorator {
 			} else if TFC.Type == "sqlitedb" {
 				log.Println("Not Implemented Yet")
 			}
+
+			// if transfer is successfull decrement transfer counter
+			atomic.AddInt32(&TransferCounter, -1)
 
 			return r.Process(t)
 		})

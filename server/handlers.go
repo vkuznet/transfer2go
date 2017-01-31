@@ -43,9 +43,15 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
-	msg := fmt.Sprintf("Status content: %v\nagents: %v\n", time.Now(), _agents)
-	w.Write([]byte(msg))
+	astats := AgentStatus{Catalog: model.TFC.Type, Name: _alias, Url: _myself, Protocol: _protocol, Backend: _backend, Tool: _tool, TransferCounter: model.TransferCounter, Agents: _agents, TimeStamp: time.Now().Unix()}
+	data, err := json.Marshal(astats)
+	if err != nil {
+		log.Println("ERROR AgentsHandler", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	} else {
+		w.WriteHeader(http.StatusOK)
+	}
+	w.Write(data)
 }
 
 // AgentsHandler serves list of known agents
@@ -96,11 +102,14 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	agent := params.Agent
 	alias := params.Alias
-	if _, ok := _agents[alias]; !ok {
+	if aurl, ok := _agents[alias]; ok {
+		msg := fmt.Sprintf("Agent %s already exists in agent map at %s, %v\n", alias, aurl, _agents)
+		w.WriteHeader(http.StatusConflict)
+		w.Write([]byte(msg))
+	} else {
 		_agents[alias] = agent // register given agent/alias pair internally
+		w.WriteHeader(http.StatusOK)
 	}
-
-	w.WriteHeader(http.StatusOK)
 }
 
 // RequestHandler initiate transfer work for given request

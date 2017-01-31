@@ -5,25 +5,30 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"github.com/vkuznet/transfer2go/client"
 	"github.com/vkuznet/transfer2go/server"
 	"github.com/vkuznet/transfer2go/utils"
+	"io/ioutil"
 	"os"
 	"os/user"
 )
 
 func main() {
+
+	// server options
+	var port string
+	flag.StringVar(&port, "port", "8989", "server port number")
 	var agent string
-	flag.StringVar(&agent, "agent", "", "Remote agent end-point")
-	pwd, err := os.Getwd()
-	if err != nil {
-		fmt.Println("Unable to get current directory", err)
-		os.Exit(1)
-	}
-	var catalog string
-	flag.StringVar(&catalog, "catalog", pwd, "Agent catalog, e.g. dir name or DB uri")
+	flag.StringVar(&agent, "agent", "", "Remote agent registration end-point")
+	var configFile string
+	flag.StringVar(&configFile, "config", "", "Agent configuration file")
+	var verbose int
+	flag.IntVar(&verbose, "verbose", 0, "Verbosity level")
+
+	// client options
 	var status bool
 	flag.BoolVar(&status, "status", false, "Return status info about the agent")
 	var src string
@@ -32,23 +37,38 @@ func main() {
 	flag.StringVar(&dst, "dst", "", "Destination end-point")
 	var register string
 	flag.StringVar(&register, "register", "", "Registration end-point")
-	var url string
-	flag.StringVar(&url, "url", "", "Server end-point url, e.g. https://a.b.com/transfer2go")
-	var port string
-	flag.StringVar(&port, "port", "", "Server port number, default 8989")
-	var alias string
-	flag.StringVar(&alias, "alias", makeSiteName(), "Server alias name, e.g. T3_US_Name")
-	var mfile string
-	flag.StringVar(&mfile, "mfile", "metrics.log", "Server metrics file")
-	var minterval int64
-	flag.Int64Var(&minterval, "minterval", 60, "Server metrics interval")
-	var verbose int
-	flag.IntVar(&verbose, "verbose", 0, "Verbosity level")
+
 	flag.Parse()
 	checkX509()
 	utils.VERBOSE = verbose
-	if url != "" {
-		server.Server(port, url, alias, register, catalog, mfile, minterval)
+	if configFile != "" {
+		data, err := ioutil.ReadFile(configFile)
+		if err != nil {
+			fmt.Println("Unable to read", configFile, err)
+			os.Exit(1)
+		}
+		var config server.Config
+		err = json.Unmarshal(data, &config)
+		if err != nil {
+			fmt.Println("Unable to parse", configFile, err)
+			os.Exit(1)
+		}
+		if config.Catalog == "" {
+			pwd, err := os.Getwd()
+			if err != nil {
+				fmt.Println("Unable to get current directory", err)
+				os.Exit(1)
+			}
+			config.Catalog = pwd // use current directory as catalog
+		}
+		if config.Workers == 0 {
+			config.Workers = 10 // default value
+		}
+		if config.QueueSize == 0 {
+			config.QueueSize = 100 // default value
+		}
+
+		server.Server(port, config, register)
 	} else {
 		if status {
 			client.Status(agent)

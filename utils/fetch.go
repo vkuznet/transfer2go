@@ -81,9 +81,11 @@ var client = HttpClient()
 // ResponseType structure is what we expect to get for our URL call.
 // It contains a request URL, the data chunk and possible error from remote
 type ResponseType struct {
-	Url   string
-	Data  []byte
-	Error error
+	Url        string // response url
+	Data       []byte // response data, i.e. what we got with Body of the response
+	Error      error  // http error, a non-2xx return code is not an error
+	Status     string // http status string
+	StatusCode int    // http status code
 }
 
 func (r *ResponseType) String() string {
@@ -124,6 +126,8 @@ func FetchResponse(rurl string, args []byte) ResponseType {
 		fmt.Println("### HTTP request", req, string(dump1), err1)
 	}
 	resp, err := client.Do(req)
+	response.Status = resp.Status
+	response.StatusCode = resp.StatusCode
 	if VERBOSE > 0 {
 		if len(args) > 0 {
 			fmt.Println("TRANSFER2GO POST", rurl, string(args), err, time.Now().Sub(startTime))
