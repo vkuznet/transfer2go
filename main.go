@@ -8,12 +8,13 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/vkuznet/transfer2go/client"
-	"github.com/vkuznet/transfer2go/server"
-	"github.com/vkuznet/transfer2go/utils"
 	"io/ioutil"
 	"os"
 	"os/user"
+
+	"github.com/vkuznet/transfer2go/client"
+	"github.com/vkuznet/transfer2go/server"
+	"github.com/vkuznet/transfer2go/utils"
 )
 
 func main() {
@@ -66,6 +67,9 @@ func main() {
 		}
 		if config.QueueSize == 0 {
 			config.QueueSize = 100 // default value
+		}
+		if config.Protocol == "" {
+			config.Protocol = "http" // default value
 		}
 
 		server.Server(port, config, register)

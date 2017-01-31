@@ -33,10 +33,17 @@ type Config struct {
 	QueueSize int    `json:"queuesize"` // total size of the queue
 }
 
-// AgentInfo type
+// AgentInfo data type
 type AgentInfo struct {
 	Agent string
 	Alias string
+}
+
+// ProtocolInfo data type
+type AgentProtocol struct {
+	Protocol string `json:"protocol"`
+	Backend  string `json:"backend"`
+	Tool     string `json:"tool"`
 }
 
 // AgentStatus data type
@@ -151,13 +158,15 @@ func Server(port string, config Config, aName string) {
 	log.Println("Catalog", model.TFC)
 
 	// define handlers
-	http.HandleFunc(fmt.Sprintf("%s/status", base), StatusHandler)         // GET method
-	http.HandleFunc(fmt.Sprintf("%s/agents", base), AgentsHandler)         // GET method
-	http.HandleFunc(fmt.Sprintf("%s/files", base), FilesHandler)           // GET method
-	http.HandleFunc(fmt.Sprintf("%s/transfer", base), TransferDataHandler) // POST method
-	http.HandleFunc(fmt.Sprintf("%s/request", base), RequestHandler)       // POST method
-	http.HandleFunc(fmt.Sprintf("%s/register", base), RegisterHandler)     // POST method
-	http.HandleFunc(fmt.Sprintf("%s/", base), DefaultHandler)              // GET method
+	http.HandleFunc(fmt.Sprintf("%s/status", base), StatusHandler)             // GET method
+	http.HandleFunc(fmt.Sprintf("%s/agents", base), AgentsHandler)             // GET method
+	http.HandleFunc(fmt.Sprintf("%s/files", base), FilesHandler)               // GET method
+	http.HandleFunc(fmt.Sprintf("%s/reset", base), ResetHandler)               // GET method
+	http.HandleFunc(fmt.Sprintf("%s/transfer", base), TransferDataHandler)     // POST method
+	http.HandleFunc(fmt.Sprintf("%s/request", base), RequestHandler)           // POST method
+	http.HandleFunc(fmt.Sprintf("%s/register", base), RegisterAgentHandler)    // POST method
+	http.HandleFunc(fmt.Sprintf("%s/protocol", base), RegisterProtocolHandler) // POST method
+	http.HandleFunc(fmt.Sprintf("%s/", base), DefaultHandler)                  // GET method
 
 	// initialize task dispatcher
 	dispatcher := model.NewDispatcher(config.Workers, config.QueueSize, config.Mfile, config.Minterval)

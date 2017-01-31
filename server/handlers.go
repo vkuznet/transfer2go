@@ -6,13 +6,15 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/vkuznet/transfer2go/model"
-	"github.com/vkuznet/transfer2go/utils"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
+
+	"github.com/vkuznet/transfer2go/model"
+	"github.com/vkuznet/transfer2go/utils"
 )
 
 // GET methods
@@ -85,23 +87,36 @@ func DefaultHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(msg))
 }
 
+// ResetHandler resets current agent with default protocol and null backend/tool attributes
+func ResetHandler(w http.ResponseWriter, r *http.Request) {
+	_protocol = "http"
+	_backend = ""
+	_tool = ""
+	log.Printf("ResetHandler switched to protocol=%s backend=%s tool=%s\n", _protocol, _backend, _tool)
+	w.WriteHeader(http.StatusOK)
+}
+
 // POST methods
 
-// RegisterHandler registers current agent with another one
-func RegisterHandler(w http.ResponseWriter, r *http.Request) {
+// RegisterAgentHandler registers current agent with another one
+func RegisterAgentHandler(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != "POST" {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
 	defer r.Body.Close()
-	var params AgentInfo
-	err := json.NewDecoder(r.Body).Decode(&params)
+
+	var agentParams AgentInfo
+	err := json.NewDecoder(r.Body).Decode(&agentParams)
 	if err != nil {
-		log.Println("ERROR, RegisterHandler unable to unmarshal params", params)
+		log.Println("WARNING RegisterHandler unable to decode", r.Body, err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
-	agent := params.Agent
-	alias := params.Alias
+	// register another agent
+	agent := agentParams.Agent
+	alias := agentParams.Alias
 	if aurl, ok := _agents[alias]; ok {
 		msg := fmt.Sprintf("Agent %s already exists in agent map at %s, %v\n", alias, aurl, _agents)
 		w.WriteHeader(http.StatusConflict)
@@ -110,6 +125,36 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		_agents[alias] = agent // register given agent/alias pair internally
 		w.WriteHeader(http.StatusOK)
 	}
+}
+
+// RegisterProtocolHandler registers current agent with another one
+func RegisterProtocolHandler(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != "POST" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	defer r.Body.Close()
+
+	var protocolParams AgentProtocol
+	err := json.NewDecoder(r.Body).Decode(&protocolParams)
+	if err != nil {
+		log.Println("WARNING RegisterHandler unable to decode", r.Body, err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	// register another protocol for myself
+	if stat, err := os.Stat(protocolParams.Tool); err == nil && !stat.IsDir() {
+		_protocol = protocolParams.Protocol
+		_backend = protocolParams.Backend
+		_tool = protocolParams.Tool
+		log.Printf("INFO RegisterHandler switched to protocol=%s backend=%s tool=%s\n", _protocol, _backend, _tool)
+		w.WriteHeader(http.StatusOK)
+		return
+	} else {
+		log.Println("ERROR RegisterHandler", err)
+	}
+	w.WriteHeader(http.StatusInternalServerError)
 }
 
 // RequestHandler initiate transfer work for given request
