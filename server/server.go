@@ -25,7 +25,7 @@ type Config struct {
 	Url       string `json:"url"`       // agent url
 	Catalog   string `json:"catalog"`   // catalog file name, e.g. catalog.db
 	Protocol  string `json:"protocol"`  // backend protocol, e.g. srmv2
-	backend   string `json:"backend"`   // backend, e.g. srm
+	Backend   string `json:"backend"`   // backend, e.g. srm
 	Tool      string `json:"tool"`      // backend tool, e.g. srmcp
 	Mfile     string `json:"mfile"`     // metrics file name
 	Minterval int64  `json:"minterval"` // metrics interval
