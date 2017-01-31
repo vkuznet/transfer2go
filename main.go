@@ -53,8 +53,6 @@ func main() {
 		if status {
 			client.Status(agent)
 		} else {
-			// TODO: replace TransferData to Transfer (which is server based one)
-			//             err := client.TransferData(agent, src, dst)
 			err := client.Transfer(agent, src, dst)
 			if err != nil {
 				fmt.Printf("Unable to transfer %s/%s to %s", agent, src, dst)

@@ -157,7 +157,7 @@ func TransferDataHandler(w http.ResponseWriter, r *http.Request) {
 	// So far we call catalog.Uri to handle the file path and use simple file writer
 	// to write directly to filesystem. Instead, I need to handle data via catalog
 	if model.TFC.Type == "filesystem" {
-		arr := strings.Split(td.Name, "/")
+		arr := strings.Split(td.File, "/")
 		fname := arr[len(arr)-1]
 		filePath := fmt.Sprintf("%s/%s", model.TFC.Uri, fname)
 		err := ioutil.WriteFile(filePath, td.Data, 0666)
@@ -166,8 +166,8 @@ func TransferDataHandler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		// read back the file and verify its hash
-		hash, bytes := model.Hash(filePath)
+		// verify hash, bytes of transferred data
+		hash, bytes := model.Hash(td.Data)
 		if hash != td.Hash {
 			log.Println("ERROR, TransferHandler written file has different hash", hash, td.Hash)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -178,7 +178,7 @@ func TransferDataHandler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		log.Printf("wrote %s/%s %s/%s hash=%s, bytes=%v\n", td.Source, fname, td.Destination, filePath, td.Hash, td.Bytes)
+		log.Printf("wrote %s/%s %s/%s hash=%s, bytes=%v\n", td.SrcAlias, fname, td.DstAlias, filePath, td.Hash, td.Bytes)
 	} else if model.TFC.Type == "sqlitedb" {
 		log.Println("Not implemented")
 	}

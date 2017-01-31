@@ -9,7 +9,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/rcrowley/go-metrics"
-	"io"
 	"io/ioutil"
 	"log"
 	"os"
@@ -71,7 +70,11 @@ func (c *Catalog) Files(pattern string) []string {
 func (c *Catalog) FileInfo(fileEntry string) (string, string, int64) {
 	if c.Type == "filesystem" {
 		fname := fileEntry
-		hash, b := Hash(fname)
+		data, err := ioutil.ReadFile(fname)
+		if err != nil {
+			log.Println("ERROR, unable to read a file", fname, err)
+		}
+		hash, b := Hash(data)
 		return fname, hash, b
 	} else if c.Type == "sqlitedb" {
 		log.Println("Not Implemented Yet")
@@ -91,32 +94,14 @@ type Metrics struct {
 // AgentMetrics defines various metrics about the agent work
 var AgentMetrics Metrics
 
-// TransferData struct holds all attributes of transfering data, such as name, checksum, data, etc.
-type TransferData struct {
-	Source      string `json:"source"`
-	Destination string `json:"destination"`
-	Name        string `json:"name"`
-	Data        []byte `json:"data"`
-	Hash        string `json:"hash"`
-	Bytes       int64  `json:"bytes"`
-}
-
-// Hash implements hash function for given file name, it returns a hash and number of bytes in a file
-// TODO: Hash function should return hash, bytes and []byte to avoid overhead with
-// reading file multiple times
-func Hash(fname string) (string, int64) {
+// Hash implements hash function for data, it returns a hash and number of bytes
+func Hash(data []byte) (string, int64) {
 	hasher := sha256.New()
-	f, err := os.Open(fname)
-	if err != nil {
-		msg := fmt.Sprintf("Unable to open file %s, %v", fname, err)
-		panic(msg)
+	b, e := hasher.Write(data)
+	if e != nil {
+		log.Println("ERROR, Unable to write chunk of data via hasher.Write", e)
 	}
-	defer f.Close()
-	b, err := io.Copy(hasher, f)
-	if err != nil {
-		panic(err)
-	}
-	return hex.EncodeToString(hasher.Sum(nil)), b
+	return hex.EncodeToString(hasher.Sum(nil)), int64(b)
 }
 
 // TransferCollection holds data about transfer requests
@@ -127,11 +112,13 @@ type TransferCollection struct {
 
 // TransferRequest data type
 type TransferRequest struct {
-	TimeStamp   int64  `json:"ts"`
-	File        string `json:"file"`
-	Source      string `json:"source"`
-	Destination string `json:"destination"`
-	Latency     int    `json:"latency"`
+	TimeStamp int64  `json:"ts"`
+	File      string `json:"file"`
+	SrcUrl    string `json:"srcUrl"`
+	SrcAlias  string `json:"srcAlias"`
+	DstUrl    string `json:"dstUrl"`
+	DstAlias  string `json:"dstAlias"`
+	Latency   int    `json:"latency"`
 }
 
 // Run method perform a job on transfer request
@@ -143,6 +130,18 @@ func (t *TransferRequest) Run() error {
 	)
 	request.Process(t)
 	return nil
+}
+
+// TransferData extends TransferRequest interface to include transferring data, checksum, bytes
+type TransferData struct {
+	File     string `json:"file"`
+	SrcUrl   string `json:"srcUrl"`
+	SrcAlias string `json:"srcAlias"`
+	DstUrl   string `json:"dstUrl"`
+	DstAlias string `json:"dstAlias"`
+	Data     []byte `json:"data"`
+	Hash     string `json:"hash"`
+	Bytes    int64  `json:"bytes"`
 }
 
 // Job represents the job to be run

@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"strings"
 	"time"
 
 	"github.com/vkuznet/transfer2go/utils"
@@ -53,23 +52,19 @@ func Transfer() Decorator {
 
 			fname, fhash, fbytes := TFC.FileInfo(t.File)
 			if TFC.Type == "filesystem" {
-				arr := strings.Split(t.Destination, ":")
-				dstUrl := arr[1]
-				// TODO: I need to change model.Hash to return []byte or Reader/Writer to
-				// properly stream data via json encoder
-				hash, b := Hash(fname)
+				data, err := ioutil.ReadFile(fname)
+				if err != nil {
+					return err
+				}
+				hash, b := Hash(data)
 				if hash != fhash {
 					return fmt.Errorf("File hash mismatch")
 				}
 				if b != fbytes {
 					return fmt.Errorf("File bytes mismatch")
 				}
-				data, err := ioutil.ReadFile(fname)
-				if err != nil {
-					return err
-				}
-				url := fmt.Sprintf("%s/transfer", dstUrl)
-				td := TransferData{Name: fname, Data: data, Hash: hash, Bytes: b, Source: t.Source, Destination: t.Destination}
+				url := fmt.Sprintf("%s/transfer", t.DstUrl)
+				td := TransferData{File: fname, Data: data, Hash: hash, Bytes: b, SrcUrl: t.SrcUrl, SrcAlias: t.SrcAlias, DstUrl: t.DstUrl, DstAlias: t.DstAlias}
 				d, e := json.Marshal(td)
 				if e != nil {
 					return e
