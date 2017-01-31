@@ -81,7 +81,7 @@ func Transfer() Decorator {
 				log.Println("Not Implemented Yet")
 			}
 
-			// if transfer is successfull decrement transfer counter
+			// if transfer is successful decrement transfer counter
 			atomic.AddInt32(&TransferCounter, -1)
 
 			return r.Process(t)
