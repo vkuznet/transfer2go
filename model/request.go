@@ -62,7 +62,7 @@ func Transfer() Decorator {
 				if err != nil {
 					return err
 				}
-				hash, b := Hash(data)
+				hash, b := utils.Hash(data)
 				if hash != fhash {
 					return fmt.Errorf("File hash mismatch")
 				}

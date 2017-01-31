@@ -4,16 +4,16 @@ package model
 // Copyright (c) 2017 - Valentin Kuznetsov <vkuznet@gmail.com>
 
 import (
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
 	"fmt"
-	"github.com/rcrowley/go-metrics"
 	"io/ioutil"
 	"log"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/rcrowley/go-metrics"
+	"github.com/vkuznet/transfer2go/utils"
 
 	// loads sqlite3 database layer
 	_ "github.com/mattn/go-sqlite3"
@@ -74,7 +74,7 @@ func (c *Catalog) FileInfo(fileEntry string) (string, string, int64) {
 		if err != nil {
 			log.Println("ERROR, unable to read a file", fname, err)
 		}
-		hash, b := Hash(data)
+		hash, b := utils.Hash(data)
 		return fname, hash, b
 	} else if c.Type == "sqlitedb" {
 		log.Println("Not Implemented Yet")
@@ -93,16 +93,6 @@ type Metrics struct {
 
 // AgentMetrics defines various metrics about the agent work
 var AgentMetrics Metrics
-
-// Hash implements hash function for data, it returns a hash and number of bytes
-func Hash(data []byte) (string, int64) {
-	hasher := sha256.New()
-	b, e := hasher.Write(data)
-	if e != nil {
-		log.Println("ERROR, Unable to write chunk of data via hasher.Write", e)
-	}
-	return hex.EncodeToString(hasher.Sum(nil)), int64(b)
-}
 
 // TransferCollection holds data about transfer requests
 type TransferCollection struct {

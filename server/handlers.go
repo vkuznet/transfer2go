@@ -45,7 +45,8 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	astats := AgentStatus{Catalog: model.TFC.Type, Name: _alias, Url: _myself, Protocol: _protocol, Backend: _backend, Tool: _tool, TransferCounter: model.TransferCounter, Agents: _agents, TimeStamp: time.Now().Unix()}
+	addrs := utils.HostIP()
+	astats := AgentStatus{Addrs: addrs, Catalog: model.TFC.Type, Name: _alias, Url: _myself, Protocol: _protocol, Backend: _backend, Tool: _tool, TransferCounter: model.TransferCounter, Agents: _agents, TimeStamp: time.Now().Unix()}
 	data, err := json.Marshal(astats)
 	if err != nil {
 		log.Println("ERROR AgentsHandler", err)
@@ -221,7 +222,7 @@ func TransferDataHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		// verify hash, bytes of transferred data
-		hash, bytes := model.Hash(td.Data)
+		hash, bytes := utils.Hash(td.Data)
 		if hash != td.Hash {
 			log.Println("ERROR, TransferHandler written file has different hash", hash, td.Hash)
 			w.WriteHeader(http.StatusInternalServerError)

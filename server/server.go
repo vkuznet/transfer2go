@@ -48,15 +48,16 @@ type AgentProtocol struct {
 
 // AgentStatus data type
 type AgentStatus struct {
-	Url             string            `json:"url"`
-	Name            string            `json:"name"`
-	TimeStamp       int64             `json:"ts"`
-	TransferCounter int32             `json:"tc"`
-	Protocol        string            `json:"protocol"`
-	Catalog         string            `json:"catalog"`
-	Backend         string            `json:"backend"`
-	Tool            string            `json:"tool"`
-	Agents          map[string]string `json:"agents"`
+	Url             string            `json:"url"`      // agent url
+	Name            string            `json:"name"`     // agent name or alias
+	TimeStamp       int64             `json:"ts"`       // time stamp
+	TransferCounter int32             `json:"tc"`       // number of transfers at a given time
+	Catalog         string            `json:"catalog"`  // underlying TFC catalog
+	Protocol        string            `json:"protocol"` // underlying transfer protocol
+	Backend         string            `json:"backend"`  // underlying transfer backend
+	Tool            string            `json:"tool"`     // underlying transfer tool, e.g. xrdcp
+	Agents          map[string]string `json:"agents"`   // list of known agents
+	Addrs           []string          `json:"addrs"`    // list of all IP addresses
 }
 
 // globals used in server/handlers
