@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/vkuznet/transfer2go/common"
 	"github.com/vkuznet/transfer2go/utils"
 )
 
@@ -52,37 +53,83 @@ func Transfer() Decorator {
 		return RequestFunc(func(t *TransferRequest) error {
 			// increment number of transfers
 			atomic.AddInt32(&TransferCounter, 1)
-			// TODO: main Transfer logic would be implemented here
-			// so far we call simple log.Println and later we'll transfer the request here
-			log.Println("Transfer", t) // REPLACE WITH ACTUAL CODE
 
-			fname, fhash, fbytes := TFC.FileInfo(t.File)
+			// TODO: I need to decide how to deal with TransferCounter, so far:
+			// decrement transfer counter when done with transfer request
+			defer atomic.AddInt32(&TransferCounter, -1)
+
+			// TODO: main Transfer logic would be implemented here
+			log.Println("Request Transfer", t)
+
+			rec := TFC.FileInfo(t.File)
+			if rec.Lfn == "" {
+				// file does not exists in TFC, nothing to do, return immediately
+				log.Printf("WARNING requested file %s does not exists in TFC of this agent\n", t.File)
+				return r.Process(t)
+			}
 			if TFC.Type == "filesystem" {
-				data, err := ioutil.ReadFile(fname)
+				data, err := ioutil.ReadFile(rec.Lfn)
 				if err != nil {
 					return err
 				}
 				hash, b := utils.Hash(data)
-				if hash != fhash {
+				if hash != rec.Hash {
 					return fmt.Errorf("File hash mismatch")
 				}
-				if b != fbytes {
+				if b != rec.Bytes {
 					return fmt.Errorf("File bytes mismatch")
 				}
 				url := fmt.Sprintf("%s/transfer", t.DstUrl)
-				td := TransferData{File: fname, Data: data, Hash: hash, Bytes: b, SrcUrl: t.SrcUrl, SrcAlias: t.SrcAlias, DstUrl: t.DstUrl, DstAlias: t.DstAlias}
+				td := TransferData{File: rec.Lfn, Data: data, Hash: hash, Bytes: b, SrcUrl: t.SrcUrl, SrcAlias: t.SrcAlias, DstUrl: t.DstUrl, DstAlias: t.DstAlias}
 				d, e := json.Marshal(td)
 				if e != nil {
 					return e
 				}
 				resp := utils.FetchResponse(url, d)
 				return resp.Error
-			} else if TFC.Type == "sqlitedb" {
-				log.Println("Not Implemented Yet")
+			} else if TFC.Type == "sqlite3" {
+				// TODO: This should be a go-routine
+				url := fmt.Sprintf("%s/status", t.DstUrl)
+				resp := utils.FetchResponse(url, []byte{})
+				if resp.Error != nil {
+					return resp.Error
+				}
+				var dstAgent common.AgentStatus
+				err := json.Unmarshal(resp.Data, &dstAgent)
+				if err != nil {
+					return err
+				}
+				url = fmt.Sprintf("%s/status", t.SrcUrl)
+				resp = utils.FetchResponse(url, []byte{})
+				if resp.Error != nil {
+					return resp.Error
+				}
+				var srcAgent common.AgentStatus
+				err = json.Unmarshal(resp.Data, &srcAgent)
+				if err != nil {
+					return err
+				}
+				pfn := fmt.Sprintf("%s%s", srcAgent.Backend, rec.Lfn)
+				rpfn := fmt.Sprintf("%s%s", dstAgent.Backend, rec.Lfn)
+				// TODO: I need one entry for local TFC and another for remote TFC
+				entry := CatalogEntry{Dataset: rec.Dataset, Block: rec.Block, Lfn: rec.Lfn, Pfn: rec.Pfn, Bytes: rec.Bytes, Hash: rec.Hash}
+				TFC.Add(entry)
+				// TODO: perform transfer with the help of backend tool
+				cmd := fmt.Sprintf("%s %s %s", srcAgent.Tool, pfn, rpfn)
+				log.Println("Transfer command", cmd)
+				// TODO: Perform transfer and check that it is completed
+				// Add entry for remote TFC after transfer is completed
+				url = fmt.Sprintf("%s/addRecord", t.DstUrl)
+				rEntry := CatalogEntry{Dataset: rec.Dataset, Block: rec.Block, Lfn: rec.Lfn, Pfn: rpfn, Bytes: rec.Bytes, Hash: rec.Hash}
+				data, err := json.Marshal(rEntry)
+				if err != nil {
+					return err
+				}
+				resp = utils.FetchResponse(url, data) // POST request
+				if resp.Error != nil {
+					return resp.Error
+				}
 			}
-
-			// if transfer is successful decrement transfer counter
-			atomic.AddInt32(&TransferCounter, -1)
 
 			return r.Process(t)
 		})
