@@ -4,6 +4,7 @@ package server
 // Copyright (c) 2017 - Valentin Kuznetsov <vkuznet@gmail.com>
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -41,23 +42,9 @@ type AgentInfo struct {
 
 // ProtocolInfo data type
 type AgentProtocol struct {
-	Protocol string `json:"protocol"`
-	Backend  string `json:"backend"`
-	Tool     string `json:"tool"`
-}
-
-// AgentStatus data type
-type AgentStatus struct {
-	Url             string            `json:"url"`      // agent url
-	Name            string            `json:"name"`     // agent name or alias
-	TimeStamp       int64             `json:"ts"`       // time stamp
-	TransferCounter int32             `json:"tc"`       // number of transfers at a given time
-	Catalog         string            `json:"catalog"`  // underlying TFC catalog
-	Protocol        string            `json:"protocol"` // underlying transfer protocol
-	Backend         string            `json:"backend"`  // underlying transfer backend
-	Tool            string            `json:"tool"`     // underlying transfer tool, e.g. xrdcp
-	Agents          map[string]string `json:"agents"`   // list of known agents
-	Addrs           []string          `json:"addrs"`    // list of all IP addresses
+	Protocol string `json:"protocol"` // protocol name, e.g. srmv2
+	Backend  string `json:"backend"`  // backend storage end-point, e.g. srm://cms-srm.cern.ch:8443/srm/managerv2?SFN=
+	Tool     string `json:"tool"`     // actual executable, e.g. /usr/local/bin/srmcp
 }
 
 // globals used in server/handlers
@@ -92,8 +79,7 @@ func register(register, alias, agent string) error {
 func registerAtAgents(aName string) {
 	// register itself
 	if _, ok := _agents[_alias]; ok {
-		fmt.Println("ERROR, unable to register", _alias, "at", _agents, "since this name already exists")
-		os.Exit(1)
+		log.Fatal("ERROR unable to register", _alias, "at", _agents, "since this name already exists")
 	}
 	_agents[_alias] = _myself
 
@@ -101,8 +87,7 @@ func registerAtAgents(aName string) {
 	if aName != "" && len(aName) > 0 {
 		err := register(aName, _alias, _myself) // submit remote registration of given agent name
 		if err != nil {
-			fmt.Println("Unable to register", _alias, _myself, "at", aName, err)
-			os.Exit(1)
+			log.Fatal("ERROR Unable to register", _alias, _myself, "at", aName, err)
 		}
 		aurl := fmt.Sprintf("%s/agents", aName)
 		resp := utils.FetchResponse(aurl, []byte{})
@@ -155,6 +140,19 @@ func Server(port string, config Config, aName string) {
 		if err != nil {
 			log.Fatalf("Unable to parse catalog JSON file, error=%v\n", err)
 		}
+		// open up Catalog DB
+		dbtype := model.TFC.Type
+		dburi := model.TFC.Uri // TODO: I may need to change this for MySQL/ORACLE
+		db, dberr := sql.Open(dbtype, dburi)
+		defer db.Close()
+		if dberr != nil {
+			log.Fatalf("ERROR sql.Open, %v\n", dberr)
+		}
+		dberr = db.Ping()
+		if dberr != nil {
+			log.Fatalf("ERROR db.Ping, %v\n", dberr)
+		}
+		model.DB = db
 	}
 	log.Println("Catalog", model.TFC)
 
