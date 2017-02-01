@@ -33,9 +33,9 @@ func main() {
 	var status bool
 	flag.BoolVar(&status, "status", false, "Return status info about the agent")
 	var src string
-	flag.StringVar(&src, "src", "", "Source logical file name")
+	flag.StringVar(&src, "src", "", "Source end-point, either local file or AgentName:LFN")
 	var dst string
-	flag.StringVar(&dst, "dst", "", "Destination end-point")
+	flag.StringVar(&dst, "dst", "", "Destination end-point, either AgentName or AgentName:LFN")
 	var register string
 	flag.StringVar(&register, "register", "", "Registration end-point")
 
@@ -74,6 +74,7 @@ func main() {
 
 		server.Server(port, config, register)
 	} else {
+
 		if status {
 			client.Status(agent)
 		} else {
