@@ -17,11 +17,11 @@ import (
 )
 
 // global pointer to DB
-var _db *sql.DB
+var DB *sql.DB
 
-func check(err error) {
+func check(msg string, err error) {
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("ERROR %s, %v\n", msg, err)
 	}
 }
 
@@ -30,44 +30,26 @@ type CatalogEntry struct {
 	Lfn     string `json:"lfn"`     // lfn stands for Logical File Name
 	Pfn     string `json:"pfn"`     // pfn stands for Physical File Name
 	Dataset string `json:"dataset"` // dataset represents collection of blocks
-	Block   string `json:"block"`   // block idetify single block withing a dataset
+	Block   string `json:"block"`   // block idetify single block within a dataset
 	Bytes   int64  `json:"bytes"`   // size of the files in bytes
 	Hash    string `json:"hash"`    // hash represents checksum of the pfn
 }
 
 // Catalog represents Trivial File Catalog (TFC) of the model
 type Catalog struct {
-	Type     string `json:"type"`     // catalog type, e.g. filesystem, sqlitedb, etc.
-	Uri      string `json:"uri"`      // catalog uri, e.g. sqlitedb:///file.db
+	Type     string `json:"type"`     // catalog type, e.g. filesystem, sqlite3, etc.
+	Uri      string `json:"uri"`      // catalog uri, e.g. file.db
 	Login    string `json:"login"`    // database login
 	Password string `json:"password"` // database password
 	Owner    string `json:"owner"`    // used by ORACLE DB, defines owner of the database
 }
 
-func (c *Catalog) Open() {
-	if _db == nil {
-		dbtype := c.Type
-		dburi := c.Uri // TODO: I may need to change this for MySQL/ORACLE
-		_db, dberr := sql.Open(dbtype, dburi)
-		defer _db.Close()
-		if dberr != nil {
-			log.Fatal(dberr)
-		}
-		dberr = _db.Ping()
-		if dberr != nil {
-			log.Fatal(dberr)
-		}
-		_db.SetMaxOpenConns(100)
-		_db.SetMaxIdleConns(100)
-	}
-}
-
 // Find method look-up entries in a catalog for a given query
 func (c *Catalog) Find(stm string, cols []string, vals []interface{}, args ...interface{}) []CatalogEntry {
 	var out []CatalogEntry
-	rows, err := _db.Query(stm, args...)
+	rows, err := DB.Query(stm, args...)
 	if err != nil {
-		msg := fmt.Sprintf("ERROR _db.Query, query='%s' args='%v' error=%v", stm, args, err)
+		msg := fmt.Sprintf("ERROR DB.Query, query='%s' args='%v' error=%v", stm, args, err)
 		log.Fatal(msg)
 	}
 	defer rows.Close()
@@ -92,54 +74,77 @@ func (c *Catalog) Find(stm string, cols []string, vals []interface{}, args ...in
 		out = append(out, rec)
 	}
 	if err = rows.Err(); err != nil {
-		log.Fatal(err)
+		log.Fatalf("ERROR rows.Err, %v\n", err)
 	}
 	return out
 }
 
 // Add method adds entry to a catalog
 func (c *Catalog) Add(entry CatalogEntry) error {
-	// open DB connection
-	c.Open()
 
 	// add entry to the catalog
-	tx, e := _db.Begin()
-	check(e)
+	tx, e := DB.Begin()
+	check("Unable to setup transaction", e)
 
 	var stm string
-	// get dataset id
-	stm = fmt.Sprintf("SELECT id FROM DATASETS WHERE dataset=?")
-	did, e1 := _db.Exec(stm, entry.Dataset)
-	check(e1)
+	var did, bid int
 
 	// insert dataset into dataset tables
 	stm = fmt.Sprintf("INSERT INTO DATASETS(dataset) VALUES(?)")
-	_, e2 := _db.Exec(stm, entry.Dataset)
-	check(e2)
+	_, e = DB.Exec(stm, entry.Dataset)
+	if e != nil {
+		if !strings.Contains(e.Error(), "UNIQUE") {
+			check("Unable to insert into datasets table", e)
+		}
+	}
 
-	// get block id
-	stm = fmt.Sprintf("SELECT id FROM BLOCKS WHERE block=?")
-	bid, e3 := _db.Exec(stm, entry.Block)
-	check(e3)
+	// get dataset id
+	stm = fmt.Sprintf("SELECT id FROM DATASETS WHERE dataset=?")
+	rows, err := DB.Query(stm, entry.Dataset)
+	check("Unable to perform DB.Query over datasets table", err)
+	defer rows.Close()
+	for rows.Next() {
+		err = rows.Scan(&did)
+		check("Unable to scan rows for datasetid", err)
+	}
 
 	// insert block into block table
 	stm = fmt.Sprintf("INSERT INTO BLOCKS(block) VALUES(?)")
-	_, e4 := _db.Exec(stm, entry.Block)
-	check(e4)
+	_, e = DB.Exec(stm, entry.Block)
+	if e != nil {
+		if !strings.Contains(e.Error(), "UNIQUE") {
+			check("Unable to insert into blocks table", e)
+		}
+	}
+
+	// get block id
+	stm = fmt.Sprintf("SELECT id FROM BLOCKS WHERE block=?")
+	rows, err = DB.Query(stm, entry.Block)
+	check("Unabel to DB.Query over blocks table", err)
+	for rows.Next() {
+		err = rows.Scan(&bid)
+		check("Unable to scan rows for datasetid", err)
+	}
 
 	// insert entry into files table
 	stm = fmt.Sprintf("INSERT INTO FILES(lfn, pfn, blockid, datasetid, bytes, hash) VALUES(?,?,?,?,?,?)")
-	_, e5 := _db.Exec(stm, entry.Lfn, entry.Pfn, bid, did, entry.Bytes, entry.Hash)
-	check(e5)
+	_, err = DB.Exec(stm, entry.Lfn, entry.Pfn, bid, did, entry.Bytes, entry.Hash)
+	if e != nil {
+		if !strings.Contains(e.Error(), "UNIQUE") {
+			check(fmt.Sprintf("Unable to DB.Exec(%s)", stm), err)
+		}
+	}
 
 	tx.Commit()
+
+	if utils.VERBOSE > 0 {
+		log.Println("Committed to Catalog", entry, "datasetid", did, "blockid", bid)
+	}
 
 	return nil
 }
 
 // Files method of catalog returns list of files known in catalog
-// TODO: implement sqlitedb catalog logic, e.g. we need to make
-// a transfer and then record in DB catalog file's hash and transfer details
 func (c *Catalog) Files(pattern string) []string {
 	var files []string
 	if c.Type == "filesystem" {
@@ -158,9 +163,9 @@ func (c *Catalog) Files(pattern string) []string {
 			}
 		}
 		return files
-	} else if c.Type == "sqlitedb" {
+	} else if c.Type == "sqlite3" {
 		// construct SQL query
-		var args []interface{} // argument values passed to SQL statment
+		var args []interface{} // argument values passed to SQL statement
 		cols := []string{"dataset", "blockid", "lfn", "pfn", "bytes", "hash"}
 		stm := fmt.Sprintf("SELECT %s FROM FILES AS F JOIN BLOCKS AS B ON F.BLOCKID=B.ID JOIN DATASETS AS D ON F.DATASETID = D.ID", strings.Join(cols, ","))
 		vals := []interface{}{new(sql.NullString), new(sql.NullString), new(sql.NullString), new(sql.NullString), new(sql.NullInt64), new(sql.NullString)}
@@ -173,7 +178,7 @@ func (c *Catalog) Files(pattern string) []string {
 }
 
 // FileInfo provides information about given file name in Catalog
-func (c *Catalog) FileInfo(fileEntry string) (string, string, int64) {
+func (c *Catalog) FileInfo(fileEntry string) CatalogEntry {
 	if c.Type == "filesystem" {
 		fname := fileEntry
 		data, err := ioutil.ReadFile(fname)
@@ -181,11 +186,17 @@ func (c *Catalog) FileInfo(fileEntry string) (string, string, int64) {
 			log.Println("ERROR, unable to read a file", fname, err)
 		}
 		hash, b := utils.Hash(data)
-		return fname, hash, b
-	} else if c.Type == "sqlitedb" {
-		log.Println("Not Implemented Yet")
+		entry := CatalogEntry{Lfn: fname, Pfn: fname, Hash: hash, Bytes: b, Dataset: "/a/b/c", Block: "123"}
+		return entry
+	} else if c.Type == "sqlite3" {
+		cols := []string{"pfn", "bytes", "hash"}
+		stm := fmt.Sprintf("SELECT %s FROM FILES AS F WHERE LFN = ?", strings.Join(cols, ","))
+		vals := []interface{}{new(sql.NullString), new(sql.NullInt64), new(sql.NullString)}
+		for _, entry := range c.Find(stm, cols, vals, fileEntry) {
+			return entry
+		}
 	}
-	return fileEntry, "", 0
+	return CatalogEntry{}
 }
 
 // TFC stands for Trivial File Catalog
