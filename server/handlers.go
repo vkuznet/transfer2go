@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vkuznet/transfer2go/common"
 	"github.com/vkuznet/transfer2go/model"
 	"github.com/vkuznet/transfer2go/utils"
 )
@@ -46,7 +47,7 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	addrs := utils.HostIP()
-	astats := AgentStatus{Addrs: addrs, Catalog: model.TFC.Type, Name: _alias, Url: _myself, Protocol: _protocol, Backend: _backend, Tool: _tool, TransferCounter: model.TransferCounter, Agents: _agents, TimeStamp: time.Now().Unix()}
+	astats := common.AgentStatus{Addrs: addrs, Catalog: model.TFC.Type, Name: _alias, Url: _myself, Protocol: _protocol, Backend: _backend, Tool: _tool, TransferCounter: model.TransferCounter, Agents: _agents, TimeStamp: time.Now().Unix()}
 	data, err := json.Marshal(astats)
 	if err != nil {
 		log.Println("ERROR AgentsHandler", err)
@@ -119,9 +120,13 @@ func RegisterAgentHandler(w http.ResponseWriter, r *http.Request) {
 	agent := agentParams.Agent
 	alias := agentParams.Alias
 	if aurl, ok := _agents[alias]; ok {
-		msg := fmt.Sprintf("Agent %s already exists in agent map at %s, %v\n", alias, aurl, _agents)
-		w.WriteHeader(http.StatusConflict)
-		w.Write([]byte(msg))
+		if aurl != agent {
+			msg := fmt.Sprintf("Agent %s (%s) already exists in agents map, %v\n", alias, aurl, _agents)
+			w.WriteHeader(http.StatusConflict)
+			w.Write([]byte(msg))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
 	} else {
 		_agents[alias] = agent // register given agent/alias pair internally
 		w.WriteHeader(http.StatusOK)
@@ -204,7 +209,7 @@ func TransferDataHandler(w http.ResponseWriter, r *http.Request) {
 	var td model.TransferData
 	err := json.NewDecoder(r.Body).Decode(&td)
 	if err != nil {
-		log.Println("ERROR, TransferHandler unable to unmarshal incoming data", err)
+		log.Println("ERROR TransferDataHandler unable to unmarshal incoming data", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -234,8 +239,8 @@ func TransferDataHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		log.Printf("wrote %s/%s %s/%s hash=%s, bytes=%v\n", td.SrcAlias, fname, td.DstAlias, filePath, td.Hash, td.Bytes)
-	} else if model.TFC.Type == "sqlitedb" {
-		log.Println("Not implemented")
+	} else if model.TFC.Type == "sqlite3" {
+		log.Println("Not implemented yet")
 	}
 	w.WriteHeader(http.StatusOK)
 }
