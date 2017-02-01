@@ -8,6 +8,9 @@ package client
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/vkuznet/transfer2go/model"
@@ -17,7 +20,31 @@ import (
 // Transfer client function is responsible to initiate transfer request from
 // source to destination.
 func Transfer(agent, src, dst string) error {
-	fmt.Println("### Transfer", agent, src, "to site", dst)
+	var transfer, upload bool
+	var srcFile, srcAlias, srcUrl, dstFile, dstAlias, dstUrl string
+	srcUrl = agent
+	if stat, err := os.Stat(src); err == nil && !stat.IsDir() {
+		// local file, we need to transfer it to the destination
+		upload = true
+		srcFile = src
+		srcUrl = agent
+	}
+	if strings.Contains(src, ":") {
+		arr := strings.Split(src, ":")
+		srcAlias = arr[0]
+		srcFile = arr[1]
+	}
+	if strings.Contains(dst, ":") {
+		arr := strings.Split(dst, ":")
+		dstAlias = arr[0]
+		dstFile = arr[1]
+	} else {
+		dstAlias = dst
+		dstFile = srcFile
+	}
+	if !upload {
+		transfer = true
+	}
 
 	// find out list of all agents
 	url := fmt.Sprintf("%s/agents", agent)
@@ -31,51 +58,75 @@ func Transfer(agent, src, dst string) error {
 		return e
 	}
 
-	// get agent alias name
-	var agentAlias string
-	for alias, aurl := range remoteAgents {
-		if agent == aurl {
-			agentAlias = alias
-			break
+	// get source agent alias name
+	if srcAlias == "" {
+		for alias, aurl := range remoteAgents {
+			if agent == aurl {
+				srcAlias = alias
+				break
+			}
 		}
 	}
 
 	// check if destination is ok
-	dstUrl, ok := remoteAgents[dst]
+	dstUrl, ok := remoteAgents[dstAlias]
 	if !ok {
 		fmt.Println("Unable to resolve destination", dst)
 		fmt.Println("Map of known agents", remoteAgents)
 		return fmt.Errorf("Unknown destination")
 	}
 
-	// Read data from source agent
-	url = fmt.Sprintf("%s/files?pattern=%s", agent, src)
-	resp = utils.FetchResponse(url, []byte{})
-	if resp.Error != nil {
+	if transfer {
+		fmt.Println("### Transfer", agent, src, "to site", dst)
+
+		// Read data from source agent
+		url = fmt.Sprintf("%s/files?pattern=%s", srcUrl, srcFile)
+		resp = utils.FetchResponse(url, []byte{})
+		if resp.Error != nil {
+			return resp.Error
+		}
+		var files []string
+		err := json.Unmarshal(resp.Data, &files)
+		if err != nil {
+			return err
+		}
+
+		// form transfer request
+		var requests []model.TransferRequest
+		for _, fname := range files {
+			ts := time.Now().Unix()
+			requests = append(requests, model.TransferRequest{SrcUrl: srcUrl, SrcAlias: srcAlias, DstUrl: dstUrl, DstAlias: dst, File: fname, TimeStamp: ts})
+		}
+		ts := time.Now().Unix()
+		transferCollection := model.TransferCollection{TimeStamp: ts, Requests: requests}
+
+		url = fmt.Sprintf("%s/request", dstUrl)
+		d, e := json.Marshal(transferCollection)
+		if e != nil {
+			return e
+		}
+		resp = utils.FetchResponse(url, d)
 		return resp.Error
 	}
-	var files []string
-	err := json.Unmarshal(resp.Data, &files)
-	if err != nil {
-		return err
+
+	if upload {
+		fmt.Println("### Upload", src, "to site", dstAlias, dstUrl, "as", dstFile)
+		data, err := ioutil.ReadFile(srcFile)
+		if err != nil {
+			return err
+		}
+		hash, bytes := utils.Hash(data)
+		transferData := model.TransferData{File: dstFile, SrcUrl: srcUrl, SrcAlias: srcAlias, DstUrl: dstUrl, DstAlias: dstAlias, Data: data, Hash: hash, Bytes: bytes}
+		url = fmt.Sprintf("%s/transfer", dstUrl)
+		d, e := json.Marshal(transferData)
+		if e != nil {
+			return e
+		}
+		resp = utils.FetchResponse(url, d)
+		return resp.Error
 	}
 
-	// form transfer request
-	var requests []model.TransferRequest
-	for _, fname := range files {
-		ts := time.Now().Unix()
-		requests = append(requests, model.TransferRequest{SrcUrl: agent, SrcAlias: agentAlias, DstUrl: dstUrl, DstAlias: dst, File: fname, TimeStamp: ts})
-	}
-	ts := time.Now().Unix()
-	transferCollection := model.TransferCollection{TimeStamp: ts, Requests: requests}
-
-	url = fmt.Sprintf("%s/request", dstUrl)
-	d, e := json.Marshal(transferCollection)
-	if e != nil {
-		return e
-	}
-	resp = utils.FetchResponse(url, d)
-	return resp.Error
+	return fmt.Errorf("Unable to understand client request, src=%v to dst=%v", src, dst)
 }
 
 // Status function provides status about given agent
