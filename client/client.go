@@ -116,13 +116,15 @@ func Transfer(agent, src, dst string) error {
 			return err
 		}
 		hash, bytes := utils.Hash(data)
-		transferData := model.TransferData{File: dstFile, SrcUrl: srcUrl, SrcAlias: srcAlias, DstUrl: dstUrl, DstAlias: dstAlias, Data: data, Hash: hash, Bytes: bytes}
+		d := "/a/b/c" // dataset name
+		b := "123"    // block name
+		transferData := model.TransferData{File: dstFile, Dataset: d, Block: b, SrcUrl: srcUrl, SrcAlias: srcAlias, DstUrl: dstUrl, DstAlias: dstAlias, Data: data, Hash: hash, Bytes: bytes}
 		url = fmt.Sprintf("%s/transfer", dstUrl)
-		d, e := json.Marshal(transferData)
-		if e != nil {
-			return e
+		data, err = json.Marshal(transferData)
+		if err != nil {
+			return err
 		}
-		resp = utils.FetchResponse(url, d)
+		resp = utils.FetchResponse(url, data)
 		return resp.Error
 	}
 
