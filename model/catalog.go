@@ -101,7 +101,7 @@ func (c *Catalog) Add(entry CatalogEntry) error {
 	// get block id
 	stm = fmt.Sprintf("SELECT id FROM BLOCKS WHERE block=?")
 	rows, err = DB.Query(stm, entry.Block)
-	check("Unabel to DB.Query over blocks table", err)
+	check("Unable to DB.Query over blocks table", err)
 	for rows.Next() {
 		err = rows.Scan(&bid)
 		check("Unable to scan rows for datasetid", err)

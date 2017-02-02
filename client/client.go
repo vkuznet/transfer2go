@@ -18,6 +18,7 @@ import (
 	"github.com/vkuznet/transfer2go/utils"
 )
 
+// UserRequest represent client request to the agent
 type UserRequest struct {
 	SrcUrl   string
 	SrcAlias string
