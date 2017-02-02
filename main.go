@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"os/user"
 
@@ -45,19 +46,19 @@ func main() {
 	if configFile != "" {
 		data, err := ioutil.ReadFile(configFile)
 		if err != nil {
-			fmt.Println("Unable to read", configFile, err)
+			log.Println("Unable to read", configFile, err)
 			os.Exit(1)
 		}
 		var config server.Config
 		err = json.Unmarshal(data, &config)
 		if err != nil {
-			fmt.Println("Unable to parse", configFile, err)
+			log.Println("Unable to parse", configFile, err)
 			os.Exit(1)
 		}
 		if config.Catalog == "" {
 			pwd, err := os.Getwd()
 			if err != nil {
-				fmt.Println("Unable to get current directory", err)
+				log.Println("Unable to get current directory", err)
 				os.Exit(1)
 			}
 			config.Catalog = pwd // use current directory as catalog
@@ -80,7 +81,7 @@ func main() {
 		} else {
 			err := client.Transfer(agent, src, dst)
 			if err != nil {
-				fmt.Printf("Unable to transfer %s/%s to %s", agent, src, dst)
+				log.Printf("Unable to transfer %s/%s to %s", agent, src, dst)
 				os.Exit(1)
 			}
 		}
@@ -116,9 +117,10 @@ func checkX509() {
 		check += 1
 	}
 	if check > 1 {
-		fmt.Println("Neither X509_USER_PROXY or X509_USER_KEY/X509_USER_CERT are set")
-		fmt.Println("In order to run please obtain valid proxy via \"voms-proxy-init -voms cms -rfc\"")
-		fmt.Println("and setup X509_USER_PROXY or setup X509_USER_KEY/X509_USER_CERT in your environment")
+		msg := fmt.Sprintf("Neither X509_USER_PROXY or X509_USER_KEY/X509_USER_CERT are set. ")
+		msg += "In order to run please obtain valid proxy via \"voms-proxy-init -voms cms -rfc\""
+		msg += "and setup X509_USER_PROXY or setup X509_USER_KEY/X509_USER_CERT in your environment"
+		log.Println(msg)
 		os.Exit(-1)
 	}
 }

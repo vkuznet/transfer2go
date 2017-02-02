@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"strings"
 	"time"
@@ -78,13 +79,13 @@ func Transfer(agent, src, dst string) error {
 	// check if destination is ok
 	dstUrl, ok := remoteAgents[dstAlias]
 	if !ok {
-		fmt.Println("Unable to resolve destination", dst)
-		fmt.Println("Map of known agents", remoteAgents)
+		log.Println("Unable to resolve destination", dst)
+		log.Println("Map of known agents", remoteAgents)
 		return fmt.Errorf("Unknown destination")
 	}
 
 	if transfer {
-		fmt.Println("### Transfer", srcAlias, srcUrl, srcFile, "=>", dstAlias, dstUrl, dstFile)
+		log.Println("### Transfer", srcAlias, srcUrl, srcFile, "=>", dstAlias, dstUrl, dstFile)
 
 		// Read data from source agent
 		url = fmt.Sprintf("%s/files?pattern=%s", srcUrl, srcFile)
@@ -117,7 +118,7 @@ func Transfer(agent, src, dst string) error {
 	}
 
 	if upload {
-		fmt.Println("### Upload", src, "to site", dstAlias, dstUrl, "as", dstFile)
+		log.Println("### Upload", src, "to site", dstAlias, dstUrl, "as", dstFile)
 		data, err := ioutil.ReadFile(srcFile)
 		if err != nil {
 			return err
@@ -141,6 +142,6 @@ func Transfer(agent, src, dst string) error {
 // Status function provides status about given agent
 func Status(agent string) error {
 	resp := utils.FetchResponse(agent+"/status", []byte{})
-	fmt.Println("### Status", agent, string(resp.Data))
+	log.Println("### Status", agent, string(resp.Data))
 	return resp.Error
 }

@@ -156,7 +156,7 @@ func (c *Catalog) Files(pattern string) []string {
 		// fetch data from DB
 		rows, err := DB.Query(stm, pattern)
 		if err != nil {
-			fmt.Println("ERROR DB.Query, query='%s' error=%v", stm, err)
+			log.Println("ERROR DB.Query, query='%s' error=%v", stm, err)
 			return files
 		}
 		defer rows.Close()
@@ -196,7 +196,7 @@ func (c *Catalog) FileInfo(fileEntry string) CatalogEntry {
 		// fetch data from DB
 		rows, err := DB.Query(stm, fileEntry)
 		if err != nil {
-			fmt.Println("ERROR DB.Query, query='%s' error=%v", stm, err)
+			log.Println("ERROR DB.Query, query='%s' error=%v", stm, err)
 			return CatalogEntry{}
 		}
 		defer rows.Close()
@@ -204,7 +204,7 @@ func (c *Catalog) FileInfo(fileEntry string) CatalogEntry {
 			rec := CatalogEntry{}
 			err := rows.Scan(&rec.Lfn, &rec.Pfn, &rec.Bytes, &rec.Hash)
 			if err != nil {
-				fmt.Println("ERROR rows.Scan", err)
+				log.Println("ERROR rows.Scan", err)
 				return CatalogEntry{}
 			}
 			return rec

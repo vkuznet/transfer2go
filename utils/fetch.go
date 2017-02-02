@@ -43,9 +43,9 @@ func tlsCerts() ([]tls.Certificate, error) {
 		}
 	}
 	if VERBOSE > 0 {
-		fmt.Println("uproxy", uproxy)
-		fmt.Println("uckey", uckey)
-		fmt.Println("ucert", ucert)
+		log.Println("uproxy", uproxy)
+		log.Println("uckey", uckey)
+		log.Println("ucert", ucert)
 	}
 
 	if uproxy == "" && uckey == "" { // user doesn't have neither proxy or user certs
@@ -127,27 +127,27 @@ func FetchResponse(rurl string, args []byte) ResponseType {
 	} else {
 		req, e = http.NewRequest("GET", rurl, nil)
 		if e != nil {
-			fmt.Println("Unable to make GET request", e)
+			log.Println("Unable to make GET request", e)
 		}
 		req.Header.Add("Accept", "*/*")
 	}
 	if VERBOSE > 1 {
 		dump1, err1 := httputil.DumpRequestOut(req, true)
-		fmt.Println("### HTTP request", req, string(dump1), err1)
+		log.Println("HTTP request", req, string(dump1), err1)
 	}
 	resp, err := client.Do(req)
 	response.Status = resp.Status
 	response.StatusCode = resp.StatusCode
 	if VERBOSE > 0 {
 		if len(args) > 0 {
-			fmt.Println("TRANSFER2GO POST", rurl, string(args), err, time.Now().Sub(startTime))
+			log.Println("HTTP POST", rurl, string(args), err, time.Now().Sub(startTime))
 		} else {
-			fmt.Println("TRANSFER2GO GET", rurl, string(args), err, time.Now().Sub(startTime))
+			log.Println("HTTP GET", rurl, string(args), err, time.Now().Sub(startTime))
 		}
 	}
 	if VERBOSE > 1 {
 		dump2, err2 := httputil.DumpResponse(resp, true)
-		fmt.Println("### HTTP response", string(dump2), err2)
+		log.Println("HTTP response", string(dump2), err2)
 	}
 	if err != nil {
 		response.Error = err
@@ -167,7 +167,7 @@ func Fetch(rurl string, args []byte, ch chan<- ResponseType) {
 	var resp, r ResponseType
 	resp = FetchResponse(rurl, args)
 	if resp.Error != nil {
-		fmt.Println("TRANSFER2GO WARNING, fail to fetch data", rurl, "error", resp.Error)
+		log.Println("TRANSFER2GO WARNING, fail to fetch data", rurl, "error", resp.Error)
 		for i := 1; i <= urlRetry; i++ {
 			sleep := time.Duration(i) * time.Second
 			time.Sleep(sleep)
@@ -175,12 +175,12 @@ func Fetch(rurl string, args []byte, ch chan<- ResponseType) {
 			if r.Error == nil {
 				break
 			}
-			fmt.Println("TRANSFER2GO WARNING", rurl, "retry", i, "error", r.Error)
+			log.Println("TRANSFER2GO WARNING", rurl, "retry", i, "error", r.Error)
 		}
 		resp = r
 	}
 	if resp.Error != nil {
-		fmt.Println("TRANSFER2GO ERROR, fail to fetch data", rurl, "retries", urlRetry, "error", resp.Error)
+		log.Println("TRANSFER2GO ERROR, fail to fetch data", rurl, "retries", urlRetry, "error", resp.Error)
 	}
 	ch <- resp
 }
@@ -195,7 +195,7 @@ func validateUrl(rurl string) bool {
 				return true
 			}
 		}
-		fmt.Println("ERROR invalid URL:", rurl)
+		log.Println("ERROR invalid URL:", rurl)
 	}
 	return false
 }
@@ -316,7 +316,7 @@ func HostIP() []string {
 	var out []string
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
-		fmt.Println("ERROR unable to resolve net.InterfaceAddrs", err)
+		log.Println("ERROR unable to resolve net.InterfaceAddrs", err)
 	}
 	for _, addr := range addrs {
 		// check the address type and if it is not a loopback the display it
