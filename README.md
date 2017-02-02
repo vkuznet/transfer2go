@@ -9,131 +9,43 @@ Go implementation of CMS
 [PhEDEx](https://www.researchgate.net/publication/228732867_Data_transfer_infrastructure_for_CMS_data_taking)
 distributed, loosly coupled agents for CMS transfering data.
 
-### How it works
-The PhEDEx agents are loosly coupled distributed agents which acts as
-DNS servers. They can be deployed at any site which is capable to
-serve data upon requests. The holds local Trivial File Catalog (TFC)
-about files on a site and allows client to discover a specific file
-and transfer it upon request to remote site (via agent request).
-The file transfer should be fault-tolerant and handle various
-failures during transfer as well as support various transfer
-technologies. To name a few, we can transfer files via HTTP or
-call SRM, etc.
+### Description
+The [CMS](http://cms.web.cern.ch/) experiment at the LHC proton-proton collider
+developed PhEDEx (Physics Experiment Data Export) service as reliable and
+scalable data management system to meet experiment requirements in Run I/II.
+Designed in 2004, and written mainly in Perl, it is still used today for
+managing multi-PB transfer loads per week, across a complex topology of dozen
+of Grid-compliant computing centres.
 
-The client may ask the following questions:
-- find a file, the request can be send to any agent and it can look-up
-if file is present in local TFC or send request to other agents and asks
-who has this file. 
+Its architecture, instead of having a central brain making global decisions on
+all CMS replica allocation, has a data management layer composed of a set of
+loosely coupled and stateless software agents - each managing highly specific
+parts of replication operations at each site in the distribution network -
+which communicate asynchronously through a central blackboard architecture.
+The system is resilient and robust against a large variety of possible failure
+reasons, and it has been designed by assuming a transfer will fail (thus
+implementing fail-over tactics) and being completely agnostic on the
+lower-level file transfer mechanism (thus focusing on full dataset management
+and detailed transfer bookkeeping). Collision data and derived data collected
+at LHC that allowed to achieve the Higgs boson discovery by ATLAS and CMS
+experiments at LHC were transferred in the CMS worldwide domain using this
+toolkit.
 
-- transfer file, the agent who has a file initiate a transfer
-request, i.e. fire up transfer goroutine which transfer
-file via default and back-up protocol and yield back
-request (via channel) if transfer is completed.
-If request failed it can be scheduled again at a later time.
+The aim of this project is to extend basic PhEDEX functionality
+to address up-coming challenges in exa-byte HL-HLC era via implementation of modern
+Go programming language.
 
-- agents should communicate with each other and exchange info
-what they have, what is their load, etc. We need embeded support
-for various metrics.
-
-- shutdown the agent, to do that agent should look-up its pending
-or request in transfer, finish them up and do clean-up.
-
-So, we need:
-- Transfer request object
-  - file
-  - source site
-  - destination site
-  - latency, i.e. when to start
-- TFC which knows about local files
-- registration of transfer tool/protocol, e.g.
-I have running agent and later I installed on a system srm tool.
-I want to register it in agent and make it available for usage.
-Post to agent a JSON with description of transfer tool, e.g.
-{"tool": "/usr/bin/srm", "priority":0}
-location of the tool and its priority in hierarchy of tools,
-0 means it will be used first.
-- agent should have ability to register itself with other agent(s)
-/register?uri=https://cern.ch/agent
-it means that each agent has an internal list of other agents
-- list file API which shows what agents has (dump its TFC)
-- transfer API which initiates the transfer
-- site list API, agent should find out how to map request
-to an agent, e.g. transfer file A to site X. Find agent which can
-talk to site X, resolve request
-transfer LFN_a to siteX
-- store API which knows how to store given file into its storage
-- check md5 hash of file
-- ask if file exists on siteX and return md5 hash of it
-- once agent receives request to store file it should check if this file exists
-  in its storage, it will allows to handle failures, e.g.
-  if agent who initiate transfer got request to transfer of 10 files it may
-  go down in a middle of the process. But it does not hold the notion
-  of which transfer it had, instead its up to the client. Client can
-  fire up any number of times the tranfer request. If the file exists
-  on remote agent, it will get ok, otherwise it will initiate a transfer.
-- transfer priority
-- generate single executable which can be used as a server or as a client
-
-
-### Examples
-```
-# start the server on port 8989 and use /tmp dir as catalog
-transfer2go -uri :8989 -catalog /tmp
-
-# place request from a client via HTTP
-curl -v -H "Content-Type: application/json" -d '{"version":"123",
-"data":[{"file":"fileA", "source":"source", "destination":"destination",
-"latency":0}, {"file":"file2", "source":"source", "destination":"destination",
-"latency":1}]}' http://localhost:8989
-
-# start server mode and register agent with another one and use catalog
-# from file.db (e.g. SQLite DB)
-transfer2go -uri :8989 -register http://cern.ch/agent -catalog file.db
-
-# will register with given agents
-transfer2go -uri :8989 -register http://cern.ch/agent,http://fnal.gov,MyFriend
-
-# request to transfer
-transfer2go -agent http://cern.ch/agent -transfer fileA -to T1_CH_CERN
-transfer2go -agent http://fnal.gov/agent -transfer fileA -to http://localhost
-transfer2go -agent T1_CH_CERN -transfer fileA -to MyFriend
-
-# return URIs of agents who has the file
-transfer2go -agent MyFriend -find /fileA
-
-# return status of transfers and pending requests
-transfer2go -agent http://fnal.gov -status
-
-# will shutdown a given agent
-transfer2go -agent T1_CH_CERN -shutdown
-```
-
-## Dependencies
-transfer2go depends on few packages:
-- go get github.com/vkuznet/x509proxy # provides x509 support
-- go get github.com/buger/jsonparser # provides fast json parser
-- go get github.com/pkg/profile # provides profile info
-- go get github.com/rcrowley/go-metrics # provides various metrics
-- go get github.com/go-sql-driver/mysql # MySQL driver
-- go get github.com/mattn/go-sqlite3 # SQLiteDB driver
-- go get gopkg.in/rana/ora.v3 # ORACLE driver
-
-
-### Installation instruction for ora Oracle driver
-
-- Download oracle client libraries and sdk from Oracle web site
-- Setup the environment and build ora.v3 package
-```
-export CGO_CFLAGS=-I/path/Oracle/instantclient_12_1/sdk/include
-# for Linux
-export CGO_LDFLAGS="-L/path/Oracle/instantclient_12_1/ -locci -lclntsh -lipc1 -lmql1 -lnnz12 -lclntshcore -lons"
-# for OSX
-export CGO_LDFLAGS="-L/opt/Oracle/instantclient_11_2/ -locci -lclntsh -lnnz11"
-go get gopkg.in/rana/ora.v3
-```
-
-To use this driver we define dbfile with *ora* entry
-```
-ora oracleLogin/oraclePassword@DB
-```
-
+The motivation for the effort is many fold:
+- eliminate central blackboard system and necessity to rely on ORACLE backend
+  via fully distributed nature of the agents, self-discovery and task
+  delegation;
+- even though current system is working well it lacks of support and expertise
+  in perl programming language. We would like to leverage modern language such as
+  Go to enhance concurrency model via native support in a language, and
+  dependency free deployment;
+- the data volume expected in HL-HLC era will grow significantly to exa-byte
+  level and we need to explore elasticity approach to handle variety of
+  opportunistic resources;
+- extend file access and transfer patterns to event streaming, or individual objects, etc.;
+- implement support for user produced data in addition to centrally produced and manager by the system
+- take advantage of built-in concurrency model of the Go language and explore the scalability boundaries.
