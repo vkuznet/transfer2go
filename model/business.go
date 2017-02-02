@@ -38,6 +38,11 @@ type TransferRequest struct {
 	Latency   int    `json:"latency"`
 }
 
+// String method return string representation of transfer request
+func (t *TransferRequest) String() string {
+	return fmt.Sprintf("<TransferRequest ts=%d, file=%s, srcUrl=%s srcAlias=%s dstUrl=%s dstAlias=%s latency=%d>", t.TimeStamp, t.File, t.SrcUrl, t.SrcAlias, t.DstUrl, t.DstAlias, t.Latency)
+}
+
 // Run method perform a job on transfer request
 func (t *TransferRequest) Run() error {
 	interval := time.Duration(t.Latency) * time.Second
