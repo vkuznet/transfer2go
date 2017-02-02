@@ -185,13 +185,10 @@ func RegisterProtocolHandler(w http.ResponseWriter, r *http.Request) {
 		_protocol = protocolParams.Protocol
 		_backend = protocolParams.Backend
 		_tool = protocolParams.Tool
-		log.Printf("INFO RegisterHandler switched to protocol=%s backend=%s tool=%s\n", _protocol, _backend, _tool)
+		log.Printf("INFO RegisterProtocolHandler switched to protocol=%s backend=%s tool=%s\n", _protocol, _backend, _tool)
 		w.WriteHeader(http.StatusOK)
 		return
-	} else {
-		log.Println("ERROR RegisterHandler", err)
 	}
-	w.WriteHeader(http.StatusInternalServerError)
 }
 
 // RequestHandler initiate transfer work for given request

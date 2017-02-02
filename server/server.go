@@ -40,7 +40,7 @@ type AgentInfo struct {
 	Alias string
 }
 
-// ProtocolInfo data type
+// AgentProtocol data type
 type AgentProtocol struct {
 	Protocol string `json:"protocol"` // protocol name, e.g. srmv2
 	Backend  string `json:"backend"`  // backend storage end-point, e.g. srm://cms-srm.cern.ch:8443/srm/managerv2?SFN=

@@ -17,7 +17,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-// global pointer to DB
+// DB is global pointer to sql database object, it is initialized once when server starts
 var DB *sql.DB
 
 func check(msg string, err error) {
@@ -54,9 +54,8 @@ func (c *Catalog) Dump() []byte {
 			log.Println("ERROR c.Dump", err)
 		}
 		return out
-	} else {
-		log.Println("Catalog Dump method is not implemented yet for", c.Type)
 	}
+	log.Println("Catalog Dump method is not implemented yet for", c.Type)
 	return nil
 
 }
@@ -156,7 +155,7 @@ func (c *Catalog) Files(pattern string) []string {
 		// fetch data from DB
 		rows, err := DB.Query(stm, pattern)
 		if err != nil {
-			log.Println("ERROR DB.Query, query='%s' error=%v", stm, err)
+			log.Printf("ERROR DB.Query, query='%s' error=%v\n", stm, err)
 			return files
 		}
 		defer rows.Close()
@@ -196,7 +195,7 @@ func (c *Catalog) FileInfo(fileEntry string) CatalogEntry {
 		// fetch data from DB
 		rows, err := DB.Query(stm, fileEntry)
 		if err != nil {
-			log.Println("ERROR DB.Query, query='%s' error=%v", stm, err)
+			log.Printf("ERROR DB.Query, query='%s' error=%v\n", stm, err)
 			return CatalogEntry{}
 		}
 		defer rows.Close()

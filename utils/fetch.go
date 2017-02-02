@@ -311,7 +311,7 @@ func List2Set(arr []string) []string {
 	return out
 }
 
-// Provides a list of host IPs
+// HostIP provides a list of host IPs
 func HostIP() []string {
 	var out []string
 	addrs, err := net.InterfaceAddrs()
