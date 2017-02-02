@@ -52,6 +52,8 @@ func (t *TransferRequest) Run() error {
 // TransferData extends TransferRequest interface to include transferring data, checksum, bytes
 type TransferData struct {
 	File     string `json:"file"`
+	Block    string `json:"block"`
+	Dataset  string `json:"dataset"`
 	SrcUrl   string `json:"srcUrl"`
 	SrcAlias string `json:"srcAlias"`
 	DstUrl   string `json:"dstUrl"`
