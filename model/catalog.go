@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"os/exec"
 	"strings"
 
 	"github.com/vkuznet/transfer2go/utils"
@@ -77,6 +78,22 @@ func (c *Catalog) Find(stm string, cols []string, vals []interface{}, args ...in
 		log.Fatalf("ERROR rows.Err, %v\n", err)
 	}
 	return out
+}
+
+// Dump method returns TFC dump in CSV format
+func (c *Catalog) Dump() []byte {
+	if c.Type == "sqlite3" {
+		cmd := fmt.Sprintf("sqlite3 %s .dump", c.Uri)
+		out, err := exec.Command(cmd).Output()
+		if err != nil {
+			log.Println("ERROR c.Dump", err)
+		}
+		return out
+	} else {
+		log.Println("Catalog Dump method is not implemented yet for", c.Type)
+	}
+	return nil
+
 }
 
 // Add method adds entry to a catalog

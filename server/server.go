@@ -161,6 +161,7 @@ func Server(port string, config Config, aName string) {
 	http.HandleFunc(fmt.Sprintf("%s/agents", base), AgentsHandler)             // GET method
 	http.HandleFunc(fmt.Sprintf("%s/files", base), FilesHandler)               // GET method
 	http.HandleFunc(fmt.Sprintf("%s/reset", base), ResetHandler)               // GET method
+	http.HandleFunc(fmt.Sprintf("%s/tfc", base), TFCHandler)                   // GET/POST method
 	http.HandleFunc(fmt.Sprintf("%s/transfer", base), TransferDataHandler)     // POST method
 	http.HandleFunc(fmt.Sprintf("%s/request", base), RequestHandler)           // POST method
 	http.HandleFunc(fmt.Sprintf("%s/register", base), RegisterAgentHandler)    // POST method

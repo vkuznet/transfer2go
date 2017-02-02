@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"os/exec"
 	"sync/atomic"
 	"time"
 
@@ -111,15 +112,20 @@ func Transfer() Decorator {
 				}
 				pfn := fmt.Sprintf("%s%s", srcAgent.Backend, rec.Lfn)
 				rpfn := fmt.Sprintf("%s%s", dstAgent.Backend, rec.Lfn)
-				// TODO: I need one entry for local TFC and another for remote TFC
-				entry := CatalogEntry{Dataset: rec.Dataset, Block: rec.Block, Lfn: rec.Lfn, Pfn: rec.Pfn, Bytes: rec.Bytes, Hash: rec.Hash}
-				TFC.Add(entry)
-				// TODO: perform transfer with the help of backend tool
-				cmd := fmt.Sprintf("%s %s %s", srcAgent.Tool, pfn, rpfn)
+				// TODO: I'm not sure if I need a record in local TFC since I do transfer from local agent which knows about the file
+				// Add transfer entry in local TFC
+				//                 entry := CatalogEntry{Dataset: rec.Dataset, Block: rec.Block, Lfn: rec.Lfn, Pfn: rec.Pfn, Bytes: rec.Bytes, Hash: rec.Hash}
+				//                 TFC.Add(entry)
+				// perform transfer with the help of backend tool
+				cmd := exec.Command(srcAgent.Tool, pfn, rpfn)
 				log.Println("Transfer command", cmd)
-				// TODO: Perform transfer and check that it is completed
+				err = cmd.Run()
+				if err != nil {
+					log.Println("ERROR", srcAgent.Tool, pfn, rpfn)
+					return err
+				}
 				// Add entry for remote TFC after transfer is completed
-				url = fmt.Sprintf("%s/addRecord", t.DstUrl)
+				url = fmt.Sprintf("%s/tfc", t.DstUrl)
 				rEntry := CatalogEntry{Dataset: rec.Dataset, Block: rec.Block, Lfn: rec.Lfn, Pfn: rpfn, Bytes: rec.Bytes, Hash: rec.Hash}
 				data, err := json.Marshal(rEntry)
 				if err != nil {

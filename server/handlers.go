@@ -100,6 +100,37 @@ func ResetHandler(w http.ResponseWriter, r *http.Request) {
 
 // POST methods
 
+// TFCHandler registers given record in local TFC
+func TFCHandler(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != "POST" || r.Method != "GET" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	defer r.Body.Close()
+
+	if r.Method == "GET" {
+		data := model.TFC.Dump()
+		w.WriteHeader(http.StatusOK)
+		w.Write(data)
+		return
+	}
+	var entry model.CatalogEntry
+	err := json.NewDecoder(r.Body).Decode(&entry)
+	if err != nil {
+		log.Println("ERROR TFCHandler unable to decode", r.Body, err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	err = model.TFC.Add(entry)
+	if err != nil {
+		log.Println("ERROR TFCHandler unable to decode", r.Body, err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
 // RegisterAgentHandler registers current agent with another one
 func RegisterAgentHandler(w http.ResponseWriter, r *http.Request) {
 
@@ -112,7 +143,7 @@ func RegisterAgentHandler(w http.ResponseWriter, r *http.Request) {
 	var agentParams AgentInfo
 	err := json.NewDecoder(r.Body).Decode(&agentParams)
 	if err != nil {
-		log.Println("WARNING RegisterHandler unable to decode", r.Body, err)
+		log.Println("ERROR RegisterAgentHandler unable to decode", r.Body, err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -145,7 +176,7 @@ func RegisterProtocolHandler(w http.ResponseWriter, r *http.Request) {
 	var protocolParams AgentProtocol
 	err := json.NewDecoder(r.Body).Decode(&protocolParams)
 	if err != nil {
-		log.Println("WARNING RegisterHandler unable to decode", r.Body, err)
+		log.Println("ERROR RegisterProtocolHandler unable to decode", r.Body, err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
