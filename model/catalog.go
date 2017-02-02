@@ -45,46 +45,11 @@ type Catalog struct {
 	Owner    string `json:"owner"`    // used by ORACLE DB, defines owner of the database
 }
 
-// Find method look-up entries in a catalog for a given query
-func (c *Catalog) Find(stm string, cols []string, vals []interface{}, args ...interface{}) []CatalogEntry {
-	var out []CatalogEntry
-	rows, err := DB.Query(stm, args...)
-	if err != nil {
-		msg := fmt.Sprintf("ERROR DB.Query, query='%s' args='%v' error=%v", stm, args, err)
-		log.Fatal(msg)
-	}
-	defer rows.Close()
-
-	// loop over rows
-	for rows.Next() {
-		err := rows.Scan(vals...)
-		if err != nil {
-			msg := fmt.Sprintf("ERROR rows.Scan, vals='%v', error=%v", vals, err)
-			log.Fatal(msg)
-		}
-		rec := CatalogEntry{}
-		rec.Dataset = vals[0].(string)
-		rec.Block = vals[1].(string)
-		rec.Lfn = vals[2].(string)
-		rec.Pfn = vals[3].(string)
-		rec.Bytes = vals[4].(int64)
-		rec.Hash = vals[5].(string)
-		//         for i, _ := range cols {
-		//             rec[cols[i]] = vals[i]
-		//         }
-		out = append(out, rec)
-	}
-	if err = rows.Err(); err != nil {
-		log.Fatalf("ERROR rows.Err, %v\n", err)
-	}
-	return out
-}
-
 // Dump method returns TFC dump in CSV format
 func (c *Catalog) Dump() []byte {
 	if c.Type == "sqlite3" {
-		cmd := fmt.Sprintf("sqlite3 %s .dump", c.Uri)
-		out, err := exec.Command(cmd).Output()
+		//         cmd := fmt.Sprintf("sqlite3 %s .dump", c.Uri)
+		out, err := exec.Command("sqlite3", c.Uri, ".dump").Output()
 		if err != nil {
 			log.Println("ERROR c.Dump", err)
 		}
@@ -181,13 +146,28 @@ func (c *Catalog) Files(pattern string) []string {
 		}
 		return files
 	} else if c.Type == "sqlite3" {
-		// construct SQL query
-		var args []interface{} // argument values passed to SQL statement
 		cols := []string{"dataset", "blockid", "lfn", "pfn", "bytes", "hash"}
-		stm := fmt.Sprintf("SELECT %s FROM FILES AS F JOIN BLOCKS AS B ON F.BLOCKID=B.ID JOIN DATASETS AS D ON F.DATASETID = D.ID", strings.Join(cols, ","))
+		stm := fmt.Sprintf("SELECT %s FROM FILES AS F JOIN BLOCKS AS B ON F.BLOCKID=B.ID JOIN DATASETS AS D ON F.DATASETID = D.ID WHERE F.LFN=?", strings.Join(cols, ","))
+		if utils.VERBOSE > 0 {
+			log.Println("Files query", stm, pattern)
+		}
 		vals := []interface{}{new(sql.NullString), new(sql.NullString), new(sql.NullString), new(sql.NullString), new(sql.NullInt64), new(sql.NullString)}
-		for _, entry := range c.Find(stm, cols, vals, args) {
-			files = append(files, entry.Lfn)
+
+		// fetch data from DB
+		rows, err := DB.Query(stm, pattern)
+		if err != nil {
+			fmt.Println("ERROR DB.Query, query='%s' error=%v", stm, err)
+			return files
+		}
+		defer rows.Close()
+		for rows.Next() {
+			rec := CatalogEntry{}
+			err := rows.Scan(&rec.Dataset, &rec.Block, &rec.Lfn, &rec.Pfn, &rec.Bytes, &rec.Hash)
+			if err != nil {
+				msg := fmt.Sprintf("ERROR rows.Scan, vals='%v', error=%v", vals, err)
+				log.Fatal(msg)
+			}
+			files = append(files, rec.Lfn)
 		}
 		return files
 	}
@@ -207,11 +187,27 @@ func (c *Catalog) FileInfo(fileEntry string) CatalogEntry {
 		entry := CatalogEntry{Lfn: fname, Pfn: fname, Hash: hash, Bytes: b, Dataset: "/a/b/c", Block: "123"}
 		return entry
 	} else if c.Type == "sqlite3" {
-		cols := []string{"pfn", "bytes", "hash"}
+		cols := []string{"lfn", "pfn", "bytes", "hash"}
 		stm := fmt.Sprintf("SELECT %s FROM FILES AS F WHERE LFN = ?", strings.Join(cols, ","))
-		vals := []interface{}{new(sql.NullString), new(sql.NullInt64), new(sql.NullString)}
-		for _, entry := range c.Find(stm, cols, vals, fileEntry) {
-			return entry
+		if utils.VERBOSE > 0 {
+			log.Println("FileInfo query", stm, fileEntry)
+		}
+
+		// fetch data from DB
+		rows, err := DB.Query(stm, fileEntry)
+		if err != nil {
+			fmt.Println("ERROR DB.Query, query='%s' error=%v", stm, err)
+			return CatalogEntry{}
+		}
+		defer rows.Close()
+		for rows.Next() {
+			rec := CatalogEntry{}
+			err := rows.Scan(&rec.Lfn, &rec.Pfn, &rec.Bytes, &rec.Hash)
+			if err != nil {
+				fmt.Println("ERROR rows.Scan", err)
+				return CatalogEntry{}
+			}
+			return rec
 		}
 	}
 	return CatalogEntry{}
