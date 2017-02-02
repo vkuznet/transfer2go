@@ -80,7 +80,7 @@ func Transfer() Decorator {
 					return fmt.Errorf("File bytes mismatch")
 				}
 				url := fmt.Sprintf("%s/transfer", t.DstUrl)
-				td := TransferData{File: rec.Lfn, Data: data, Hash: hash, Bytes: b, SrcUrl: t.SrcUrl, SrcAlias: t.SrcAlias, DstUrl: t.DstUrl, DstAlias: t.DstAlias}
+				td := TransferData{File: rec.Lfn, Dataset: rec.Dataset, Block: rec.Block, Data: data, Hash: hash, Bytes: b, SrcUrl: t.SrcUrl, SrcAlias: t.SrcAlias, DstUrl: t.DstUrl, DstAlias: t.DstAlias}
 				d, e := json.Marshal(td)
 				if e != nil {
 					return e
