@@ -3,6 +3,7 @@
 [![Build Status](https://travis-ci.org/vkuznet/transfer2go.svg?branch=master)](https://travis-ci.org/vkuznet/transfer2go)
 [![Go Report Card](https://goreportcard.com/badge/github.com/vkuznet/transfer2go)](https://goreportcard.com/report/github.com/vkuznet/transfer2go)
 [![GoDoc](https://godoc.org/github.com/vkuznet/transfer2go?status.svg)](https://godoc.org/github.com/vkuznet/transfer2go)
+[![DOI](https://zenodo.org/badge/80159126.svg)](https://zenodo.org/badge/latestdoi/80159126)
 
 Go implementation of CMS
 [PhEDEx](https://www.researchgate.net/publication/228732867_Data_transfer_infrastructure_for_CMS_data_taking)
