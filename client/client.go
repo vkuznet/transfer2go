@@ -22,7 +22,6 @@ import (
 func Transfer(agent, src, dst string) error {
 	var transfer, upload bool
 	var srcFile, srcAlias, srcUrl, dstFile, dstAlias, dstUrl string
-	srcUrl = agent
 	if stat, err := os.Stat(src); err == nil && !stat.IsDir() {
 		// local file, we need to transfer it to the destination
 		upload = true
@@ -67,6 +66,14 @@ func Transfer(agent, src, dst string) error {
 			}
 		}
 	}
+	if srcUrl == "" {
+		for alias, aurl := range remoteAgents {
+			if srcAlias == alias {
+				srcUrl = aurl
+				break
+			}
+		}
+	}
 
 	// check if destination is ok
 	dstUrl, ok := remoteAgents[dstAlias]
@@ -77,7 +84,7 @@ func Transfer(agent, src, dst string) error {
 	}
 
 	if transfer {
-		fmt.Println("### Transfer", agent, src, "to site", dst)
+		fmt.Println("### Transfer", srcAlias, srcUrl, srcFile, "=>", dstAlias, dstUrl, dstFile)
 
 		// Read data from source agent
 		url = fmt.Sprintf("%s/files?pattern=%s", srcUrl, srcFile)
@@ -100,7 +107,7 @@ func Transfer(agent, src, dst string) error {
 		ts := time.Now().Unix()
 		transferCollection := model.TransferCollection{TimeStamp: ts, Requests: requests}
 
-		url = fmt.Sprintf("%s/request", dstUrl)
+		url = fmt.Sprintf("%s/request", srcUrl)
 		d, e := json.Marshal(transferCollection)
 		if e != nil {
 			return e
