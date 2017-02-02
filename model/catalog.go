@@ -186,6 +186,7 @@ func (c *Catalog) FileInfo(fileEntry string) CatalogEntry {
 			log.Println("ERROR, unable to read a file", fname, err)
 		}
 		hash, b := utils.Hash(data)
+		// TODO: I need to know how to generate dataset and block names in this case
 		entry := CatalogEntry{Lfn: fname, Pfn: fname, Hash: hash, Bytes: b, Dataset: "/a/b/c", Block: "123"}
 		return entry
 	} else if c.Type == "sqlite3" {
