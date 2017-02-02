@@ -60,7 +60,7 @@ func Transfer() Decorator {
 			defer atomic.AddInt32(&TransferCounter, -1)
 
 			// TODO: main Transfer logic would be implemented here
-			log.Println("Request Transfer", t)
+			log.Println("Request Transfer", t.String())
 
 			rec := TFC.FileInfo(t.File)
 			if rec.Lfn == "" {
@@ -110,18 +110,14 @@ func Transfer() Decorator {
 				if err != nil {
 					return err
 				}
-				pfn := fmt.Sprintf("%s%s", srcAgent.Backend, rec.Lfn)
+				// construct remote PFN by using destination agent backend and record LFN
 				rpfn := fmt.Sprintf("%s%s", dstAgent.Backend, rec.Lfn)
-				// TODO: I'm not sure if I need a record in local TFC since I do transfer from local agent which knows about the file
-				// Add transfer entry in local TFC
-				//                 entry := CatalogEntry{Dataset: rec.Dataset, Block: rec.Block, Lfn: rec.Lfn, Pfn: rec.Pfn, Bytes: rec.Bytes, Hash: rec.Hash}
-				//                 TFC.Add(entry)
 				// perform transfer with the help of backend tool
-				cmd := exec.Command(srcAgent.Tool, pfn, rpfn)
+				cmd := exec.Command(srcAgent.Tool, rec.Pfn, rpfn)
 				log.Println("Transfer command", cmd)
 				err = cmd.Run()
 				if err != nil {
-					log.Println("ERROR", srcAgent.Tool, pfn, rpfn)
+					log.Println("ERROR", srcAgent.Tool, rec.Pfn, rpfn, err)
 					return err
 				}
 				// Add entry for remote TFC after transfer is completed
