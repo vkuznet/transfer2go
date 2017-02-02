@@ -103,7 +103,7 @@ func ResetHandler(w http.ResponseWriter, r *http.Request) {
 // TFCHandler registers given record in local TFC
 func TFCHandler(w http.ResponseWriter, r *http.Request) {
 
-	if r.Method != "POST" || r.Method != "GET" {
+	if !(r.Method == "POST" || r.Method == "GET") {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
@@ -248,6 +248,8 @@ func TransferDataHandler(w http.ResponseWriter, r *http.Request) {
 	// parse request
 	arr := strings.Split(td.File, "/")
 	fname := arr[len(arr)-1]
+	// TODO: I need to revisit how to construct pfn on an agent during upload
+	pfn := fmt.Sprintf("%s/%s", _backend, fname)
 	err = ioutil.WriteFile(fname, td.Data, 0666)
 	if err != nil {
 		log.Println("ERROR, TransferHandler unable to write file", fname)
@@ -266,11 +268,9 @@ func TransferDataHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	log.Printf("wrote %s:%s to %s\n", td.SrcAlias, fname, td.DstAlias)
+	log.Printf("wrote %s:%s to %s:%s\n", td.SrcAlias, fname, td.DstAlias, pfn)
 	if model.TFC.Type != "filesystem" {
-		lfn := fname
-		pfn := fmt.Sprintf("%s/%s", _backend, td.File)
-		entry := model.CatalogEntry{Lfn: lfn, Pfn: pfn, Dataset: td.Dataset, Block: td.Block, Bytes: bytes, Hash: hash}
+		entry := model.CatalogEntry{Lfn: td.File, Pfn: pfn, Dataset: td.Dataset, Block: td.Block, Bytes: bytes, Hash: hash}
 		model.TFC.Add(entry)
 	}
 	w.WriteHeader(http.StatusOK)
