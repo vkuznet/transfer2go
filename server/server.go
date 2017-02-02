@@ -118,6 +118,8 @@ func Server(port string, config Config, aName string) {
 	_myself = config.Url
 	_alias = config.Name
 	_protocol = config.Protocol
+	_backend = config.Backend
+	_tool = config.Tool
 	arr := strings.Split(_myself, "/")
 	base := ""
 	if len(arr) > 3 {
