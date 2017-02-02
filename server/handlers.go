@@ -214,33 +214,33 @@ func TransferDataHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// So far we call catalog.Uri to handle the file path and use simple file writer
-	// to write directly to filesystem. Instead, I need to handle data via catalog
-	if model.TFC.Type == "filesystem" {
-		arr := strings.Split(td.File, "/")
-		fname := arr[len(arr)-1]
-		filePath := fmt.Sprintf("%s/%s", model.TFC.Uri, fname)
-		err := ioutil.WriteFile(filePath, td.Data, 0666)
-		if err != nil {
-			log.Println("ERROR, TransferHandler unable to write file", fname)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		// verify hash, bytes of transferred data
-		hash, bytes := utils.Hash(td.Data)
-		if hash != td.Hash {
-			log.Println("ERROR, TransferHandler written file has different hash", hash, td.Hash)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		if bytes != td.Bytes {
-			log.Println("ERROR, TransferHandler written file has different number of bytes", bytes, td.Bytes)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		log.Printf("wrote %s/%s %s/%s hash=%s, bytes=%v\n", td.SrcAlias, fname, td.DstAlias, filePath, td.Hash, td.Bytes)
-	} else if model.TFC.Type == "sqlite3" {
-		log.Println("Not implemented yet")
+	// parse request
+	arr := strings.Split(td.File, "/")
+	fname := arr[len(arr)-1]
+	err = ioutil.WriteFile(fname, td.Data, 0666)
+	if err != nil {
+		log.Println("ERROR, TransferHandler unable to write file", fname)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	// verify hash, bytes of transferred data
+	hash, bytes := utils.Hash(td.Data)
+	if hash != td.Hash {
+		log.Println("ERROR, TransferHandler written file has different hash", hash, td.Hash)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if bytes != td.Bytes {
+		log.Println("ERROR, TransferHandler written file has different number of bytes", bytes, td.Bytes)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	log.Printf("wrote %s:%s to %s\n", td.SrcAlias, fname, td.DstAlias)
+	if model.TFC.Type != "filesystem" {
+		lfn := fname
+		pfn := fmt.Sprintf("%s/%s", _backend, td.File)
+		entry := model.CatalogEntry{Lfn: lfn, Pfn: pfn, Dataset: td.Dataset, Block: td.Block, Bytes: bytes, Hash: hash}
+		model.TFC.Add(entry)
 	}
 	w.WriteHeader(http.StatusOK)
 }
