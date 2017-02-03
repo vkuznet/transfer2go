@@ -21,8 +21,6 @@ import (
 func main() {
 
 	// server options
-	var port string
-	flag.StringVar(&port, "port", "8989", "server port number")
 	var agent string
 	flag.StringVar(&agent, "agent", "", "Remote agent registration end-point")
 	var configFile string
@@ -72,8 +70,11 @@ func main() {
 		if config.Protocol == "" {
 			config.Protocol = "http" // default value
 		}
+		if config.Port == 0 {
+			config.Port = 8989
+		}
 
-		server.Server(port, config, register)
+		server.Server(config, register)
 	} else {
 
 		if status {
