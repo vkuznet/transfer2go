@@ -81,6 +81,11 @@ type CatalogEntry struct {
 	Hash    string `json:"hash"`    // hash represents checksum of the pfn
 }
 
+// String provides string representation of CatalogEntry
+func (c *CatalogEntry) String() string {
+	return fmt.Sprintf("<CatalogEntry: dataset=%s block=%s lfn=%s pfn=%s bytes=%d hash=%s>", c.Dataset, c.Block, c.Lfn, c.Pfn, c.Bytes, c.Hash)
+}
+
 // Catalog represents Trivial File Catalog (TFC) of the model
 type Catalog struct {
 	Type     string `json:"type"`     // catalog type, e.g. filesystem, sqlite3, etc.
