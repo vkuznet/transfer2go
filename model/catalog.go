@@ -17,12 +17,16 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-// main DB record we work with
+// Record represent main DB record we work with
 type Record map[string]interface{}
 
 // DB is global pointer to sql database object, it is initialized once when server starts
 var DB *sql.DB
+
+// DBTYPE holds database type, e.g. sqlite3
 var DBTYPE string
+
+// DBSQL represent common record we get from DB SQL statement
 var DBSQL Record
 
 func check(msg string, err error) {
@@ -31,7 +35,7 @@ func check(msg string, err error) {
 	}
 }
 
-// helper function to load DBS SQL statements
+// LoadSQL is a helper function to load DBS SQL statements
 func LoadSQL(owner string) Record {
 	dbsql := make(Record)
 	// query statement
@@ -185,33 +189,31 @@ func (c *Catalog) Files(pattern string) []string {
 			}
 		}
 		return files
-	} else {
-		// TODO: make generic database statements via templates for given database type
-		//         cols := []string{"dataset", "blockid", "lfn", "pfn", "bytes", "hash"}
-		//         stm := fmt.Sprintf("SELECT %s FROM FILES AS F JOIN BLOCKS AS B ON F.BLOCKID=B.ID JOIN DATASETS AS D ON F.DATASETID = D.ID WHERE F.LFN=?", strings.Join(cols, ","))
-		stm := getSQL("files_blocks_datasets") + fmt.Sprintf(" WHERE F.LFN=%s", placeholder("lfn"))
-		if utils.VERBOSE > 0 {
-			log.Println("Files query", stm, pattern)
-		}
-		vals := []interface{}{new(sql.NullString), new(sql.NullString), new(sql.NullString), new(sql.NullString), new(sql.NullInt64), new(sql.NullString)}
+	}
+	// TODO: make generic database statements via templates for given database type
+	//         cols := []string{"dataset", "blockid", "lfn", "pfn", "bytes", "hash"}
+	//         stm := fmt.Sprintf("SELECT %s FROM FILES AS F JOIN BLOCKS AS B ON F.BLOCKID=B.ID JOIN DATASETS AS D ON F.DATASETID = D.ID WHERE F.LFN=?", strings.Join(cols, ","))
+	stm := getSQL("files_blocks_datasets") + fmt.Sprintf(" WHERE F.LFN=%s", placeholder("lfn"))
+	if utils.VERBOSE > 0 {
+		log.Println("Files query", stm, pattern)
+	}
+	vals := []interface{}{new(sql.NullString), new(sql.NullString), new(sql.NullString), new(sql.NullString), new(sql.NullInt64), new(sql.NullString)}
 
-		// fetch data from DB
-		rows, err := DB.Query(stm, pattern)
-		if err != nil {
-			log.Printf("ERROR DB.Query, query='%s' error=%v\n", stm, err)
-			return files
-		}
-		defer rows.Close()
-		for rows.Next() {
-			rec := CatalogEntry{}
-			err := rows.Scan(&rec.Dataset, &rec.Block, &rec.Lfn, &rec.Pfn, &rec.Bytes, &rec.Hash)
-			if err != nil {
-				msg := fmt.Sprintf("ERROR rows.Scan, vals='%v', error=%v", vals, err)
-				log.Fatal(msg)
-			}
-			files = append(files, rec.Lfn)
-		}
+	// fetch data from DB
+	rows, err := DB.Query(stm, pattern)
+	if err != nil {
+		log.Printf("ERROR DB.Query, query='%s' error=%v\n", stm, err)
 		return files
+	}
+	defer rows.Close()
+	for rows.Next() {
+		rec := CatalogEntry{}
+		err := rows.Scan(&rec.Dataset, &rec.Block, &rec.Lfn, &rec.Pfn, &rec.Bytes, &rec.Hash)
+		if err != nil {
+			msg := fmt.Sprintf("ERROR rows.Scan, vals='%v', error=%v", vals, err)
+			log.Fatal(msg)
+		}
+		files = append(files, rec.Lfn)
 	}
 	return files
 }
@@ -228,31 +230,30 @@ func (c *Catalog) FileInfo(fileEntry string) CatalogEntry {
 		// TODO: I need to know how to generate dataset and block names in this case
 		entry := CatalogEntry{Lfn: fname, Pfn: fname, Hash: hash, Bytes: b, Dataset: "/a/b/c", Block: "123"}
 		return entry
-	} else {
-		// TODO: make generic SQL statement via templates
-		//         cols := []string{"lfn", "pfn", "bytes", "hash"}
-		//         stm := fmt.Sprintf("SELECT %s FROM FILES AS F WHERE LFN = ?", strings.Join(cols, ","))
-		stm := getSQL("files") + fmt.Sprintf(" WHERE F.LFN=%s", placeholder("lfn"))
-		if utils.VERBOSE > 0 {
-			log.Println("FileInfo query", stm, fileEntry)
-		}
+	}
+	// TODO: make generic SQL statement via templates
+	//         cols := []string{"lfn", "pfn", "bytes", "hash"}
+	//         stm := fmt.Sprintf("SELECT %s FROM FILES AS F WHERE LFN = ?", strings.Join(cols, ","))
+	stm := getSQL("files") + fmt.Sprintf(" WHERE F.LFN=%s", placeholder("lfn"))
+	if utils.VERBOSE > 0 {
+		log.Println("FileInfo query", stm, fileEntry)
+	}
 
-		// fetch data from DB
-		rows, err := DB.Query(stm, fileEntry)
+	// fetch data from DB
+	rows, err := DB.Query(stm, fileEntry)
+	if err != nil {
+		log.Printf("ERROR DB.Query, query='%s' error=%v\n", stm, err)
+		return CatalogEntry{}
+	}
+	defer rows.Close()
+	for rows.Next() {
+		rec := CatalogEntry{}
+		err := rows.Scan(&rec.Lfn, &rec.Pfn, &rec.Bytes, &rec.Hash)
 		if err != nil {
-			log.Printf("ERROR DB.Query, query='%s' error=%v\n", stm, err)
+			log.Println("ERROR rows.Scan", err)
 			return CatalogEntry{}
 		}
-		defer rows.Close()
-		for rows.Next() {
-			rec := CatalogEntry{}
-			err := rows.Scan(&rec.Lfn, &rec.Pfn, &rec.Bytes, &rec.Hash)
-			if err != nil {
-				log.Println("ERROR rows.Scan", err)
-				return CatalogEntry{}
-			}
-			return rec
-		}
+		return rec
 	}
 	return CatalogEntry{}
 }
