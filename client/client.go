@@ -40,7 +40,7 @@ func (u *UserRequest) String() string {
 	if u.Upload {
 		action = "upload"
 	}
-	return fmt.Sprintf("<UserRequest %s %s(%s) %s => %s(%s) %s>", action, u.SrcAlias, u.SrcUrl, u.SrcFile, u.DstAlias, u.DstUrl, u.DstFile)
+	return fmt.Sprintf("<UserRequest %s %s %s %s => %s %s %s>", action, u.SrcAlias, u.SrcUrl, u.SrcFile, u.DstAlias, u.DstUrl, u.DstFile)
 }
 
 // helper function to find an LFN in agent list, return agent name/url which has this file
