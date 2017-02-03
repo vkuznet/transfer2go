@@ -226,8 +226,8 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// TransferDataHandler handles TransferData type received over HTTP
-func TransferDataHandler(w http.ResponseWriter, r *http.Request) {
+// UploadDataHandler upload TransferData HTTP
+func UploadDataHandler(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != "POST" {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -237,7 +237,7 @@ func TransferDataHandler(w http.ResponseWriter, r *http.Request) {
 	var td model.TransferData
 	err := json.NewDecoder(r.Body).Decode(&td)
 	if err != nil {
-		log.Println("ERROR TransferDataHandler unable to unmarshal incoming data", err)
+		log.Println("ERROR UploadDataHandler unable to unmarshal incoming data", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -245,23 +245,23 @@ func TransferDataHandler(w http.ResponseWriter, r *http.Request) {
 	// parse request
 	arr := strings.Split(td.File, "/")
 	fname := arr[len(arr)-1]
-	// TODO: I need to revisit how to construct pfn on an agent during upload
+	// TODO: I need to revisit how to construct pfn on agent during upload
 	pfn := fmt.Sprintf("%s/%s", _backend, fname)
 	err = ioutil.WriteFile(fname, td.Data, 0666)
 	if err != nil {
-		log.Println("ERROR, TransferHandler unable to write file", fname)
+		log.Println("ERROR, UploadDataHandler unable to write file", fname)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	// verify hash, bytes of transferred data
 	hash, bytes := utils.Hash(td.Data)
 	if hash != td.Hash {
-		log.Println("ERROR, TransferHandler written file has different hash", hash, td.Hash)
+		log.Println("ERROR, UploadDataHandler written file has different hash", hash, td.Hash)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	if bytes != td.Bytes {
-		log.Println("ERROR, TransferHandler written file has different number of bytes", bytes, td.Bytes)
+		log.Println("ERROR, UploadDataHandler written file has different number of bytes", bytes, td.Bytes)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
