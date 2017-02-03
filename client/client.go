@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vkuznet/transfer2go/common"
 	"github.com/vkuznet/transfer2go/model"
 	"github.com/vkuznet/transfer2go/utils"
 )
@@ -42,22 +43,89 @@ func (u *UserRequest) String() string {
 	return fmt.Sprintf("<UserRequest %s %s(%s) %s => %s(%s) %s>", action, u.SrcAlias, u.SrcUrl, u.SrcFile, u.DstAlias, u.DstUrl, u.DstFile)
 }
 
+// helper function to find an LFN in agent list, return agent name/url which has this file
+func findFile(agents map[string]string, file string) (string, string, string, error) {
+	// agent parameters which we assign if we find a file
+	var agentAlias, agentUrl string
+
+	out := make(chan utils.ResponseType)
+	defer close(out)
+	umap := map[string]int{}
+	for _, aurl := range agents {
+		furl := fmt.Sprintf("%s/files?pattern=%s", aurl, file)
+		go utils.Fetch(furl, []byte{}, out)
+	}
+	var aurls []string
+	exit := false
+	for {
+		select {
+		case r := <-out:
+			if r.Error == nil {
+				var files []string
+				err := json.Unmarshal(r.Data, &files)
+				if err == nil && utils.InList(file, files) {
+					aurls = append(aurls, strings.Split(r.Url, "/files")[0])
+				}
+			}
+			delete(umap, r.Url) // remove Url from map
+		default:
+			if len(umap) == 0 { // no more requests, merge data records
+				exit = true
+			}
+			time.Sleep(time.Duration(10) * time.Millisecond) // wait for response
+		}
+		if exit {
+			break
+		}
+	}
+	if len(aurls) > 0 {
+		log.Println("File", file, "found on", aurls)
+	} else {
+		err := fmt.Errorf("Unable to find %s in agents %v\n", file, agents)
+		return "", "", "", err
+
+	}
+	// TODO: we may have intelligent logic here to pick best agent to serve, e.g. based on requests transfers
+	// so far use first available one
+	var load int32
+	for alias, aurl := range agents {
+		url := fmt.Sprintf("%s/status", aurl)
+		resp := utils.FetchResponse(url, []byte{})
+		if resp.Error == nil {
+			var agentStatus common.AgentStatus
+			err := json.Unmarshal(resp.Data, &agentStatus)
+			if err != nil {
+				continue
+			}
+			if load == -1 {
+				load = agentStatus.TransferCounter
+			}
+			if agentStatus.TransferCounter <= load {
+				agentAlias = alias
+				agentUrl = aurl
+			}
+		}
+
+	}
+	if agentAlias == "" {
+		err := fmt.Errorf("Unable to find %s in agents %v\n", file, agents)
+		return agentAlias, agentUrl, file, err
+	}
+	return agentAlias, agentUrl, file, nil
+}
+
 // helper function to parse source and destination parameters
 func parse(agent, src, dst string) (UserRequest, error) {
 	var req UserRequest
 	var transfer, upload bool
 	var srcFile, srcAlias, srcUrl, dstFile, dstAlias, dstUrl string
 	if stat, err := os.Stat(src); err == nil && !stat.IsDir() {
-		// local file, we need to transfer it to the destination
+		// local file, we need to upload it to the destination
 		upload = true
 		srcFile = src
 		srcUrl = agent
 	}
-	if strings.Contains(src, ":") {
-		arr := strings.Split(src, ":")
-		srcAlias = arr[0]
-		srcFile = arr[1]
-	}
+	// start with desination
 	if strings.Contains(dst, ":") {
 		arr := strings.Split(dst, ":")
 		dstAlias = arr[0]
@@ -82,6 +150,20 @@ func parse(agent, src, dst string) (UserRequest, error) {
 		return req, e
 	}
 
+	// resolve source agent name/alias and identify file to transfer
+	if strings.Contains(src, ":") {
+		arr := strings.Split(src, ":")
+		srcAlias = arr[0]
+		srcFile = arr[1]
+	} else {
+		// input source didn't specified site name, we should try to find a file on all agents
+		// don't use := here since we assign values to srcAlias, etc., therefore I must reuse
+		// error variable
+		srcAlias, srcUrl, srcFile, e = findFile(remoteAgents, src)
+		if e != nil {
+			return req, e
+		}
+	}
 	// get source agent alias name
 	if srcAlias == "" {
 		for alias, aurl := range remoteAgents {
@@ -91,6 +173,7 @@ func parse(agent, src, dst string) (UserRequest, error) {
 			}
 		}
 	}
+	// get source agent url
 	if srcUrl == "" {
 		for alias, aurl := range remoteAgents {
 			if srcAlias == alias {
@@ -155,7 +238,7 @@ func upload(req UserRequest) error {
 	d := "/a/b/c" // dataset name
 	b := "123"    // block name
 	transferData := model.TransferData{File: req.DstFile, Dataset: d, Block: b, SrcUrl: req.SrcUrl, SrcAlias: req.SrcAlias, DstUrl: req.DstUrl, DstAlias: req.DstAlias, Data: data, Hash: hash, Bytes: bytes}
-	url := fmt.Sprintf("%s/transfer", req.DstUrl)
+	url := fmt.Sprintf("%s/upload", req.DstUrl)
 	data, err = json.Marshal(transferData)
 	if err != nil {
 		return err
