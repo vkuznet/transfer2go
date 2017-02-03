@@ -30,6 +30,7 @@ type Config struct {
 	Tool      string `json:"tool"`      // backend tool, e.g. srmcp
 	Mfile     string `json:"mfile"`     // metrics file name
 	Minterval int64  `json:"minterval"` // metrics interval
+	Staticdir string `json:"staticdir"` // static dir defines location of static files, e.g. sql,js templates
 	Workers   int    `json:"workers"`   // number of workers
 	QueueSize int    `json:"queuesize"` // total size of the queue
 }
@@ -120,6 +121,7 @@ func Server(port string, config Config, aName string) {
 	_protocol = config.Protocol
 	_backend = config.Backend
 	_tool = config.Tool
+	utils.STATICDIR = config.Staticdir
 	arr := strings.Split(_myself, "/")
 	base := ""
 	if len(arr) > 3 {
@@ -144,7 +146,8 @@ func Server(port string, config Config, aName string) {
 		}
 		// open up Catalog DB
 		dbtype := model.TFC.Type
-		dburi := model.TFC.Uri // TODO: I may need to change this for MySQL/ORACLE
+		dburi := model.TFC.Uri // TODO: may be I need to change this based on DB Login/Password, check MySQL
+		dbowner := model.TFC.Owner
 		db, dberr := sql.Open(dbtype, dburi)
 		defer db.Close()
 		if dberr != nil {
@@ -154,7 +157,10 @@ func Server(port string, config Config, aName string) {
 		if dberr != nil {
 			log.Fatalf("ERROR db.Ping, %v\n", dberr)
 		}
+
 		model.DB = db
+		model.DBTYPE = dbtype
+		model.DBSQL = model.LoadSQL(dbowner)
 	}
 	log.Println("Catalog", model.TFC)
 
@@ -164,7 +170,7 @@ func Server(port string, config Config, aName string) {
 	http.HandleFunc(fmt.Sprintf("%s/files", base), FilesHandler)               // GET method
 	http.HandleFunc(fmt.Sprintf("%s/reset", base), ResetHandler)               // GET method
 	http.HandleFunc(fmt.Sprintf("%s/tfc", base), TFCHandler)                   // GET/POST method
-	http.HandleFunc(fmt.Sprintf("%s/transfer", base), TransferDataHandler)     // POST method
+	http.HandleFunc(fmt.Sprintf("%s/upload", base), UploadDataHandler)         // POST method
 	http.HandleFunc(fmt.Sprintf("%s/request", base), RequestHandler)           // POST method
 	http.HandleFunc(fmt.Sprintf("%s/register", base), RegisterAgentHandler)    // POST method
 	http.HandleFunc(fmt.Sprintf("%s/protocol", base), RegisterProtocolHandler) // POST method
