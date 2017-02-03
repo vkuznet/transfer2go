@@ -48,6 +48,29 @@ func (f RequestFunc) Process(t *TransferRequest) error {
 // Decorator wraps a request with extra behavior
 type Decorator func(Request) Request
 
+// helper function to perform transfer via HTTP protocol
+func httpTransfer(rec CatalogEntry, t *TransferRequest) error {
+	data, err := ioutil.ReadFile(rec.Lfn)
+	if err != nil {
+		return err
+	}
+	hash, b := utils.Hash(data)
+	if hash != rec.Hash {
+		return fmt.Errorf("File hash mismatch")
+	}
+	if b != rec.Bytes {
+		return fmt.Errorf("File bytes mismatch")
+	}
+	url := fmt.Sprintf("%s/upload", t.DstUrl)
+	td := TransferData{File: rec.Lfn, Dataset: rec.Dataset, Block: rec.Block, Data: data, Hash: hash, Bytes: b, SrcUrl: t.SrcUrl, SrcAlias: t.SrcAlias, DstUrl: t.DstUrl, DstAlias: t.DstAlias}
+	d, e := json.Marshal(td)
+	if e != nil {
+		return e
+	}
+	resp := utils.FetchResponse(url, d)
+	return resp.Error
+}
+
 // Transfer returns a Decorator that performs request transfers
 func Transfer() Decorator {
 	return func(r Request) Request {
@@ -59,7 +82,6 @@ func Transfer() Decorator {
 			// decrement transfer counter when done with transfer request
 			defer atomic.AddInt32(&TransferCounter, -1)
 
-			// TODO: main Transfer logic would be implemented here
 			log.Println("Request Transfer", t.String())
 
 			rec := TFC.FileInfo(t.File)
@@ -68,50 +90,40 @@ func Transfer() Decorator {
 				log.Printf("WARNING requested file %s does not exists in TFC of this agent\n", t.File)
 				return r.Process(t)
 			}
-			if TFC.Type == "filesystem" {
-				data, err := ioutil.ReadFile(rec.Lfn)
-				if err != nil {
-					return err
-				}
-				hash, b := utils.Hash(data)
-				if hash != rec.Hash {
-					return fmt.Errorf("File hash mismatch")
-				}
-				if b != rec.Bytes {
-					return fmt.Errorf("File bytes mismatch")
-				}
-				url := fmt.Sprintf("%s/transfer", t.DstUrl)
-				td := TransferData{File: rec.Lfn, Dataset: rec.Dataset, Block: rec.Block, Data: data, Hash: hash, Bytes: b, SrcUrl: t.SrcUrl, SrcAlias: t.SrcAlias, DstUrl: t.DstUrl, DstAlias: t.DstAlias}
-				d, e := json.Marshal(td)
-				if e != nil {
-					return e
-				}
-				resp := utils.FetchResponse(url, d)
+			// obtain information about source and destination agents
+			url := fmt.Sprintf("%s/status", t.DstUrl)
+			resp := utils.FetchResponse(url, []byte{})
+			if resp.Error != nil {
 				return resp.Error
-			} else if TFC.Type == "sqlite3" {
-				// TODO: This should be a go-routine
-				url := fmt.Sprintf("%s/status", t.DstUrl)
-				resp := utils.FetchResponse(url, []byte{})
-				if resp.Error != nil {
-					return resp.Error
-				}
-				var dstAgent common.AgentStatus
-				err := json.Unmarshal(resp.Data, &dstAgent)
+			}
+			var dstAgent common.AgentStatus
+			err := json.Unmarshal(resp.Data, &dstAgent)
+			if err != nil {
+				return err
+			}
+			url = fmt.Sprintf("%s/status", t.SrcUrl)
+			resp = utils.FetchResponse(url, []byte{})
+			if resp.Error != nil {
+				return resp.Error
+			}
+			var srcAgent common.AgentStatus
+			err = json.Unmarshal(resp.Data, &srcAgent)
+			if err != nil {
+				return err
+			}
+
+			// if protocol is not given use default one: HTTP
+			var rpfn string // remote PFN
+			if srcAgent.Protocol == "" || srcAgent.Protocol == "http" {
+				log.Println("Transfer via HTTP protocol to", dstAgent)
+				err = httpTransfer(rec, t)
 				if err != nil {
 					return err
 				}
-				url = fmt.Sprintf("%s/status", t.SrcUrl)
-				resp = utils.FetchResponse(url, []byte{})
-				if resp.Error != nil {
-					return resp.Error
-				}
-				var srcAgent common.AgentStatus
-				err = json.Unmarshal(resp.Data, &srcAgent)
-				if err != nil {
-					return err
-				}
+				rpfn = rec.Lfn
+			} else {
 				// construct remote PFN by using destination agent backend and record LFN
-				rpfn := fmt.Sprintf("%s%s", dstAgent.Backend, rec.Lfn)
+				rpfn = fmt.Sprintf("%s%s", dstAgent.Backend, rec.Lfn)
 				// perform transfer with the help of backend tool
 				cmd := exec.Command(srcAgent.Tool, rec.Pfn, rpfn)
 				log.Println("Transfer command", cmd)
@@ -120,17 +132,17 @@ func Transfer() Decorator {
 					log.Println("ERROR", srcAgent.Tool, rec.Pfn, rpfn, err)
 					return err
 				}
-				// Add entry for remote TFC after transfer is completed
-				url = fmt.Sprintf("%s/tfc", t.DstUrl)
-				rEntry := CatalogEntry{Dataset: rec.Dataset, Block: rec.Block, Lfn: rec.Lfn, Pfn: rpfn, Bytes: rec.Bytes, Hash: rec.Hash}
-				data, err := json.Marshal(rEntry)
-				if err != nil {
-					return err
-				}
-				resp = utils.FetchResponse(url, data) // POST request
-				if resp.Error != nil {
-					return resp.Error
-				}
+			}
+			// Add entry for remote TFC after transfer is completed
+			url = fmt.Sprintf("%s/tfc", t.DstUrl)
+			rEntry := CatalogEntry{Dataset: rec.Dataset, Block: rec.Block, Lfn: rec.Lfn, Pfn: rpfn, Bytes: rec.Bytes, Hash: rec.Hash}
+			d, e := json.Marshal(rEntry)
+			if e != nil {
+				return e
+			}
+			resp = utils.FetchResponse(url, d) // POST request
+			if resp.Error != nil {
+				return resp.Error
 			}
 
 			return r.Process(t)
