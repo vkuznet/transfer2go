@@ -33,6 +33,13 @@ type Config struct {
 	Staticdir string `json:"staticdir"` // static dir defines location of static files, e.g. sql,js templates
 	Workers   int    `json:"workers"`   // number of workers
 	QueueSize int    `json:"queuesize"` // total size of the queue
+	Port      int    `json:"port"`      // port number given server runs on, default 8989
+	Base      string `json:"base""`     // URL base path for agent server, it will be extracted from Url
+}
+
+// String returns string representation of Config data type
+func (c *Config) String() string {
+	return fmt.Sprintf("<Config: name=%s url=%s port=%d base=%s catalog=%s protocol=%s backend=%s tool=%s mfile=%s minterval=%d staticdir=%s workders=%d queuesize=%d>", c.Name, c.Url, c.Port, c.Base, c.Catalog, c.Protocol, c.Backend, c.Tool, c.Mfile, c.Minterval, c.Staticdir, c.Workers, c.QueueSize)
 }
 
 // AgentInfo data type
@@ -114,7 +121,7 @@ func registerAtAgents(aName string) {
 }
 
 // Server implementation
-func Server(port string, config Config, aName string) {
+func Server(config Config, aName string) {
 	_config = config
 	_myself = config.Url
 	_alias = config.Name
@@ -127,7 +134,12 @@ func Server(port string, config Config, aName string) {
 	if len(arr) > 3 {
 		base = fmt.Sprintf("/%s", strings.Join(arr[3:], "/"))
 	}
-	log.Printf("Start agent: url=%s, port=%s, base=%s", _myself, port, base)
+	port := "8989" // default port, the port here is a string type since we'll use it later in http.ListenAndServe
+	if config.Port != 0 {
+		port = fmt.Sprintf("%d", config.Port)
+	}
+	config.Base = base
+	log.Println("Agent", config.String())
 
 	// register self agent URI in remote agent and vice versa
 	registerAtAgents(aName)
