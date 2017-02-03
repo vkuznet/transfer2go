@@ -95,7 +95,7 @@ type ResponseType struct {
 }
 
 func (r *ResponseType) String() string {
-	return fmt.Sprintf("<Response: url=%s, data=%s, error=%v>", r.Url, string(r.Data), r.Error)
+	return fmt.Sprintf("<Response: url=%s data=%s error=%v>", r.Url, string(r.Data), r.Error)
 }
 
 // UrlRequest structure holds details about url request's attributes
