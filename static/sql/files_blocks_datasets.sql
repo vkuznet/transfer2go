@@ -1,0 +1,2 @@
+SELECT dataset, blockid, lfn, pfn, bytes, hash
+FROM FILES AS F JOIN BLOCKS AS B ON F.BLOCKID=B.ID JOIN DATASETS AS D ON F.DATASETID = D.ID

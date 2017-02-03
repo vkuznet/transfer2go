@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>DBS server</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="//code.jquery.com/jquery-1.11.2.min.js"></script>
+    <link rel="stylesheet" href="css/kube.min.css" />
+    <link rel="stylesheet" href="css/main.css" />
+</head>
+<body class="kubepage">
+
+    <header class="group header">
+        <nav class="navbar navbar-left">
+            <ul>
+            <li><img src="images/cms_logo.jpg" alt="" style="width:30px" ></li>
+            <li><a href="" class="main-menu-item">DBS</a></li>
+            </ul>
+        </nav>
+        <nav class="navbar navbar-right">
+            <strong>User: {{.User}}</strong>
+        </nav>
+    </header>
+    <br/>
+
+<div class="main-font">
+    {{.Content}}
+</div>
+
+</body>
+</html>
