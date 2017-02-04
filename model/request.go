@@ -125,11 +125,11 @@ func Transfer() Decorator {
 				// construct remote PFN by using destination agent backend and record LFN
 				rpfn = fmt.Sprintf("%s%s", dstAgent.Backend, rec.Lfn)
 				// perform transfer with the help of backend tool
-				cmd := exec.Command(srcAgent.Tool, rec.Pfn, rpfn)
+				cmd := exec.Command(srcAgent.Tool, srcAgent.ToolOpts, rec.Pfn, rpfn)
 				log.Println("Transfer command", cmd)
 				err = cmd.Run()
 				if err != nil {
-					log.Println("ERROR", srcAgent.Tool, rec.Pfn, rpfn, err)
+					log.Println("ERROR", srcAgent.Tool, srcAgent.ToolOpts, rec.Pfn, rpfn, err)
 					return err
 				}
 			}

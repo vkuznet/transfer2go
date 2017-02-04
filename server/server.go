@@ -28,6 +28,7 @@ type Config struct {
 	Protocol  string `json:"protocol"`  // backend protocol, e.g. srmv2
 	Backend   string `json:"backend"`   // backend, e.g. srm
 	Tool      string `json:"tool"`      // backend tool, e.g. srmcp
+	ToolOpts  string `json:"toolopts"`  // options for backend tool
 	Mfile     string `json:"mfile"`     // metrics file name
 	Minterval int64  `json:"minterval"` // metrics interval
 	Staticdir string `json:"staticdir"` // static dir defines location of static files, e.g. sql,js templates
@@ -39,7 +40,7 @@ type Config struct {
 
 // String returns string representation of Config data type
 func (c *Config) String() string {
-	return fmt.Sprintf("<Config: name=%s url=%s port=%d base=%s catalog=%s protocol=%s backend=%s tool=%s mfile=%s minterval=%d staticdir=%s workders=%d queuesize=%d>", c.Name, c.Url, c.Port, c.Base, c.Catalog, c.Protocol, c.Backend, c.Tool, c.Mfile, c.Minterval, c.Staticdir, c.Workers, c.QueueSize)
+	return fmt.Sprintf("<Config: name=%s url=%s port=%d base=%s catalog=%s protocol=%s backend=%s tool=%s opts=%s mfile=%s minterval=%d staticdir=%s workders=%d queuesize=%d>", c.Name, c.Url, c.Port, c.Base, c.Catalog, c.Protocol, c.Backend, c.Tool, c.ToolOpts, c.Mfile, c.Minterval, c.Staticdir, c.Workers, c.QueueSize)
 }
 
 // AgentInfo data type
@@ -53,10 +54,11 @@ type AgentProtocol struct {
 	Protocol string `json:"protocol"` // protocol name, e.g. srmv2
 	Backend  string `json:"backend"`  // backend storage end-point, e.g. srm://cms-srm.cern.ch:8443/srm/managerv2?SFN=
 	Tool     string `json:"tool"`     // actual executable, e.g. /usr/local/bin/srmcp
+	ToolOpts string `json:"toolopts"` // options for backend tool
 }
 
 // globals used in server/handlers
-var _myself, _alias, _protocol, _backend, _tool string
+var _myself, _alias, _protocol, _backend, _tool, _toolOpts string
 var _agents map[string]string
 var _config Config
 
@@ -128,6 +130,7 @@ func Server(config Config, aName string) {
 	_protocol = config.Protocol
 	_backend = config.Backend
 	_tool = config.Tool
+	_toolOpts = config.ToolOpts
 	utils.STATICDIR = config.Staticdir
 	arr := strings.Split(_myself, "/")
 	base := ""

@@ -13,6 +13,7 @@ type AgentStatus struct {
 	Protocol        string            `json:"protocol"` // underlying transfer protocol
 	Backend         string            `json:"backend"`  // underlying transfer backend
 	Tool            string            `json:"tool"`     // underlying transfer tool, e.g. xrdcp
+	ToolOpts        string            `json:"toolopts"` // options for backend tool
 	Agents          map[string]string `json:"agents"`   // list of known agents
 	Addrs           []string          `json:"addrs"`    // list of all IP addresses
 }

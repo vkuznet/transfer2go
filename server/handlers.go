@@ -47,7 +47,7 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	addrs := utils.HostIP()
-	astats := common.AgentStatus{Addrs: addrs, Catalog: model.TFC.Type, Name: _alias, Url: _myself, Protocol: _protocol, Backend: _backend, Tool: _tool, TransferCounter: model.TransferCounter, Agents: _agents, TimeStamp: time.Now().Unix()}
+	astats := common.AgentStatus{Addrs: addrs, Catalog: model.TFC.Type, Name: _alias, Url: _myself, Protocol: _protocol, Backend: _backend, Tool: _tool, ToolOpts: _toolOpts, TransferCounter: model.TransferCounter, Agents: _agents, TimeStamp: time.Now().Unix()}
 	data, err := json.Marshal(astats)
 	if err != nil {
 		log.Println("ERROR AgentsHandler", err)
@@ -185,6 +185,7 @@ func RegisterProtocolHandler(w http.ResponseWriter, r *http.Request) {
 		_protocol = protocolParams.Protocol
 		_backend = protocolParams.Backend
 		_tool = protocolParams.Tool
+		_toolOpts = protocolParams.ToolOpts
 		log.Printf("INFO RegisterProtocolHandler switched to protocol=%s backend=%s tool=%s\n", _protocol, _backend, _tool)
 		w.WriteHeader(http.StatusOK)
 		return
