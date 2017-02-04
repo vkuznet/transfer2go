@@ -85,8 +85,8 @@ func findFile(agents map[string]string, file string) (string, string, string, er
 		return "", "", "", err
 
 	}
-	// TODO: we may have intelligent logic here to pick best agent to serve, e.g. based on requests transfers
-	// so far use first available one
+	// Apply some intelligent logic here
+	// pick the leasst busiest agent based on requests transfers it has
 	var load int32
 	for alias, aurl := range agents {
 		url := fmt.Sprintf("%s/status", aurl)
@@ -266,9 +266,9 @@ func Transfer(agent, src, dst string) error {
 	return fmt.Errorf("Unable to understand client request, src=%v to dst=%v", src, dst)
 }
 
-// Status function provides status about given agent
-func Status(agent string) error {
-	resp := utils.FetchResponse(agent+"/status", []byte{})
-	log.Println("Status", agent, string(resp.Data))
+// Agent function call agent url
+func Agent(agent string) error {
+	resp := utils.FetchResponse(agent, []byte{})
+	log.Println(string(resp.Data))
 	return resp.Error
 }

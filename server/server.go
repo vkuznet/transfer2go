@@ -36,11 +36,12 @@ type Config struct {
 	QueueSize int    `json:"queuesize"` // total size of the queue
 	Port      int    `json:"port"`      // port number given server runs on, default 8989
 	Base      string `json:"base""`     // URL base path for agent server, it will be extracted from Url
+	Register  string `json:"register"`  // remote agent URL to register
 }
 
 // String returns string representation of Config data type
 func (c *Config) String() string {
-	return fmt.Sprintf("<Config: name=%s url=%s port=%d base=%s catalog=%s protocol=%s backend=%s tool=%s opts=%s mfile=%s minterval=%d staticdir=%s workders=%d queuesize=%d>", c.Name, c.Url, c.Port, c.Base, c.Catalog, c.Protocol, c.Backend, c.Tool, c.ToolOpts, c.Mfile, c.Minterval, c.Staticdir, c.Workers, c.QueueSize)
+	return fmt.Sprintf("<Config: name=%s url=%s port=%d base=%s catalog=%s protocol=%s backend=%s tool=%s opts=%s mfile=%s minterval=%d staticdir=%s workders=%d queuesize=%d register=%s>", c.Name, c.Url, c.Port, c.Base, c.Catalog, c.Protocol, c.Backend, c.Tool, c.ToolOpts, c.Mfile, c.Minterval, c.Staticdir, c.Workers, c.QueueSize, c.Register)
 }
 
 // AgentInfo data type
@@ -123,7 +124,7 @@ func registerAtAgents(aName string) {
 }
 
 // Server implementation
-func Server(config Config, aName string) {
+func Server(config Config) {
 	_config = config
 	_myself = config.Url
 	_alias = config.Name
@@ -145,7 +146,7 @@ func Server(config Config, aName string) {
 	log.Println("Agent", config.String())
 
 	// register self agent URI in remote agent and vice versa
-	registerAtAgents(aName)
+	registerAtAgents(config.Register)
 
 	// define catalog
 	if stat, err := os.Stat(config.Catalog); err == nil && stat.IsDir() {

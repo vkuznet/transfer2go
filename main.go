@@ -22,21 +22,17 @@ func main() {
 
 	// server options
 	var agent string
-	flag.StringVar(&agent, "agent", "", "Remote agent registration end-point")
+	flag.StringVar(&agent, "agent", "", "Remote agent (registration) end-point")
 	var configFile string
 	flag.StringVar(&configFile, "config", "", "Agent configuration file")
 	var verbose int
 	flag.IntVar(&verbose, "verbose", 0, "Verbosity level")
 
 	// client options
-	var status bool
-	flag.BoolVar(&status, "status", false, "Return status info about the agent")
 	var src string
 	flag.StringVar(&src, "src", "", "Source end-point, either local file or AgentName:LFN")
 	var dst string
 	flag.StringVar(&dst, "dst", "", "Destination end-point, either AgentName or AgentName:LFN")
-	var register string
-	flag.StringVar(&register, "register", "", "Registration end-point")
 
 	flag.Parse()
 	checkX509()
@@ -73,12 +69,15 @@ func main() {
 		if config.Port == 0 {
 			config.Port = 8989
 		}
+		if config.Register == "" {
+			log.Println("WARNING this agent is not registered with remote ones, either provide register in your config or invoke register API call")
+		}
 
-		server.Server(config, register)
+		server.Server(config)
 	} else {
 
-		if status {
-			client.Status(agent)
+		if src == "" { // no transfer request
+			client.Agent(agent)
 		} else {
 			err := client.Transfer(agent, src, dst)
 			if err != nil {

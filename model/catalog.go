@@ -195,9 +195,6 @@ func (c *Catalog) Files(pattern string) []string {
 		}
 		return files
 	}
-	// TODO: make generic database statements via templates for given database type
-	//         cols := []string{"dataset", "blockid", "lfn", "pfn", "bytes", "hash"}
-	//         stm := fmt.Sprintf("SELECT %s FROM FILES AS F JOIN BLOCKS AS B ON F.BLOCKID=B.ID JOIN DATASETS AS D ON F.DATASETID = D.ID WHERE F.LFN=?", strings.Join(cols, ","))
 	stm := getSQL("files_blocks_datasets") + fmt.Sprintf(" WHERE F.LFN=%s", placeholder("lfn"))
 	if utils.VERBOSE > 0 {
 		log.Println("Files query", stm, pattern)
@@ -236,9 +233,6 @@ func (c *Catalog) FileInfo(fileEntry string) CatalogEntry {
 		entry := CatalogEntry{Lfn: fname, Pfn: fname, Hash: hash, Bytes: b, Dataset: "/a/b/c", Block: "123"}
 		return entry
 	}
-	// TODO: make generic SQL statement via templates
-	//         cols := []string{"lfn", "pfn", "bytes", "hash"}
-	//         stm := fmt.Sprintf("SELECT %s FROM FILES AS F WHERE LFN = ?", strings.Join(cols, ","))
 	stm := getSQL("files") + fmt.Sprintf(" WHERE F.LFN=%s", placeholder("lfn"))
 	if utils.VERBOSE > 0 {
 		log.Println("FileInfo query", stm, fileEntry)
