@@ -30,9 +30,9 @@ type TransferCollection struct {
 // TransferRequest data type
 type TransferRequest struct {
 	TimeStamp int64  `json:"ts"`       // timestamp of the request
-	File      string `json:"file"`     // LFN name to be transfered
-	Block     string `json:"block"`    // block name to be transfered
-	Dataset   string `json:"dataset"`  // dataset name to be transfered
+	File      string `json:"file"`     // LFN name to be transferred
+	Block     string `json:"block"`    // block name to be transferred
+	Dataset   string `json:"dataset"`  // dataset name to be transferred
 	SrcUrl    string `json:"srcUrl"`   // source agent URL which initiate the transfer
 	SrcAlias  string `json:"srcAlias"` // source agent name
 	DstUrl    string `json:"dstUrl"`   // destination agent URL which will consume the transfer

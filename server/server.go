@@ -35,7 +35,7 @@ type Config struct {
 	Workers   int    `json:"workers"`   // number of workers
 	QueueSize int    `json:"queuesize"` // total size of the queue
 	Port      int    `json:"port"`      // port number given server runs on, default 8989
-	Base      string `json:"base""`     // URL base path for agent server, it will be extracted from Url
+	Base      string `json:"base"`      // URL base path for agent server, it will be extracted from Url
 	Register  string `json:"register"`  // remote agent URL to register
 }
 
