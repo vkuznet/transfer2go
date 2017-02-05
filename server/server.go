@@ -176,7 +176,7 @@ func Server(config Config) {
 
 		model.DB = db
 		model.DBTYPE = dbtype
-		model.DBSQL = model.LoadSQL(dbowner)
+		model.DBSQL = model.LoadSQL(dbtype, dbowner)
 	}
 	log.Println("Catalog", model.TFC)
 

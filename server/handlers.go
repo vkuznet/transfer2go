@@ -27,8 +27,10 @@ func FilesHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	pattern := r.FormValue("pattern")
-	files := model.TFC.Files(pattern)
+	lfn := r.FormValue("lfn")
+	dataset := r.FormValue("dataset")
+	block := r.FormValue("block")
+	files := model.TFC.Files(dataset, block, lfn)
 	data, err := json.Marshal(files)
 	if err != nil {
 		log.Println("ERROR AgentsHandler", err)

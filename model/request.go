@@ -84,10 +84,10 @@ func Transfer() Decorator {
 
 			log.Println("Request Transfer", t.String())
 
-			rec := TFC.FileInfo(t.File)
-			if rec.Lfn == "" {
+			records := TFC.FindRecords(*t)
+			if len(records) == 0 {
 				// file does not exists in TFC, nothing to do, return immediately
-				log.Printf("WARNING requested file %s does not exists in TFC of this agent\n", t.File)
+				log.Printf("WARNING %v does match anything in TFC of this agent\n", t)
 				return r.Process(t)
 			}
 			// obtain information about source and destination agents
@@ -112,37 +112,45 @@ func Transfer() Decorator {
 				return err
 			}
 
-			// if protocol is not given use default one: HTTP
-			var rpfn string // remote PFN
-			if srcAgent.Protocol == "" || srcAgent.Protocol == "http" {
-				log.Println("Transfer via HTTP protocol to", dstAgent)
-				err = httpTransfer(rec, t)
-				if err != nil {
-					return err
+			// TODO: I need to implement bulk transfer for all files in found records
+			// so far I loop over them individually and transfer one by one
+			for _, rec := range records {
+
+				// if protocol is not given use default one: HTTP
+				var rpfn string // remote PFN
+				if srcAgent.Protocol == "" || srcAgent.Protocol == "http" {
+					log.Println("Transfer via HTTP protocol to", dstAgent)
+					err = httpTransfer(rec, t)
+					if err != nil {
+						return err
+					}
+					rpfn = rec.Lfn
+				} else {
+					// construct remote PFN by using destination agent backend and record LFN
+					rpfn = fmt.Sprintf("%s%s", dstAgent.Backend, rec.Lfn)
+					// perform transfer with the help of backend tool
+					cmd := exec.Command(srcAgent.Tool, srcAgent.ToolOpts, rec.Pfn, rpfn)
+					if srcAgent.ToolOpts == "" {
+						cmd = exec.Command(srcAgent.Tool, rec.Pfn, rpfn)
+					}
+					log.Println("Transfer command", cmd)
+					err = cmd.Run()
+					if err != nil {
+						log.Println("ERROR", srcAgent.Tool, srcAgent.ToolOpts, rec.Pfn, rpfn, err)
+						return err
+					}
 				}
-				rpfn = rec.Lfn
-			} else {
-				// construct remote PFN by using destination agent backend and record LFN
-				rpfn = fmt.Sprintf("%s%s", dstAgent.Backend, rec.Lfn)
-				// perform transfer with the help of backend tool
-				cmd := exec.Command(srcAgent.Tool, srcAgent.ToolOpts, rec.Pfn, rpfn)
-				log.Println("Transfer command", cmd)
-				err = cmd.Run()
-				if err != nil {
-					log.Println("ERROR", srcAgent.Tool, srcAgent.ToolOpts, rec.Pfn, rpfn, err)
-					return err
+				// Add entry for remote TFC after transfer is completed
+				url = fmt.Sprintf("%s/tfc", t.DstUrl)
+				rEntry := CatalogEntry{Dataset: rec.Dataset, Block: rec.Block, Lfn: rec.Lfn, Pfn: rpfn, Bytes: rec.Bytes, Hash: rec.Hash}
+				d, e := json.Marshal(rEntry)
+				if e != nil {
+					return e
 				}
-			}
-			// Add entry for remote TFC after transfer is completed
-			url = fmt.Sprintf("%s/tfc", t.DstUrl)
-			rEntry := CatalogEntry{Dataset: rec.Dataset, Block: rec.Block, Lfn: rec.Lfn, Pfn: rpfn, Bytes: rec.Bytes, Hash: rec.Hash}
-			d, e := json.Marshal(rEntry)
-			if e != nil {
-				return e
-			}
-			resp = utils.FetchResponse(url, d) // POST request
-			if resp.Error != nil {
-				return resp.Error
+				resp = utils.FetchResponse(url, d) // POST request
+				if resp.Error != nil {
+					return resp.Error
+				}
 			}
 
 			return r.Process(t)

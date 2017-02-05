@@ -1,0 +1,1 @@
+INSERT INTO BLOCKS(block) VALUES(?)

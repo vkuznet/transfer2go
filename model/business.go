@@ -29,23 +29,25 @@ type TransferCollection struct {
 
 // TransferRequest data type
 type TransferRequest struct {
-	TimeStamp int64  `json:"ts"`
-	File      string `json:"file"`
-	SrcUrl    string `json:"srcUrl"`
-	SrcAlias  string `json:"srcAlias"`
-	DstUrl    string `json:"dstUrl"`
-	DstAlias  string `json:"dstAlias"`
-	Latency   int    `json:"latency"`
+	TimeStamp int64  `json:"ts"`       // timestamp of the request
+	File      string `json:"file"`     // LFN name to be transfered
+	Block     string `json:"block"`    // block name to be transfered
+	Dataset   string `json:"dataset"`  // dataset name to be transfered
+	SrcUrl    string `json:"srcUrl"`   // source agent URL which initiate the transfer
+	SrcAlias  string `json:"srcAlias"` // source agent name
+	DstUrl    string `json:"dstUrl"`   // destination agent URL which will consume the transfer
+	DstAlias  string `json:"dstAlias"` // destination agent name
+	Delay     int    `json:"delay"`    // transfer delay time, i.e. post-pone transfer
 }
 
 // String method return string representation of transfer request
 func (t *TransferRequest) String() string {
-	return fmt.Sprintf("<TransferRequest ts=%d file=%s srcUrl=%s srcAlias=%s dstUrl=%s dstAlias=%s latency=%d>", t.TimeStamp, t.File, t.SrcUrl, t.SrcAlias, t.DstUrl, t.DstAlias, t.Latency)
+	return fmt.Sprintf("<TransferRequest ts=%d file=%s block=%s dataset=%s srcUrl=%s srcAlias=%s dstUrl=%s dstAlias=%s delay=%d>", t.TimeStamp, t.File, t.Block, t.Dataset, t.SrcUrl, t.SrcAlias, t.DstUrl, t.DstAlias, t.Delay)
 }
 
 // Run method perform a job on transfer request
 func (t *TransferRequest) Run() error {
-	interval := time.Duration(t.Latency) * time.Second
+	interval := time.Duration(t.Delay) * time.Second
 	request := Decorate(DefaultProcessor,
 		Pause(interval), // will pause a given request for a given interval
 		Transfer(),

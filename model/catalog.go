@@ -36,12 +36,12 @@ func check(msg string, err error) {
 }
 
 // LoadSQL is a helper function to load DBS SQL statements
-func LoadSQL(owner string) Record {
+func LoadSQL(dbtype, owner string) Record {
 	dbsql := make(Record)
 	// query statement
 	tmplData := make(Record)
 	tmplData["Owner"] = owner
-	sdir := fmt.Sprintf("%s/sql", utils.STATICDIR)
+	sdir := fmt.Sprintf("%s/sql/%s", utils.STATICDIR, dbtype)
 	for _, f := range utils.ListFiles(sdir) {
 		k := strings.Split(f, ".")[0]
 		dbsql[k] = utils.ParseTmpl(sdir, f, tmplData)
@@ -121,7 +121,7 @@ func (c *Catalog) Add(entry CatalogEntry) error {
 	var did, bid int
 
 	// insert dataset into dataset tables
-	stm = fmt.Sprintf("INSERT INTO DATASETS(dataset) VALUES(?)")
+	stm = getSQL("insert_datasets")
 	_, e = DB.Exec(stm, entry.Dataset)
 	if e != nil {
 		if !strings.Contains(e.Error(), "UNIQUE") {
@@ -130,7 +130,7 @@ func (c *Catalog) Add(entry CatalogEntry) error {
 	}
 
 	// get dataset id
-	stm = fmt.Sprintf("SELECT id FROM DATASETS WHERE dataset=?")
+	stm = getSQL("id_datasets")
 	rows, err := DB.Query(stm, entry.Dataset)
 	check("Unable to perform DB.Query over datasets table", err)
 	defer rows.Close()
@@ -140,7 +140,7 @@ func (c *Catalog) Add(entry CatalogEntry) error {
 	}
 
 	// insert block into block table
-	stm = fmt.Sprintf("INSERT INTO BLOCKS(block) VALUES(?)")
+	stm = getSQL("insert_blocks")
 	_, e = DB.Exec(stm, entry.Block)
 	if e != nil {
 		if !strings.Contains(e.Error(), "UNIQUE") {
@@ -149,7 +149,7 @@ func (c *Catalog) Add(entry CatalogEntry) error {
 	}
 
 	// get block id
-	stm = fmt.Sprintf("SELECT id FROM BLOCKS WHERE block=?")
+	stm = getSQL("id_blocks")
 	rows, err = DB.Query(stm, entry.Block)
 	check("Unable to DB.Query over blocks table", err)
 	for rows.Next() {
@@ -158,7 +158,7 @@ func (c *Catalog) Add(entry CatalogEntry) error {
 	}
 
 	// insert entry into files table
-	stm = fmt.Sprintf("INSERT INTO FILES(lfn, pfn, blockid, datasetid, bytes, hash) VALUES(?,?,?,?,?,?)")
+	stm = getSQL("insert_files")
 	_, err = DB.Exec(stm, entry.Lfn, entry.Pfn, bid, did, entry.Bytes, entry.Hash)
 	if e != nil {
 		if !strings.Contains(e.Error(), "UNIQUE") {
@@ -169,61 +169,26 @@ func (c *Catalog) Add(entry CatalogEntry) error {
 	tx.Commit()
 
 	if utils.VERBOSE > 0 {
-		log.Println("Committed to Catalog", entry, "datasetid", did, "blockid", bid)
+		log.Println("Committed to Catalog", entry.String(), "datasetid", did, "blockid", bid)
 	}
 
 	return nil
 }
 
-// Files method of catalog returns list of files known in catalog
-func (c *Catalog) Files(pattern string) []string {
+// Files returns list of files for specified conditions
+func (c *Catalog) Files(dataset, block, lfn string) []string {
 	var files []string
-	if c.Type == "filesystem" {
-		filesInfo, err := ioutil.ReadDir(c.Uri)
-		if err != nil {
-			log.Println("ERROR: unable to list files in catalog", c.Uri, err)
-			return []string{}
-		}
-		for _, f := range filesInfo {
-			if pattern != "" {
-				if strings.Contains(f.Name(), pattern) {
-					files = append(files, fmt.Sprintf("%s/%s", c.Uri, f.Name()))
-				}
-			} else {
-				files = append(files, fmt.Sprintf("%s/%s", c.Uri, f.Name()))
-			}
-		}
-		return files
-	}
-	stm := getSQL("files_blocks_datasets") + fmt.Sprintf(" WHERE F.LFN=%s", placeholder("lfn"))
-	if utils.VERBOSE > 0 {
-		log.Println("Files query", stm, pattern)
-	}
-	vals := []interface{}{new(sql.NullString), new(sql.NullString), new(sql.NullString), new(sql.NullString), new(sql.NullInt64), new(sql.NullString)}
-
-	// fetch data from DB
-	rows, err := DB.Query(stm, pattern)
-	if err != nil {
-		log.Printf("ERROR DB.Query, query='%s' error=%v\n", stm, err)
-		return files
-	}
-	defer rows.Close()
-	for rows.Next() {
-		rec := CatalogEntry{}
-		err := rows.Scan(&rec.Dataset, &rec.Block, &rec.Lfn, &rec.Pfn, &rec.Bytes, &rec.Hash)
-		if err != nil {
-			msg := fmt.Sprintf("ERROR rows.Scan, vals='%v', error=%v", vals, err)
-			log.Fatal(msg)
-		}
+	req := TransferRequest{Dataset: dataset, Block: block, File: lfn}
+	for _, rec := range c.FindRecords(req) {
 		files = append(files, rec.Lfn)
 	}
 	return files
 }
 
-// FileInfo provides information about given file name in Catalog
-func (c *Catalog) FileInfo(fileEntry string) CatalogEntry {
+// FindFiles returns catalog records for a given transfer request
+func (c *Catalog) FindRecords(req TransferRequest) []CatalogEntry {
 	if c.Type == "filesystem" {
-		fname := fileEntry
+		fname := req.File
 		data, err := ioutil.ReadFile(fname)
 		if err != nil {
 			log.Println("ERROR, unable to read a file", fname, err)
@@ -231,30 +196,50 @@ func (c *Catalog) FileInfo(fileEntry string) CatalogEntry {
 		hash, b := utils.Hash(data)
 		// TODO: I need to know how to generate dataset and block names in this case
 		entry := CatalogEntry{Lfn: fname, Pfn: fname, Hash: hash, Bytes: b, Dataset: "/a/b/c", Block: "123"}
-		return entry
+		var out []CatalogEntry
+		out = append(out, entry)
+		return out
 	}
-	stm := getSQL("files") + fmt.Sprintf(" WHERE F.LFN=%s", placeholder("lfn"))
+	stm := getSQL("files_blocks_datasets")
+	var cond []string
+	var vals []interface{}
+	if req.File != "" {
+		cond = append(cond, fmt.Sprintf("F.LFN=%s", placeholder("lfn")))
+		vals = append(vals, req.File)
+	}
+	if req.Block != "" {
+		cond = append(cond, fmt.Sprintf("B.BLOCK=%s", placeholder("block")))
+		vals = append(vals, req.Block)
+	}
+	if req.Dataset != "" {
+		cond = append(cond, fmt.Sprintf("D.DATASET=%s", placeholder("dataset")))
+		vals = append(vals, req.Dataset)
+	}
+	if len(cond) > 0 {
+		stm += fmt.Sprintf(" WHERE %s", strings.Join(cond, " AND "))
+	}
+
 	if utils.VERBOSE > 0 {
-		log.Println("FileInfo query", stm, fileEntry)
+		log.Println("FindRecords query", stm, vals)
 	}
 
 	// fetch data from DB
-	rows, err := DB.Query(stm, fileEntry)
+	rows, err := DB.Query(stm, vals...)
 	if err != nil {
 		log.Printf("ERROR DB.Query, query='%s' error=%v\n", stm, err)
-		return CatalogEntry{}
+		return []CatalogEntry{}
 	}
 	defer rows.Close()
+	var out []CatalogEntry
 	for rows.Next() {
 		rec := CatalogEntry{}
-		err := rows.Scan(&rec.Lfn, &rec.Pfn, &rec.Bytes, &rec.Hash)
+		err := rows.Scan(&rec.Dataset, &rec.Block, &rec.Lfn, &rec.Pfn, &rec.Bytes, &rec.Hash)
 		if err != nil {
 			log.Println("ERROR rows.Scan", err)
-			return CatalogEntry{}
 		}
-		return rec
+		out = append(out, rec)
 	}
-	return CatalogEntry{}
+	return out
 }
 
 // TFC stands for Trivial File Catalog
