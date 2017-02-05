@@ -185,7 +185,7 @@ func (c *Catalog) Files(dataset, block, lfn string) []string {
 	return files
 }
 
-// FindFiles returns catalog records for a given transfer request
+// FindRecords returns catalog records for a given transfer request
 func (c *Catalog) FindRecords(req TransferRequest) []CatalogEntry {
 	if c.Type == "filesystem" {
 		fname := req.File
