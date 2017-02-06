@@ -11,7 +11,6 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"os/user"
 
 	"github.com/vkuznet/transfer2go/client"
 	"github.com/vkuznet/transfer2go/server"
@@ -35,7 +34,7 @@ func main() {
 	flag.StringVar(&dst, "dst", "", "Destination end-point, either AgentName or AgentName:LFN")
 
 	flag.Parse()
-	checkX509()
+	utils.CheckX509()
 	utils.VERBOSE = verbose
 	if configFile != "" {
 		data, err := ioutil.ReadFile(configFile)
@@ -95,32 +94,4 @@ func makeSiteName() string {
 		panic(fmt.Sprintf("Unable to get hostname, error=%v", err))
 	}
 	return fmt.Sprintf("T4_%s_%v", host, os.Getuid())
-}
-
-// helper function to check X509 settings
-func checkX509() {
-	uproxy := os.Getenv("X509_USER_PROXY")
-	uckey := os.Getenv("X509_USER_KEY")
-	ucert := os.Getenv("X509_USER_CERT")
-	var check int
-	if uproxy == "" {
-		// check if /tmp/x509up_u$UID exists
-		u, err := user.Current()
-		if err == nil {
-			fname := fmt.Sprintf("/tmp/x509up_u%s", u.Uid)
-			if _, err := os.Stat(fname); err != nil {
-				check += 1
-			}
-		}
-	}
-	if uckey == "" && ucert == "" {
-		check += 1
-	}
-	if check > 1 {
-		msg := fmt.Sprintf("Neither X509_USER_PROXY or X509_USER_KEY/X509_USER_CERT are set. ")
-		msg += "In order to run please obtain valid proxy via \"voms-proxy-init -voms cms -rfc\""
-		msg += "and setup X509_USER_PROXY or setup X509_USER_KEY/X509_USER_CERT in your environment"
-		log.Println(msg)
-		os.Exit(-1)
-	}
 }
