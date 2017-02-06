@@ -237,7 +237,7 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// UploadDataHandler upload TransferData HTTP
+// UploadDataHandler upload TransferData record and send back catalog entry to recepient
 func UploadDataHandler(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != "POST" {
@@ -258,7 +258,7 @@ func UploadDataHandler(w http.ResponseWriter, r *http.Request) {
 	fname := arr[len(arr)-1]
 	// TODO: I need to revisit how to construct pfn on agent during upload
 	pfn := fmt.Sprintf("%s/%s", _backend, fname)
-	err = ioutil.WriteFile(fname, td.Data, 0666)
+	err = ioutil.WriteFile(pfn, td.Data, 0666)
 	if err != nil {
 		log.Println("ERROR, UploadDataHandler unable to write file", fname)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -276,8 +276,17 @@ func UploadDataHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	// send back catalog entry which can be used for verification
+	// but do not write to catalog since another end should verify first that
+	// data is transferred, then it will update the TFC
 	log.Printf("wrote %s:%s to %s:%s\n", td.SrcAlias, fname, td.DstAlias, pfn)
 	entry := model.CatalogEntry{Lfn: td.File, Pfn: pfn, Dataset: td.Dataset, Block: td.Block, Bytes: bytes, Hash: hash}
-	model.TFC.Add(entry)
+	data, err := json.Marshal(entry)
+	if err != nil {
+		log.Println("ERROR, UploadDataHandler unable to marshal catalog entry", entry, err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
+	w.Write(data)
 }

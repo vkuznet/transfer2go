@@ -49,26 +49,31 @@ func (f RequestFunc) Process(t *TransferRequest) error {
 type Decorator func(Request) Request
 
 // helper function to perform transfer via HTTP protocol
-func httpTransfer(rec CatalogEntry, t *TransferRequest) error {
-	data, err := ioutil.ReadFile(rec.Lfn)
+func httpTransfer(rec CatalogEntry, t *TransferRequest) (string, error) {
+	data, err := ioutil.ReadFile(rec.Pfn)
 	if err != nil {
-		return err
+		return "", err
 	}
 	hash, b := utils.Hash(data)
 	if hash != rec.Hash {
-		return fmt.Errorf("File hash mismatch")
+		return "", fmt.Errorf("File hash mismatch hash=%s rec.Hash=%s\n", hash, rec.Hash)
 	}
 	if b != rec.Bytes {
-		return fmt.Errorf("File bytes mismatch")
+		return "", fmt.Errorf("File bytes mismatch, bytes=%d rec.Bytes=%d\n", b, rec.Bytes)
 	}
-	url := fmt.Sprintf("%s/upload", t.DstUrl)
 	td := TransferData{File: rec.Lfn, Dataset: rec.Dataset, Block: rec.Block, Data: data, Hash: hash, Bytes: b, SrcUrl: t.SrcUrl, SrcAlias: t.SrcAlias, DstUrl: t.DstUrl, DstAlias: t.DstAlias}
 	d, e := json.Marshal(td)
 	if e != nil {
-		return e
+		return "", e
 	}
+	url := fmt.Sprintf("%s/upload", t.DstUrl)
 	resp := utils.FetchResponse(url, d)
-	return resp.Error
+	var r CatalogEntry
+	err = json.Unmarshal(resp.Data, &r)
+	if err != nil {
+		return "", err
+	}
+	return r.Pfn, nil
 }
 
 // Transfer returns a Decorator that performs request transfers
@@ -114,17 +119,18 @@ func Transfer() Decorator {
 
 			// TODO: I need to implement bulk transfer for all files in found records
 			// so far I loop over them individually and transfer one by one
+			var trRecords []CatalogEntry // list of successfully transferred records
 			for _, rec := range records {
 
 				// if protocol is not given use default one: HTTP
 				var rpfn string // remote PFN
 				if srcAgent.Protocol == "" || srcAgent.Protocol == "http" {
-					log.Println("Transfer via HTTP protocol to", dstAgent)
-					err = httpTransfer(rec, t)
+					log.Println("Transfer via HTTP protocol to", dstAgent.String())
+					rpfn, err = httpTransfer(rec, t)
 					if err != nil {
-						return err
+						log.Println("ERROR Transfer", rec.String(), t.String(), err)
+						continue // if we fail on single record we continue with others
 					}
-					rpfn = rec.Lfn
 				} else {
 					// construct remote PFN by using destination agent backend and record LFN
 					rpfn = fmt.Sprintf("%s%s", dstAgent.Backend, rec.Lfn)
@@ -136,23 +142,22 @@ func Transfer() Decorator {
 					log.Println("Transfer command", cmd)
 					err = cmd.Run()
 					if err != nil {
-						log.Println("ERROR", srcAgent.Tool, srcAgent.ToolOpts, rec.Pfn, rpfn, err)
-						return err
+						log.Println("ERROR Transfer", srcAgent.Tool, srcAgent.ToolOpts, rec.Pfn, rpfn, err)
+						continue // if we fail on single record we continue with others
 					}
 				}
-				// Add entry for remote TFC after transfer is completed
-				url = fmt.Sprintf("%s/tfc", t.DstUrl)
 				r := CatalogEntry{Dataset: rec.Dataset, Block: rec.Block, Lfn: rec.Lfn, Pfn: rpfn, Bytes: rec.Bytes, Hash: rec.Hash}
-				var records []CatalogEntry
-				records = append(records, r)
-				d, e := json.Marshal(records)
-				if e != nil {
-					return e
-				}
-				resp = utils.FetchResponse(url, d) // POST request
-				if resp.Error != nil {
-					return resp.Error
-				}
+				trRecords = append(trRecords, r)
+			}
+			// Add entry for remote TFC after transfer is completed
+			url = fmt.Sprintf("%s/tfc", t.DstUrl)
+			d, e := json.Marshal(trRecords)
+			if e != nil {
+				return e
+			}
+			resp = utils.FetchResponse(url, d) // POST request
+			if resp.Error != nil {
+				return resp.Error
 			}
 
 			return r.Process(t)
