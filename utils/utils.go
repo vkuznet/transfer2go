@@ -6,12 +6,14 @@ package utils
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"hash/adler32"
 	"io/ioutil"
 	"log"
 	"net"
+	"os"
+	"os/user"
 	"path/filepath"
 	"runtime"
 	"text/template"
@@ -59,7 +61,7 @@ func ParseTmpl(tdir, tmpl string, data interface{}) string {
 
 // Hash implements hash function for data, it returns a hash and number of bytes
 func Hash(data []byte) (string, int64) {
-	hasher := sha256.New()
+	hasher := adler32.New()
 	b, e := hasher.Write(data)
 	if e != nil {
 		log.Println("ERROR, Unable to write chunk of data via hasher.Write", e)
@@ -172,4 +174,32 @@ func HostIP() []string {
 		}
 	}
 	return List2Set(out)
+}
+
+// ChekcX509 function checks X509 settings
+func CheckX509() {
+	uproxy := os.Getenv("X509_USER_PROXY")
+	uckey := os.Getenv("X509_USER_KEY")
+	ucert := os.Getenv("X509_USER_CERT")
+	var check int
+	if uproxy == "" {
+		// check if /tmp/x509up_u$UID exists
+		u, err := user.Current()
+		if err == nil {
+			fname := fmt.Sprintf("/tmp/x509up_u%s", u.Uid)
+			if _, err := os.Stat(fname); err != nil {
+				check += 1
+			}
+		}
+	}
+	if uckey == "" && ucert == "" {
+		check += 1
+	}
+	if check > 1 {
+		msg := fmt.Sprintf("Neither X509_USER_PROXY or X509_USER_KEY/X509_USER_CERT are set. ")
+		msg += "In order to run please obtain valid proxy via \"voms-proxy-init -voms cms -rfc\""
+		msg += "and setup X509_USER_PROXY or setup X509_USER_KEY/X509_USER_CERT in your environment"
+		log.Println(msg)
+		os.Exit(-1)
+	}
 }
