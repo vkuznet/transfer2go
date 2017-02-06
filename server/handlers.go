@@ -132,11 +132,7 @@ func TFCHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, rec := range records {
 		err = model.TFC.Add(rec)
-	}
-	if err != nil {
-		log.Println("ERROR TFCHandler unable to decode", r.Body, err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+		log.Println("TFCHandler adds", rec, err)
 	}
 	w.WriteHeader(http.StatusOK)
 }

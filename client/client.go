@@ -215,14 +215,14 @@ func Agent(agent string) error {
 	return resp.Error
 }
 
-// Upload function upload given meta-data to the agent
-func Upload(agent, fname string) error {
+// Register function upload given meta-data to the agent and register them in its TFC
+func Register(agent, fname string) error {
 	// read inpuf file name which contains records meta-data (catalog entries)
 	c, e := ioutil.ReadFile(fname)
 	if e != nil {
 		log.Fatalf("Unable to read %s, error=%v\n", fname, e)
 	}
-	var records []model.CatalogEntry
+	var uploadRecords, records []model.CatalogEntry
 	err := json.Unmarshal([]byte(c), &records)
 	if err != nil {
 		log.Fatalf("Unable to parse catalog JSON file, error=%v\n", err)
@@ -238,16 +238,20 @@ func Upload(agent, fname string) error {
 		if err != nil {
 			return err
 		}
-		rec.Hash, rec.Bytes = utils.Hash(data)
+		hash, bytes := utils.Hash(data)
+		r := model.CatalogEntry{Lfn: rec.Lfn, Pfn: rec.Pfn, Block: rec.Block, Dataset: rec.Dataset, Hash: hash, Bytes: bytes}
+		uploadRecords = append(uploadRecords, r)
 	}
-	d, e := json.Marshal(records)
+	d, e := json.Marshal(uploadRecords)
 	if e != nil {
 		return e
 	}
 	url := fmt.Sprintf("%s/tfc", agent)
 	resp := utils.FetchResponse(url, d)
 	if resp.Error != nil {
+		log.Fatalf("Unable to upload", url, string(resp.Data), resp.Error)
 		return resp.Error
 	}
+	log.Println("Registered", len(uploadRecords), "records in", agent)
 	return nil
 }

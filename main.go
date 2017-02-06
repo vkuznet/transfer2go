@@ -32,10 +32,8 @@ func main() {
 	flag.StringVar(&src, "src", "", "Source end-point, either local file or AgentName:LFN")
 	var dst string
 	flag.StringVar(&dst, "dst", "", "Destination end-point, either AgentName or AgentName:LFN")
-
-	// upload options
-	var upload string
-	flag.StringVar(&upload, "upload", "", "File with meta-data of records to upload in JSON data format")
+	var register string
+	flag.StringVar(&register, "register", "", "File with meta-data of records in JSON data format to register at remote agent")
 
 	flag.Parse()
 	utils.CheckX509()
@@ -79,10 +77,10 @@ func main() {
 		server.Server(config)
 	} else {
 		var err error
-		if src == "" { // no transfer request
+		if register != "" {
+			err = client.Register(agent, register)
+		} else if src == "" { // no transfer request
 			client.Agent(agent)
-		} else if upload != "" {
-			err = client.Upload(agent, upload)
 		} else {
 			err = client.Transfer(agent, src, dst)
 		}
