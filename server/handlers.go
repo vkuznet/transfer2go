@@ -237,7 +237,7 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// UploadDataHandler upload TransferData record and send back catalog entry to recepient
+// UploadDataHandler upload TransferData record and send back catalog entry to recipient
 func UploadDataHandler(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != "POST" {
