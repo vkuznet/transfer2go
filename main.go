@@ -35,7 +35,7 @@ func main() {
 
 	// upload options
 	var upload string
-	flag.StringVar(&upload, "upload", "", "Meta-data of records to upload")
+	flag.StringVar(&upload, "upload", "", "File with meta-data of records to upload in JSON data format")
 
 	flag.Parse()
 	utils.CheckX509()

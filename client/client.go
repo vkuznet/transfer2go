@@ -231,6 +231,9 @@ func Upload(agent, fname string) error {
 	// this work only for local filesystem, but I don't know how it will work
 	// for remote storage
 	for _, rec := range records {
+		if rec.Lfn == "" || rec.Pfn == "" || rec.Block == "" || rec.Dataset == "" {
+			log.Fatalf("Record must have at least the following fields: lfn, pfn, block, dataset, instead received", rec)
+		}
 		data, err := ioutil.ReadFile(rec.Pfn)
 		if err != nil {
 			return err
