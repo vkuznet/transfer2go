@@ -8,6 +8,7 @@ package client
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"strings"
 	"time"
@@ -212,4 +213,38 @@ func Agent(agent string) error {
 	resp := utils.FetchResponse(agent, []byte{})
 	log.Println(string(resp.Data))
 	return resp.Error
+}
+
+// Upload function upload given meta-data to the agent
+func Upload(agent, fname string) error {
+	// read inpuf file name which contains records meta-data (catalog entries)
+	c, e := ioutil.ReadFile(fname)
+	if e != nil {
+		log.Fatalf("Unable to read %s, error=%v\n", fname, e)
+	}
+	var records []model.CatalogEntry
+	err := json.Unmarshal([]byte(c), &records)
+	if err != nil {
+		log.Fatalf("Unable to parse catalog JSON file, error=%v\n", err)
+	}
+	// TODO: so far we scan every record and read a file to get its hash
+	// this work only for local filesystem, but I don't know how it will work
+	// for remote storage
+	for _, rec := range records {
+		data, err := ioutil.ReadFile(rec.Pfn)
+		if err != nil {
+			return err
+		}
+		rec.Hash, rec.Bytes = utils.Hash(data)
+	}
+	d, e := json.Marshal(records)
+	if e != nil {
+		return e
+	}
+	url := fmt.Sprintf("%s/tfc", agent)
+	resp := utils.FetchResponse(url, d)
+	if resp.Error != nil {
+		return resp.Error
+	}
+	return nil
 }

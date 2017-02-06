@@ -33,6 +33,10 @@ func main() {
 	var dst string
 	flag.StringVar(&dst, "dst", "", "Destination end-point, either AgentName or AgentName:LFN")
 
+	// upload options
+	var upload string
+	flag.StringVar(&upload, "upload", "", "Meta-data of records to upload")
+
 	flag.Parse()
 	utils.CheckX509()
 	utils.VERBOSE = verbose
@@ -74,15 +78,17 @@ func main() {
 
 		server.Server(config)
 	} else {
-
+		var err error
 		if src == "" { // no transfer request
 			client.Agent(agent)
+		} else if upload != "" {
+			err = client.Upload(agent, upload)
 		} else {
-			err := client.Transfer(agent, src, dst)
-			if err != nil {
-				log.Printf("Unable to transfer %s/%s to %s", agent, src, dst)
-				os.Exit(1)
-			}
+			err = client.Transfer(agent, src, dst)
+		}
+		if err != nil {
+			log.Printf("Unable to transfer %s/%s to %s", agent, src, dst)
+			os.Exit(1)
 		}
 	}
 }
