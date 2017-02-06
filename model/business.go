@@ -21,12 +21,6 @@ type Metrics struct {
 // AgentMetrics defines various metrics about the agent work
 var AgentMetrics Metrics
 
-// TransferCollection holds data about transfer requests
-type TransferCollection struct {
-	TimeStamp int64             `json:"ts"`
-	Requests  []TransferRequest `json:"data"`
-}
-
 // TransferRequest data type
 type TransferRequest struct {
 	TimeStamp int64  `json:"ts"`       // timestamp of the request

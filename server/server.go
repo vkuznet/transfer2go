@@ -10,7 +10,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/vkuznet/transfer2go/model"
@@ -149,35 +148,31 @@ func Server(config Config) {
 	registerAtAgents(config.Register)
 
 	// define catalog
-	if stat, err := os.Stat(config.Catalog); err == nil && stat.IsDir() {
-		model.TFC = model.Catalog{Type: "filesystem", Uri: config.Catalog}
-	} else {
-		c, e := ioutil.ReadFile(config.Catalog)
-		if e != nil {
-			log.Fatalf("Unable to read catalog file, error=%v\n", err)
-		}
-		err := json.Unmarshal([]byte(c), &model.TFC)
-		if err != nil {
-			log.Fatalf("Unable to parse catalog JSON file, error=%v\n", err)
-		}
-		// open up Catalog DB
-		dbtype := model.TFC.Type
-		dburi := model.TFC.Uri // TODO: may be I need to change this based on DB Login/Password, check MySQL
-		dbowner := model.TFC.Owner
-		db, dberr := sql.Open(dbtype, dburi)
-		defer db.Close()
-		if dberr != nil {
-			log.Fatalf("ERROR sql.Open, %v\n", dberr)
-		}
-		dberr = db.Ping()
-		if dberr != nil {
-			log.Fatalf("ERROR db.Ping, %v\n", dberr)
-		}
-
-		model.DB = db
-		model.DBTYPE = dbtype
-		model.DBSQL = model.LoadSQL(dbtype, dbowner)
+	c, e := ioutil.ReadFile(config.Catalog)
+	if e != nil {
+		log.Fatalf("Unable to read catalog file, error=%v\n", e)
 	}
+	err := json.Unmarshal([]byte(c), &model.TFC)
+	if err != nil {
+		log.Fatalf("Unable to parse catalog JSON file, error=%v\n", err)
+	}
+	// open up Catalog DB
+	dbtype := model.TFC.Type
+	dburi := model.TFC.Uri // TODO: may be I need to change this based on DB Login/Password, check MySQL
+	dbowner := model.TFC.Owner
+	db, dberr := sql.Open(dbtype, dburi)
+	defer db.Close()
+	if dberr != nil {
+		log.Fatalf("ERROR sql.Open, %v\n", dberr)
+	}
+	dberr = db.Ping()
+	if dberr != nil {
+		log.Fatalf("ERROR db.Ping, %v\n", dberr)
+	}
+
+	model.DB = db
+	model.DBTYPE = dbtype
+	model.DBSQL = model.LoadSQL(dbtype, dbowner)
 	log.Println("Catalog", model.TFC)
 
 	// define handlers
@@ -198,7 +193,7 @@ func Server(config Config) {
 	log.Println("Start dispatcher with", config.Workers, "workers, queue size", config.QueueSize)
 
 	// start server
-	err := http.ListenAndServe(":"+port, nil)
+	err = http.ListenAndServe(":"+port, nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}

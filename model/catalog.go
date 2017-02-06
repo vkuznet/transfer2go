@@ -6,7 +6,6 @@ package model
 import (
 	"database/sql"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os/exec"
 	"strings"
@@ -88,7 +87,7 @@ func (c *CatalogEntry) String() string {
 
 // Catalog represents Trivial File Catalog (TFC) of the model
 type Catalog struct {
-	Type     string `json:"type"`     // catalog type, e.g. filesystem, sqlite3, etc.
+	Type     string `json:"type"`     // catalog type, e.g. sqlite3, etc.
 	Uri      string `json:"uri"`      // catalog uri, e.g. file.db
 	Login    string `json:"login"`    // database login
 	Password string `json:"password"` // database password
@@ -179,27 +178,14 @@ func (c *Catalog) Add(entry CatalogEntry) error {
 func (c *Catalog) Files(dataset, block, lfn string) []string {
 	var files []string
 	req := TransferRequest{Dataset: dataset, Block: block, File: lfn}
-	for _, rec := range c.FindRecords(req) {
+	for _, rec := range c.Records(req) {
 		files = append(files, rec.Lfn)
 	}
 	return files
 }
 
-// FindRecords returns catalog records for a given transfer request
-func (c *Catalog) FindRecords(req TransferRequest) []CatalogEntry {
-	if c.Type == "filesystem" {
-		fname := req.File
-		data, err := ioutil.ReadFile(fname)
-		if err != nil {
-			log.Println("ERROR, unable to read a file", fname, err)
-		}
-		hash, b := utils.Hash(data)
-		// TODO: I need to know how to generate dataset and block names in this case
-		entry := CatalogEntry{Lfn: fname, Pfn: fname, Hash: hash, Bytes: b, Dataset: "/a/b/c", Block: "123"}
-		var out []CatalogEntry
-		out = append(out, entry)
-		return out
-	}
+// Records returns catalog records for a given transfer request
+func (c *Catalog) Records(req TransferRequest) []CatalogEntry {
 	stm := getSQL("files_blocks_datasets")
 	var cond []string
 	var vals []interface{}
@@ -220,7 +206,7 @@ func (c *Catalog) FindRecords(req TransferRequest) []CatalogEntry {
 	}
 
 	if utils.VERBOSE > 0 {
-		log.Println("FindRecords query", stm, vals)
+		log.Println("Records query", stm, vals)
 	}
 
 	// fetch data from DB

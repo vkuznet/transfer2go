@@ -60,7 +60,7 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
-// AgentsHandler serves list of known agents
+// AgentsHandler returns list of known agents
 func AgentsHandler(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != "GET" {
@@ -112,7 +112,13 @@ func TFCHandler(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	if r.Method == "GET" {
-		data := model.TFC.Dump()
+		records := model.TFC.Records(model.TransferRequest{})
+		data, err := json.Marshal(records)
+		if err != nil {
+			log.Println("ERROR TFCHandler unable to marshal", records, err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 		w.WriteHeader(http.StatusOK)
 		w.Write(data)
 		return
@@ -207,20 +213,20 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Read the body into a string for json decoding
-	var content = &model.TransferCollection{}
-	err := json.NewDecoder(r.Body).Decode(&content)
+	var requests = &[]model.TransferRequest{}
+	err := json.NewDecoder(r.Body).Decode(&requests)
 	if err != nil {
-		log.Println("ERROR RequestHandler unable to decode TransferCollection", err)
+		log.Println("ERROR RequestHandler unable to decode []TransferRequest", err)
 		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	// go through each request and queue items individually to run job over the given request
-	for _, rdoc := range content.Requests {
+	for _, r := range *requests {
 
 		// let's create a job with the payload
-		work := model.Job{TransferRequest: rdoc}
+		work := model.Job{TransferRequest: r}
 
 		// Push the work onto the queue.
 		model.JobQueue <- work
@@ -269,9 +275,7 @@ func UploadDataHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Printf("wrote %s:%s to %s:%s\n", td.SrcAlias, fname, td.DstAlias, pfn)
-	if model.TFC.Type != "filesystem" {
-		entry := model.CatalogEntry{Lfn: td.File, Pfn: pfn, Dataset: td.Dataset, Block: td.Block, Bytes: bytes, Hash: hash}
-		model.TFC.Add(entry)
-	}
+	entry := model.CatalogEntry{Lfn: td.File, Pfn: pfn, Dataset: td.Dataset, Block: td.Block, Bytes: bytes, Hash: hash}
+	model.TFC.Add(entry)
 	w.WriteHeader(http.StatusOK)
 }

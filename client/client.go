@@ -112,20 +112,20 @@ func findFiles(agents map[string]string, src string) ([]AgentFiles, error) {
 }
 
 // helper function to parse source and destination parameters
-func parse(agent, src, dst string) ([]model.TransferCollection, error) {
-	var tc []model.TransferCollection
+func parse(agent, src, dst string) ([][]model.TransferRequest, error) {
+	var tr [][]model.TransferRequest
 	var dstUrl string
 
 	// find out list of all agents
 	url := fmt.Sprintf("%s/agents", agent)
 	resp := utils.FetchResponse(url, []byte{})
 	if resp.Error != nil {
-		return tc, resp.Error
+		return tr, resp.Error
 	}
 	var remoteAgents map[string]string
 	e := json.Unmarshal(resp.Data, &remoteAgents)
 	if e != nil {
-		return tc, e
+		return tr, e
 	}
 
 	// resolve source agent name/alias and identify file to transfer
@@ -138,14 +138,14 @@ func parse(agent, src, dst string) ([]model.TransferCollection, error) {
 	dstUrl, ok := remoteAgents[dst]
 	if !ok {
 		log.Println("Unable to resolve destination", dst, "known agents", remoteAgents)
-		return tc, fmt.Errorf("Unknown destination")
+		return tr, fmt.Errorf("Unknown destination")
 	}
 
 	// get list of records which provide info about agent and a file
 	// and construct transfer collection
 	records, err := findFiles(remoteAgents, src) // src here can be either lfn/block/dataset
 	if err != nil {
-		return tc, err
+		return tr, err
 	}
 	for _, rec := range records {
 		var requests []model.TransferRequest
@@ -154,9 +154,9 @@ func parse(agent, src, dst string) ([]model.TransferCollection, error) {
 			log.Println(req.String())
 			requests = append(requests, req)
 		}
-		tc = append(tc, model.TransferCollection{TimeStamp: time.Now().Unix(), Requests: requests})
+		tr = append(tr, requests)
 	}
-	return tc, nil
+	return tr, nil
 }
 
 // Transfer client function is responsible to initiate transfer request from
@@ -173,9 +173,9 @@ func Transfer(agent, src, dst string) error {
 	out := make(chan utils.ResponseType)
 	defer close(out)
 	umap := map[string]int{}
-	for _, tc := range collection {
-		furl := fmt.Sprintf("%s/request", tc.Requests[0].SrcUrl)
-		d, e := json.Marshal(tc)
+	for _, transferRequests := range collection {
+		furl := fmt.Sprintf("%s/request", transferRequests[0].SrcUrl)
+		d, e := json.Marshal(transferRequests)
 		if e != nil {
 			return e
 		}

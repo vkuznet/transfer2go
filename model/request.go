@@ -84,7 +84,7 @@ func Transfer() Decorator {
 
 			log.Println("Request Transfer", t.String())
 
-			records := TFC.FindRecords(*t)
+			records := TFC.Records(*t)
 			if len(records) == 0 {
 				// file does not exists in TFC, nothing to do, return immediately
 				log.Printf("WARNING %v does match anything in TFC of this agent\n", t)
