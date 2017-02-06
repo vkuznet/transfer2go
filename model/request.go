@@ -142,8 +142,10 @@ func Transfer() Decorator {
 				}
 				// Add entry for remote TFC after transfer is completed
 				url = fmt.Sprintf("%s/tfc", t.DstUrl)
-				rEntry := CatalogEntry{Dataset: rec.Dataset, Block: rec.Block, Lfn: rec.Lfn, Pfn: rpfn, Bytes: rec.Bytes, Hash: rec.Hash}
-				d, e := json.Marshal(rEntry)
+				r := CatalogEntry{Dataset: rec.Dataset, Block: rec.Block, Lfn: rec.Lfn, Pfn: rpfn, Bytes: rec.Bytes, Hash: rec.Hash}
+				var records []CatalogEntry
+				records = append(records, r)
+				d, e := json.Marshal(records)
 				if e != nil {
 					return e
 				}

@@ -123,14 +123,16 @@ func TFCHandler(w http.ResponseWriter, r *http.Request) {
 		w.Write(data)
 		return
 	}
-	var entry model.CatalogEntry
-	err := json.NewDecoder(r.Body).Decode(&entry)
+	var records []model.CatalogEntry
+	err := json.NewDecoder(r.Body).Decode(&records)
 	if err != nil {
 		log.Println("ERROR TFCHandler unable to decode", r.Body, err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	err = model.TFC.Add(entry)
+	for _, rec := range records {
+		err = model.TFC.Add(rec)
+	}
 	if err != nil {
 		log.Println("ERROR TFCHandler unable to decode", r.Body, err)
 		w.WriteHeader(http.StatusInternalServerError)
