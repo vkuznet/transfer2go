@@ -176,7 +176,7 @@ func HostIP() []string {
 	return List2Set(out)
 }
 
-// ChekcX509 function checks X509 settings
+// CheckX509 function checks X509 settings
 func CheckX509() {
 	uproxy := os.Getenv("X509_USER_PROXY")
 	uckey := os.Getenv("X509_USER_KEY")
