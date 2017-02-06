@@ -220,19 +220,20 @@ func Register(agent, fname string) error {
 	// read inpuf file name which contains records meta-data (catalog entries)
 	c, e := ioutil.ReadFile(fname)
 	if e != nil {
-		log.Fatalf("Unable to read %s, error=%v\n", fname, e)
+		return fmt.Errorf("Unable to read %s, error=%v\n", fname, e)
 	}
 	var uploadRecords, records []model.CatalogEntry
 	err := json.Unmarshal([]byte(c), &records)
 	if err != nil {
-		log.Fatalf("Unable to parse catalog JSON file, error=%v\n", err)
+		return fmt.Errorf("Unable to parse catalog JSON file, %v\n", err)
 	}
 	// TODO: so far we scan every record and read a file to get its hash
 	// this work only for local filesystem, but I don't know how it will work
 	// for remote storage
 	for _, rec := range records {
 		if rec.Lfn == "" || rec.Pfn == "" || rec.Block == "" || rec.Dataset == "" {
-			log.Fatalf("Record must have at least the following fields: lfn, pfn, block, dataset, instead received", rec)
+			e := fmt.Errorf("Record must have at least the following fields: lfn, pfn, block, dataset, instead received: %v\n", rec)
+			return e
 		}
 		data, err := ioutil.ReadFile(rec.Pfn)
 		if err != nil {
@@ -249,8 +250,7 @@ func Register(agent, fname string) error {
 	url := fmt.Sprintf("%s/tfc", agent)
 	resp := utils.FetchResponse(url, d)
 	if resp.Error != nil {
-		log.Fatalf("Unable to upload", url, string(resp.Data), resp.Error)
-		return resp.Error
+		return fmt.Errorf("Unable to upload, url=%s, data=%s, err=%v\n", url, string(resp.Data), resp.Error)
 	}
 	log.Println("Registered", len(uploadRecords), "records in", agent)
 	return nil

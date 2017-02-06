@@ -85,7 +85,7 @@ func main() {
 			err = client.Transfer(agent, src, dst)
 		}
 		if err != nil {
-			log.Printf("Unable to transfer %s/%s to %s", agent, src, dst)
+			log.Println(err)
 			os.Exit(1)
 		}
 	}
