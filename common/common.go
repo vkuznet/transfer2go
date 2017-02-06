@@ -1,5 +1,7 @@
 package common
 
+import "fmt"
+
 // transfer2go agent common structures
 // Copyright (c) 2017 - Valentin Kuznetsov <vkuznet@gmail.com>
 
@@ -16,4 +18,9 @@ type AgentStatus struct {
 	ToolOpts        string            `json:"toolopts"` // options for backend tool
 	Agents          map[string]string `json:"agents"`   // list of known agents
 	Addrs           []string          `json:"addrs"`    // list of all IP addresses
+}
+
+// String provides string representation of given agent status
+func (a *AgentStatus) String() string {
+	return fmt.Sprintf("<Agent name=%s url=%s catalog=%s protocol=%s backend=%s tool=%s toolOpts=%s transfers=%d agents=%v addrs=%v>", a.Name, a.Url, a.Catalog, a.Protocol, a.Backend, a.Tool, a.ToolOpts, a.TransferCounter, a.Agents, a.Addrs)
 }
