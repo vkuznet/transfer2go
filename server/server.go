@@ -12,7 +12,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/vkuznet/transfer2go/model"
+	"github.com/vkuznet/transfer2go/core"
 	"github.com/vkuznet/transfer2go/utils"
 
 	// web profiler, see https://golang.org/pkg/net/http/pprof
@@ -152,14 +152,14 @@ func Server(config Config) {
 	if e != nil {
 		log.Fatalf("Unable to read catalog file, error=%v\n", e)
 	}
-	err := json.Unmarshal([]byte(c), &model.TFC)
+	err := json.Unmarshal([]byte(c), &core.TFC)
 	if err != nil {
 		log.Fatalf("Unable to parse catalog JSON file, error=%v\n", err)
 	}
 	// open up Catalog DB
-	dbtype := model.TFC.Type
-	dburi := model.TFC.Uri // TODO: may be I need to change this based on DB Login/Password, check MySQL
-	dbowner := model.TFC.Owner
+	dbtype := core.TFC.Type
+	dburi := core.TFC.Uri // TODO: may be I need to change this based on DB Login/Password, check MySQL
+	dbowner := core.TFC.Owner
 	db, dberr := sql.Open(dbtype, dburi)
 	defer db.Close()
 	if dberr != nil {
@@ -170,10 +170,10 @@ func Server(config Config) {
 		log.Fatalf("ERROR db.Ping, %v\n", dberr)
 	}
 
-	model.DB = db
-	model.DBTYPE = dbtype
-	model.DBSQL = model.LoadSQL(dbtype, dbowner)
-	log.Println("Catalog", model.TFC)
+	core.DB = db
+	core.DBTYPE = dbtype
+	core.DBSQL = core.LoadSQL(dbtype, dbowner)
+	log.Println("Catalog", core.TFC)
 
 	// define handlers
 	http.HandleFunc(fmt.Sprintf("%s/status", base), StatusHandler)             // GET method
@@ -188,7 +188,7 @@ func Server(config Config) {
 	http.HandleFunc(fmt.Sprintf("%s/", base), DefaultHandler)                  // GET method
 
 	// initialize task dispatcher
-	dispatcher := model.NewDispatcher(config.Workers, config.QueueSize, config.Mfile, config.Minterval)
+	dispatcher := core.NewDispatcher(config.Workers, config.QueueSize, config.Mfile, config.Minterval)
 	dispatcher.Run()
 	log.Println("Start dispatcher with", config.Workers, "workers, queue size", config.QueueSize)
 

@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/vkuznet/transfer2go/model"
+	"github.com/vkuznet/transfer2go/core"
 	"github.com/vkuznet/transfer2go/utils"
 )
 
@@ -113,8 +113,8 @@ func findFiles(agents map[string]string, src string) ([]AgentFiles, error) {
 }
 
 // helper function to parse source and destination parameters
-func parse(agent, src, dst string) ([][]model.TransferRequest, error) {
-	var tr [][]model.TransferRequest
+func parse(agent, src, dst string) ([][]core.TransferRequest, error) {
+	var tr [][]core.TransferRequest
 	var dstUrl string
 
 	// find out list of all agents
@@ -149,9 +149,9 @@ func parse(agent, src, dst string) ([][]model.TransferRequest, error) {
 		return tr, err
 	}
 	for _, rec := range records {
-		var requests []model.TransferRequest
+		var requests []core.TransferRequest
 		for _, file := range rec.Files {
-			req := model.TransferRequest{SrcUrl: rec.Url, SrcAlias: rec.Alias, File: file, DstUrl: dstUrl, DstAlias: dst}
+			req := core.TransferRequest{SrcUrl: rec.Url, SrcAlias: rec.Alias, File: file, DstUrl: dstUrl, DstAlias: dst}
 			log.Println(req.String())
 			requests = append(requests, req)
 		}
@@ -222,7 +222,7 @@ func Register(agent, fname string) error {
 	if e != nil {
 		return fmt.Errorf("Unable to read %s, error=%v\n", fname, e)
 	}
-	var uploadRecords, records []model.CatalogEntry
+	var uploadRecords, records []core.CatalogEntry
 	err := json.Unmarshal([]byte(c), &records)
 	if err != nil {
 		return fmt.Errorf("Unable to parse catalog JSON file, %v\n", err)
@@ -240,7 +240,7 @@ func Register(agent, fname string) error {
 			return err
 		}
 		hash, bytes := utils.Hash(data)
-		r := model.CatalogEntry{Lfn: rec.Lfn, Pfn: rec.Pfn, Block: rec.Block, Dataset: rec.Dataset, Hash: hash, Bytes: bytes}
+		r := core.CatalogEntry{Lfn: rec.Lfn, Pfn: rec.Pfn, Block: rec.Block, Dataset: rec.Dataset, Hash: hash, Bytes: bytes}
 		uploadRecords = append(uploadRecords, r)
 	}
 	d, e := json.Marshal(uploadRecords)

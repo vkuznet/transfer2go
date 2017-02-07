@@ -1,6 +1,6 @@
-package model
+package core
 
-// transfer2go data model module
+// transfer2go core data transfer module
 // Copyright (c) 2017 - Valentin Kuznetsov <vkuznet@gmail.com>
 
 import (
@@ -48,20 +48,6 @@ func (t *TransferRequest) Run() error {
 	)
 	request.Process(t)
 	return nil
-}
-
-// TransferData extends TransferRequest interface to include transferring data, checksum, bytes
-type TransferData struct {
-	File     string `json:"file"`
-	Block    string `json:"block"`
-	Dataset  string `json:"dataset"`
-	SrcUrl   string `json:"srcUrl"`
-	SrcAlias string `json:"srcAlias"`
-	DstUrl   string `json:"dstUrl"`
-	DstAlias string `json:"dstAlias"`
-	Data     []byte `json:"data"`
-	Hash     string `json:"hash"`
-	Bytes    int64  `json:"bytes"`
 }
 
 // Job represents the job to be run

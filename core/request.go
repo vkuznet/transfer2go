@@ -1,20 +1,44 @@
-package model
+package core
 
-// transfer2go data model implementation
+// transfer2go data core module, request implementation
 // Copyright (c) 2017 - Valentin Kuznetsov <vkuznet@gmail.com>
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
+	"mime/multipart"
+	"net/http"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"sync/atomic"
 	"time"
 
-	"github.com/vkuznet/transfer2go/common"
 	"github.com/vkuznet/transfer2go/utils"
 )
+
+// AgentStatus data type
+type AgentStatus struct {
+	Url             string            `json:"url"`      // agent url
+	Name            string            `json:"name"`     // agent name or alias
+	TimeStamp       int64             `json:"ts"`       // time stamp
+	TransferCounter int32             `json:"tc"`       // number of transfers at a given time
+	Catalog         string            `json:"catalog"`  // underlying TFC catalog
+	Protocol        string            `json:"protocol"` // underlying transfer protocol
+	Backend         string            `json:"backend"`  // underlying transfer backend
+	Tool            string            `json:"tool"`     // underlying transfer tool, e.g. xrdcp
+	ToolOpts        string            `json:"toolopts"` // options for backend tool
+	Agents          map[string]string `json:"agents"`   // list of known agents
+	Addrs           []string          `json:"addrs"`    // list of all IP addresses
+}
+
+// String provides string representation of given agent status
+func (a *AgentStatus) String() string {
+	return fmt.Sprintf("<Agent name=%s url=%s catalog=%s protocol=%s backend=%s tool=%s toolOpts=%s transfers=%d agents=%v addrs=%v>", a.Name, a.Url, a.Catalog, a.Protocol, a.Backend, a.Tool, a.ToolOpts, a.TransferCounter, a.Agents, a.Addrs)
+}
 
 // TransferCounter is a global atomic counter which keep tracks of transfers in the agent
 var TransferCounter int32
@@ -48,28 +72,51 @@ func (f RequestFunc) Process(t *TransferRequest) error {
 // Decorator wraps a request with extra behavior
 type Decorator func(Request) Request
 
+// filleTransferRequest creates HTTP request to transfer a given file name
+// https://matt.aimonetti.net/posts/2013/07/01/golang-multipart-file-upload-example/
+func fileTransferRequest(c CatalogEntry, tr *TransferRequest) (*http.Request, error) {
+	file, err := os.Open(c.Pfn)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	part, err := writer.CreateFormFile("data", filepath.Base(c.Pfn))
+	if err != nil {
+		return nil, err
+	}
+	_, err = io.Copy(part, file)
+	err = writer.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	url := fmt.Sprintf("%s/upload", tr.DstUrl)
+	req, err := http.NewRequest("POST", url, body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("Pfn", c.Pfn)
+	req.Header.Set("Lfn", c.Lfn)
+	req.Header.Set("Bytes", fmt.Sprintf("%d", c.Bytes))
+	req.Header.Set("Hash", c.Hash)
+	req.Header.Set("Src", tr.SrcAlias)
+	req.Header.Set("Dst", tr.DstAlias)
+	return req, err
+}
+
 // helper function to perform transfer via HTTP protocol
-func httpTransfer(rec CatalogEntry, t *TransferRequest) (string, error) {
-	data, err := ioutil.ReadFile(rec.Pfn)
+func httpTransfer(c CatalogEntry, t *TransferRequest) (string, error) {
+	// create file transfer request
+	request, err := fileTransferRequest(c, t)
 	if err != nil {
 		return "", err
 	}
-	hash, b := utils.Hash(data)
-	if hash != rec.Hash {
-		return "", fmt.Errorf("File hash mismatch hash=%s rec.Hash=%s\n", hash, rec.Hash)
-	}
-	if b != rec.Bytes {
-		return "", fmt.Errorf("File bytes mismatch, bytes=%d rec.Bytes=%d\n", b, rec.Bytes)
-	}
-	td := TransferData{File: rec.Lfn, Dataset: rec.Dataset, Block: rec.Block, Data: data, Hash: hash, Bytes: b, SrcUrl: t.SrcUrl, SrcAlias: t.SrcAlias, DstUrl: t.DstUrl, DstAlias: t.DstAlias}
-	d, e := json.Marshal(td)
-	if e != nil {
-		return "", e
-	}
-	url := fmt.Sprintf("%s/upload", t.DstUrl)
-	resp := utils.FetchResponse(url, d)
+	client := utils.HttpClient()
+	resp, err := client.Do(request)
+	defer resp.Body.Close()
+
 	var r CatalogEntry
-	err = json.Unmarshal(resp.Data, &r)
+	err = json.NewDecoder(resp.Body).Decode(&r)
 	if err != nil {
 		return "", err
 	}
@@ -101,7 +148,7 @@ func Transfer() Decorator {
 			if resp.Error != nil {
 				return resp.Error
 			}
-			var dstAgent common.AgentStatus
+			var dstAgent AgentStatus
 			err := json.Unmarshal(resp.Data, &dstAgent)
 			if err != nil {
 				return err
@@ -111,7 +158,7 @@ func Transfer() Decorator {
 			if resp.Error != nil {
 				return resp.Error
 			}
-			var srcAgent common.AgentStatus
+			var srcAgent AgentStatus
 			err = json.Unmarshal(resp.Data, &srcAgent)
 			if err != nil {
 				return err
