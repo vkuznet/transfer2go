@@ -70,6 +70,9 @@ func main() {
 		if config.Port == 0 {
 			config.Port = 8989
 		}
+		if agent != "" {
+			config.Register = agent
+		}
 		if config.Register == "" {
 			log.Println("WARNING this agent is not registered with remote ones, either provide register in your config or invoke register API call")
 		}
