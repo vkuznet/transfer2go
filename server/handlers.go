@@ -11,6 +11,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/http/httputil"
 	"os"
 	"strings"
 	"time"
@@ -18,6 +19,113 @@ import (
 	"github.com/vkuznet/transfer2go/core"
 	"github.com/vkuznet/transfer2go/utils"
 )
+
+// global variable which we initialize once
+var _userDNs []string
+
+func userDNs() []string {
+	var out []string
+	rurl := "https://cmsweb.cern.ch/sitedb/data/prod/people"
+	resp := utils.FetchResponse(rurl, []byte{})
+	if resp.Error != nil {
+		log.Println("ERROR unable to fetch SiteDB records", resp.Error)
+		return out
+	}
+	/*
+		headers, _, _, err := jsonparser.Get(resp.Data, "desc", "columns")
+		if err != nil {
+			log.Println("ERROR unable to fetch SiteDB columns", err)
+			return out
+		}
+		var idx int
+		for i, h := range headers {
+			if string(h) == "dn" {
+				idx = i
+				break
+			}
+		}
+		jsonparser.ArrayEach(resp.Data, func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+			dn, err := jsonparser.GetString(value, fmt.Sprintf("[%s]", idx))
+			if err == nil {
+				out = append(out, dn)
+			}
+		}, "result")
+	*/
+	var rec map[string]interface{}
+	err := json.Unmarshal(resp.Data, &rec)
+	if err != nil {
+		log.Println("ERROR unable to unmarshal response", err)
+		return out
+	}
+	desc := rec["desc"].(map[string]interface{})
+	headers := desc["columns"].([]interface{})
+	var idx int
+	for i, h := range headers {
+		if h.(string) == "dn" {
+			idx = i
+			break
+		}
+	}
+	values := rec["result"].([]interface{})
+	for _, item := range values {
+		val := item.([]interface{})
+		v := val[idx]
+		if v != nil {
+			out = append(out, v.(string))
+		}
+	}
+	return out
+}
+
+func init() {
+	_userDNs = userDNs()
+}
+
+// custom logic for CMS authentication, users may implement their own logic here
+func auth(r *http.Request) bool {
+	if utils.VERBOSE > 1 {
+		dump, err := httputil.DumpRequest(r, true)
+		log.Println("AuthHandler HTTP request", r, string(dump), err)
+	}
+	userDN := utils.UserDN(r)
+	log.Println("auth userDN", userDN)
+	return utils.InList(userDN, _userDNs)
+}
+
+func AuthHandler(w http.ResponseWriter, r *http.Request) {
+	// check if server started with hkey file (auth is required)
+	status := auth(r)
+	if !status {
+		log.Println(_userDNs)
+		msg := "You are not allowed to access this resource"
+		http.Error(w, msg, http.StatusForbidden)
+		return
+	}
+	arr := strings.Split(r.URL.Path, "/")
+	path := arr[len(arr)-1]
+	switch path {
+	case "status":
+		StatusHandler(w, r)
+	case "agents":
+		AgentsHandler(w, r)
+	case "files":
+		FilesHandler(w, r)
+	case "reset":
+		ResetHandler(w, r)
+	case "tfc":
+		TFCHandler(w, r)
+	case "upload":
+		UploadDataHandler(w, r)
+	case "request":
+		RequestHandler(w, r)
+	case "register":
+		RegisterAgentHandler(w, r)
+	case "protocol":
+		RegisterProtocolHandler(w, r)
+	default:
+		DefaultHandler(w, r)
+	}
+}
 
 // GET methods
 
