@@ -75,6 +75,7 @@ func auth(r *http.Request) bool {
 	return match
 }
 
+// AuthHandler authenticate incoming requests and route them to appropriate handler
 func AuthHandler(w http.ResponseWriter, r *http.Request) {
 	// check if server started with hkey file (auth is required)
 	status := auth(r)
