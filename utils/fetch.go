@@ -52,7 +52,7 @@ func tlsCerts() ([]tls.Certificate, error) {
 			uproxy = fname
 		}
 	}
-	if VERBOSE > 0 {
+	if VERBOSE > 1 {
 		log.Println("uproxy", uproxy)
 		log.Println("uckey", uckey)
 		log.Println("ucert", ucert)

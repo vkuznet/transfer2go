@@ -127,6 +127,7 @@ func httpTransfer(c CatalogEntry, t *TransferRequest) (string, error) {
 func Transfer() Decorator {
 	return func(r Request) Request {
 		return RequestFunc(func(t *TransferRequest) error {
+			AgentMetrics.Transfers.Mark(1)
 			// increment number of transfers
 			atomic.AddInt32(&TransferCounter, 1)
 

@@ -14,6 +14,7 @@ import (
 
 // Metrics of the agent
 type Metrics struct {
+	Transfers    metrics.Meter
 	Meter        metrics.Meter
 	WorkerMeters []metrics.Meter
 }
@@ -145,7 +146,7 @@ func (d *Dispatcher) Run() {
 	// starting n number of workers
 	for i := 0; i < d.MaxWorkers; i++ {
 		worker := NewWorker(i, d.JobPool)
-		AgentMetrics.WorkerMeters[i].Mark(0)
+		AgentMetrics.WorkerMeters[i].Mark(1)
 		worker.Start()
 	}
 
