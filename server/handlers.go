@@ -88,15 +88,17 @@ func auth(r *http.Request) bool {
 		log.Println("AuthHandler HTTP request", r, string(dump), err)
 	}
 	userDN := utils.UserDN(r)
-	log.Println("auth userDN", userDN)
-	return utils.InList(userDN, _userDNs)
+	match := utils.InList(userDN, _userDNs)
+	if !match {
+		log.Println("ERROR Auth userDN", userDN, "not found in SiteDB")
+	}
+	return match
 }
 
 func AuthHandler(w http.ResponseWriter, r *http.Request) {
 	// check if server started with hkey file (auth is required)
 	status := auth(r)
 	if !status {
-		log.Println(_userDNs)
 		msg := "You are not allowed to access this resource"
 		http.Error(w, msg, http.StatusForbidden)
 		return

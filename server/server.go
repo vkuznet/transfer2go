@@ -13,7 +13,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/vkuznet/cmsauth"
 	"github.com/vkuznet/transfer2go/core"
 	"github.com/vkuznet/transfer2go/utils"
 
@@ -65,7 +64,6 @@ type AgentProtocol struct {
 var _myself, _alias, _protocol, _backend, _tool, _toolOpts string
 var _agents map[string]string
 var _config Config
-var _cmsAuth cmsauth.CMSAuth
 
 // init
 func init() {
