@@ -31,26 +31,6 @@ func userDNs() []string {
 		log.Println("ERROR unable to fetch SiteDB records", resp.Error)
 		return out
 	}
-	/*
-		headers, _, _, err := jsonparser.Get(resp.Data, "desc", "columns")
-		if err != nil {
-			log.Println("ERROR unable to fetch SiteDB columns", err)
-			return out
-		}
-		var idx int
-		for i, h := range headers {
-			if string(h) == "dn" {
-				idx = i
-				break
-			}
-		}
-		jsonparser.ArrayEach(resp.Data, func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
-			dn, err := jsonparser.GetString(value, fmt.Sprintf("[%s]", idx))
-			if err == nil {
-				out = append(out, dn)
-			}
-		}, "result")
-	*/
 	var rec map[string]interface{}
 	err := json.Unmarshal(resp.Data, &rec)
 	if err != nil {
