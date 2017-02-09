@@ -4,6 +4,7 @@ package server
 // Copyright (c) 2017 - Valentin Kuznetsov <vkuznet@gmail.com>
 
 import (
+	"crypto/tls"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/vkuznet/cmsauth"
 	"github.com/vkuznet/transfer2go/core"
 	"github.com/vkuznet/transfer2go/utils"
 
@@ -36,6 +38,8 @@ type Config struct {
 	Port      int    `json:"port"`      // port number given server runs on, default 8989
 	Base      string `json:"base"`      // URL base path for agent server, it will be extracted from Url
 	Register  string `json:"register"`  // remote agent URL to register
+	ServerKey string `json:"serverkey"` // server key file
+	ServerCrt string `json:"servercrt"` // server crt file
 }
 
 // String returns string representation of Config data type
@@ -61,6 +65,7 @@ type AgentProtocol struct {
 var _myself, _alias, _protocol, _backend, _tool, _toolOpts string
 var _agents map[string]string
 var _config Config
+var _cmsAuth cmsauth.CMSAuth
 
 // init
 func init() {
@@ -176,24 +181,22 @@ func Server(config Config) {
 	log.Println("Catalog", core.TFC)
 
 	// define handlers
-	http.HandleFunc(fmt.Sprintf("%s/status", base), StatusHandler)             // GET method
-	http.HandleFunc(fmt.Sprintf("%s/agents", base), AgentsHandler)             // GET method
-	http.HandleFunc(fmt.Sprintf("%s/files", base), FilesHandler)               // GET method
-	http.HandleFunc(fmt.Sprintf("%s/reset", base), ResetHandler)               // GET method
-	http.HandleFunc(fmt.Sprintf("%s/tfc", base), TFCHandler)                   // GET/POST method
-	http.HandleFunc(fmt.Sprintf("%s/upload", base), UploadDataHandler)         // POST method
-	http.HandleFunc(fmt.Sprintf("%s/request", base), RequestHandler)           // POST method
-	http.HandleFunc(fmt.Sprintf("%s/register", base), RegisterAgentHandler)    // POST method
-	http.HandleFunc(fmt.Sprintf("%s/protocol", base), RegisterProtocolHandler) // POST method
-	http.HandleFunc(fmt.Sprintf("%s/", base), DefaultHandler)                  // GET method
+	http.HandleFunc(fmt.Sprintf("%s/", base), AuthHandler)
 
 	// initialize task dispatcher
 	dispatcher := core.NewDispatcher(config.Workers, config.QueueSize, config.Mfile, config.Minterval)
 	dispatcher.Run()
 	log.Println("Start dispatcher with", config.Workers, "workers, queue size", config.QueueSize)
 
-	// start server
-	err = http.ListenAndServe(":"+port, nil)
+	// start HTTPS server which require user certificates
+	server := &http.Server{
+		Addr: ":" + port,
+		TLSConfig: &tls.Config{
+			ClientAuth: tls.RequestClientCert,
+		},
+	}
+	err = server.ListenAndServeTLS(config.ServerCrt, config.ServerKey)
+	//     err = http.ListenAndServe(":"+port, nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
