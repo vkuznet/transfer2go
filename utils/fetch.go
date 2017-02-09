@@ -24,6 +24,20 @@ import (
 // VERBOSE variable control verbosity level of client's utilities
 var VERBOSE int
 
+// UserDN function parses user Distinguished Name (DN) from client's HTTP request
+func UserDN(r *http.Request) string {
+	var names []interface{}
+	for _, cert := range r.TLS.PeerCertificates {
+		for _, name := range cert.Subject.Names {
+			switch v := name.Value.(type) {
+			case string:
+				names = append(names, v)
+			}
+		}
+	}
+	return fmt.Sprintf("/DC=%s/DC=%s/OU=%s/OU=%s/CN=%s/CN=%s/CN=%s", names...)
+}
+
 // client X509 certificates
 func tlsCerts() ([]tls.Certificate, error) {
 	uproxy := os.Getenv("X509_USER_PROXY")
