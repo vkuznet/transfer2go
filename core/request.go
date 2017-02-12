@@ -14,7 +14,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sync/atomic"
 	"time"
 
 	"github.com/vkuznet/transfer2go/utils"
@@ -127,16 +126,7 @@ func httpTransfer(c CatalogEntry, t *TransferRequest) (string, error) {
 func Transfer() Decorator {
 	return func(r Request) Request {
 		return RequestFunc(func(t *TransferRequest) error {
-			AgentMetrics.Transfers.Mark(1)
-			// increment number of transfers
-			atomic.AddInt32(&TransferCounter, 1)
-
-			// TODO: I need to decide how to deal with TransferCounter, so far:
-			// decrement transfer counter when done with transfer request
-			defer atomic.AddInt32(&TransferCounter, -1)
-
 			log.Println("Request Transfer", t.String())
-
 			records := TFC.Records(*t)
 			if len(records) == 0 {
 				// file does not exists in TFC, nothing to do, return immediately
@@ -196,6 +186,11 @@ func Transfer() Decorator {
 				}
 				r := CatalogEntry{Dataset: rec.Dataset, Block: rec.Block, Lfn: rec.Lfn, Pfn: rpfn, Bytes: rec.Bytes, Hash: rec.Hash}
 				trRecords = append(trRecords, r)
+
+				// record how much we transferred
+				AgentMetrics.Transfers.Mark(r.Bytes)
+				AgentMetrics.CountTransfers.Inc(1)
+
 			}
 			// Add entry for remote TFC after transfer is completed
 			url = fmt.Sprintf("%s/tfc", t.DstUrl)

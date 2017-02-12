@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sync/atomic"
 	"time"
 
 	"github.com/rcrowley/go-metrics"
@@ -14,9 +15,11 @@ import (
 
 // Metrics of the agent
 type Metrics struct {
-	Transfers    metrics.Meter
-	Meter        metrics.Meter
-	WorkerMeters []metrics.Meter
+	InTransfer      metrics.Counter
+	FailedTransfers metrics.Counter
+	CountTransfers  metrics.Counter
+	Transfers       metrics.Meter
+	WorkerCounters  []metrics.Counter
 }
 
 // AgentMetrics defines various metrics about the agent work
@@ -47,8 +50,7 @@ func (t *TransferRequest) Run() error {
 		Pause(interval), // will pause a given request for a given interval
 		Transfer(),
 	)
-	request.Process(t)
-	return nil
+	return request.Process(t)
 }
 
 // Job represents the job to be run
@@ -86,10 +88,34 @@ func (w Worker) Start() {
 
 			select {
 			case job := <-w.JobChannel:
-				AgentMetrics.WorkerMeters[w.Id].Mark(1)
+				// increment number of transfers
+				atomic.AddInt32(&TransferCounter, 1)
+
+				// Add info to agents metrics
+				AgentMetrics.WorkerCounters[w.Id].Inc(1)
+				AgentMetrics.InTransfer.Inc(1)
 				// we have received a work request.
 				if err := job.TransferRequest.Run(); err != nil {
-					log.Println("Error in job.TransferRequest.Run:", err.Error())
+					msg := fmt.Sprintf("WARNING %v experienced an error %v, put on hold", job.TransferRequest, err.Error())
+					// decide if we'll drop the request or put it on hold by increasing its delay and put back to job channel
+					if job.TransferRequest.Delay > 300 {
+						log.Println("ERROR ", job.TransferRequest, "exceed number of iteration, discard request")
+						AgentMetrics.FailedTransfers.Inc(1)
+					} else if job.TransferRequest.Delay > 0 {
+						job.TransferRequest.Delay *= 2
+						log.Println(msg)
+						w.JobChannel <- job
+					} else {
+						job.TransferRequest.Delay = 60
+						log.Println(msg)
+						w.JobChannel <- job
+					}
+				} else {
+					AgentMetrics.WorkerCounters[w.Id].Dec(1)
+					AgentMetrics.InTransfer.Dec(1)
+
+					// decrement global transfer counter, it is used by agent status
+					atomic.AddInt32(&TransferCounter, -1)
 				}
 
 			case <-w.quit:
@@ -124,16 +150,19 @@ func NewDispatcher(maxWorkers, maxQueue int, mfile string, minterval int64) *Dis
 	defer f.Close()
 
 	r := metrics.DefaultRegistry
+	inT := metrics.GetOrRegisterCounter("inTransfer", r)
+	fT := metrics.GetOrRegisterCounter("failedTransfers", r)
+	cT := metrics.GetOrRegisterCounter("countTransfers", r)
 	m := metrics.GetOrRegisterMeter("requests", r)
 	go metrics.Log(r, time.Duration(minterval)*time.Second, log.New(f, "metrics: ", log.Lmicroseconds))
 
 	// define agent metrics
-	var workerMeters []metrics.Meter
+	var workerMeters []metrics.Counter
 	for i := 0; i < maxWorkers; i++ {
-		wm := metrics.GetOrRegisterMeter(fmt.Sprintf("worker_%d", i), r)
+		wm := metrics.GetOrRegisterCounter(fmt.Sprintf("worker_%d", i), r)
 		workerMeters = append(workerMeters, wm)
 	}
-	AgentMetrics = Metrics{Meter: m, WorkerMeters: workerMeters}
+	AgentMetrics = Metrics{InTransfer: inT, FailedTransfers: fT, CountTransfers: cT, Transfers: m, WorkerCounters: workerMeters}
 
 	// define pool of workers and jobqueue
 	pool := make(chan chan Job, maxWorkers)
@@ -146,7 +175,6 @@ func (d *Dispatcher) Run() {
 	// starting n number of workers
 	for i := 0; i < d.MaxWorkers; i++ {
 		worker := NewWorker(i, d.JobPool)
-		AgentMetrics.WorkerMeters[i].Mark(1)
 		worker.Start()
 	}
 
@@ -157,7 +185,6 @@ func (d *Dispatcher) dispatch() {
 	for {
 		select {
 		case job := <-JobQueue:
-			AgentMetrics.Meter.Mark(1)
 			// a job request has been received
 			go func(job Job) {
 				// try to obtain a worker job channel that is available.
