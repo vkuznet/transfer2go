@@ -21,26 +21,23 @@ import (
 
 // AgentStatus data type
 type AgentStatus struct {
-	Url             string            `json:"url"`      // agent url
-	Name            string            `json:"name"`     // agent name or alias
-	TimeStamp       int64             `json:"ts"`       // time stamp
-	TransferCounter int32             `json:"tc"`       // number of transfers at a given time
-	Catalog         string            `json:"catalog"`  // underlying TFC catalog
-	Protocol        string            `json:"protocol"` // underlying transfer protocol
-	Backend         string            `json:"backend"`  // underlying transfer backend
-	Tool            string            `json:"tool"`     // underlying transfer tool, e.g. xrdcp
-	ToolOpts        string            `json:"toolopts"` // options for backend tool
-	Agents          map[string]string `json:"agents"`   // list of known agents
-	Addrs           []string          `json:"addrs"`    // list of all IP addresses
+	Url       string            `json:"url"`      // agent url
+	Name      string            `json:"name"`     // agent name or alias
+	TimeStamp int64             `json:"ts"`       // time stamp
+	Catalog   string            `json:"catalog"`  // underlying TFC catalog
+	Protocol  string            `json:"protocol"` // underlying transfer protocol
+	Backend   string            `json:"backend"`  // underlying transfer backend
+	Tool      string            `json:"tool"`     // underlying transfer tool, e.g. xrdcp
+	ToolOpts  string            `json:"toolopts"` // options for backend tool
+	Agents    map[string]string `json:"agents"`   // list of known agents
+	Addrs     []string          `json:"addrs"`    // list of all IP addresses
+	Metrics   map[string]int64  `json:"metrics"`  // agent metrics
 }
 
 // String provides string representation of given agent status
 func (a *AgentStatus) String() string {
-	return fmt.Sprintf("<Agent name=%s url=%s catalog=%s protocol=%s backend=%s tool=%s toolOpts=%s transfers=%d agents=%v addrs=%v>", a.Name, a.Url, a.Catalog, a.Protocol, a.Backend, a.Tool, a.ToolOpts, a.TransferCounter, a.Agents, a.Addrs)
+	return fmt.Sprintf("<Agent name=%s url=%s catalog=%s protocol=%s backend=%s tool=%s toolOpts=%s agents=%v addrs=%v metrics(%s)>", a.Name, a.Url, a.Catalog, a.Protocol, a.Backend, a.Tool, a.ToolOpts, a.Agents, a.Addrs, a.Metrics)
 }
-
-// TransferCounter is a global atomic counter which keep tracks of transfers in the agent
-var TransferCounter int32
 
 // Processor is an object who process' given task
 // The logic of the Processor should be implemented.
@@ -160,6 +157,8 @@ func Transfer() Decorator {
 			var trRecords []CatalogEntry // list of successfully transferred records
 			for _, rec := range records {
 
+				AgentMetrics.Bytes.Inc(rec.Bytes)
+
 				// if protocol is not given use default one: HTTP
 				var rpfn string // remote PFN
 				if srcAgent.Protocol == "" || srcAgent.Protocol == "http" {
@@ -188,8 +187,9 @@ func Transfer() Decorator {
 				trRecords = append(trRecords, r)
 
 				// record how much we transferred
-				AgentMetrics.Transfers.Mark(r.Bytes)
-				AgentMetrics.CountTransfers.Inc(1)
+				AgentMetrics.TotalBytes.Inc(r.Bytes) // keep growing
+				AgentMetrics.Total.Inc(1)            // keep growing
+				AgentMetrics.Bytes.Dec(rec.Bytes)    // decrement since we're done
 
 			}
 			// Add entry for remote TFC after transfer is completed

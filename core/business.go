@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"sync/atomic"
 	"time"
 
 	"github.com/rcrowley/go-metrics"
@@ -15,11 +14,27 @@ import (
 
 // Metrics of the agent
 type Metrics struct {
-	InTransfer      metrics.Counter
-	FailedTransfers metrics.Counter
-	CountTransfers  metrics.Counter
-	Transfers       metrics.Meter
-	WorkerCounters  []metrics.Counter
+	In         metrics.Counter // number of live transfer requests
+	Failed     metrics.Counter // number of failed transfer requests
+	Total      metrics.Counter // total number of transfer requests
+	TotalBytes metrics.Counter // total number of bytes by this agent
+	Bytes      metrics.Counter // number of bytes in progress
+}
+
+// String representation of Metrics
+func (m *Metrics) String() string {
+	return fmt.Sprintf("<Metrics: in=%d failed=%d total=%d bytes=%d totBytes=%d>", m.In.Count(), m.Failed.Count(), m.Total.Count(), m.Bytes.Count(), m.TotalBytes.Count())
+}
+
+// ToDict converts Metrics structure to a map
+func (m *Metrics) ToDict() map[string]int64 {
+	dict := make(map[string]int64)
+	dict["in"] = m.In.Count()
+	dict["failed"] = m.Failed.Count()
+	dict["total"] = m.Total.Count()
+	dict["totalBytes"] = m.TotalBytes.Count()
+	dict["bytes"] = m.Bytes.Count()
+	return dict
 }
 
 // AgentMetrics defines various metrics about the agent work
@@ -88,19 +103,15 @@ func (w Worker) Start() {
 
 			select {
 			case job := <-w.JobChannel:
-				// increment number of transfers
-				atomic.AddInt32(&TransferCounter, 1)
-
 				// Add info to agents metrics
-				AgentMetrics.WorkerCounters[w.Id].Inc(1)
-				AgentMetrics.InTransfer.Inc(1)
+				AgentMetrics.In.Inc(1)
 				// we have received a work request.
 				if err := job.TransferRequest.Run(); err != nil {
 					msg := fmt.Sprintf("WARNING %v experienced an error %v, put on hold", job.TransferRequest, err.Error())
 					// decide if we'll drop the request or put it on hold by increasing its delay and put back to job channel
 					if job.TransferRequest.Delay > 300 {
 						log.Println("ERROR ", job.TransferRequest, "exceed number of iteration, discard request")
-						AgentMetrics.FailedTransfers.Inc(1)
+						AgentMetrics.Failed.Inc(1)
 					} else if job.TransferRequest.Delay > 0 {
 						job.TransferRequest.Delay *= 2
 						log.Println(msg)
@@ -111,11 +122,8 @@ func (w Worker) Start() {
 						w.JobChannel <- job
 					}
 				} else {
-					AgentMetrics.WorkerCounters[w.Id].Dec(1)
-					AgentMetrics.InTransfer.Dec(1)
-
-					// decrement global transfer counter, it is used by agent status
-					atomic.AddInt32(&TransferCounter, -1)
+					// decrement transfer counter
+					AgentMetrics.In.Dec(1)
 				}
 
 			case <-w.quit:
@@ -149,20 +157,15 @@ func NewDispatcher(maxWorkers, maxQueue int, mfile string, minterval int64) *Dis
 	}
 	defer f.Close()
 
+	// define agent's metrics
 	r := metrics.DefaultRegistry
 	inT := metrics.GetOrRegisterCounter("inTransfer", r)
-	fT := metrics.GetOrRegisterCounter("failedTransfers", r)
-	cT := metrics.GetOrRegisterCounter("countTransfers", r)
-	m := metrics.GetOrRegisterMeter("requests", r)
+	failT := metrics.GetOrRegisterCounter("failedTransfers", r)
+	totT := metrics.GetOrRegisterCounter("totalTransfers", r)
+	totB := metrics.GetOrRegisterCounter("totalBytes", r)
+	bytesT := metrics.GetOrRegisterCounter("bytesInTransfer", r)
+	AgentMetrics = Metrics{In: inT, Failed: failT, Total: totT, TotalBytes: totB, Bytes: bytesT}
 	go metrics.Log(r, time.Duration(minterval)*time.Second, log.New(f, "metrics: ", log.Lmicroseconds))
-
-	// define agent metrics
-	var workerMeters []metrics.Counter
-	for i := 0; i < maxWorkers; i++ {
-		wm := metrics.GetOrRegisterCounter(fmt.Sprintf("worker_%d", i), r)
-		workerMeters = append(workerMeters, wm)
-	}
-	AgentMetrics = Metrics{InTransfer: inT, FailedTransfers: fT, CountTransfers: cT, Transfers: m, WorkerCounters: workerMeters}
 
 	// define pool of workers and jobqueue
 	pool := make(chan chan Job, maxWorkers)

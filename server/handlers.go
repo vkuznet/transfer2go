@@ -141,7 +141,7 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	addrs := utils.HostIP()
-	astats := core.AgentStatus{Addrs: addrs, Catalog: core.TFC.Type, Name: _alias, Url: _myself, Protocol: _protocol, Backend: _backend, Tool: _tool, ToolOpts: _toolOpts, TransferCounter: core.TransferCounter, Agents: _agents, TimeStamp: time.Now().Unix()}
+	astats := core.AgentStatus{Addrs: addrs, Catalog: core.TFC.Type, Name: _alias, Url: _myself, Protocol: _protocol, Backend: _backend, Tool: _tool, ToolOpts: _toolOpts, Agents: _agents, TimeStamp: time.Now().Unix(), Metrics: core.AgentMetrics.ToDict()}
 	data, err := json.Marshal(astats)
 	if err != nil {
 		log.Println("ERROR AgentsHandler", err)
