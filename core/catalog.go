@@ -72,12 +72,14 @@ func placeholder(pholder string) string {
 
 // CatalogEntry represents an entry in TFC
 type CatalogEntry struct {
-	Lfn     string `json:"lfn"`     // lfn stands for Logical File Name
-	Pfn     string `json:"pfn"`     // pfn stands for Physical File Name
-	Dataset string `json:"dataset"` // dataset represents collection of blocks
-	Block   string `json:"block"`   // block idetify single block within a dataset
-	Bytes   int64  `json:"bytes"`   // size of the files in bytes
-	Hash    string `json:"hash"`    // hash represents checksum of the pfn
+	Lfn          string `json:"lfn"`          // lfn stands for Logical File Name
+	Pfn          string `json:"pfn"`          // pfn stands for Physical File Name
+	Dataset      string `json:"dataset"`      // dataset represents collection of blocks
+	Block        string `json:"block"`        // block idetify single block within a dataset
+	Bytes        int64  `json:"bytes"`        // size of the files in bytes
+	Hash         string `json:"hash"`         // hash represents checksum of the pfn
+	TransferTime int64  `json:"transferTime"` // transfer time
+	Timestamp    int64  `json:"timestamp"`    // time stamp
 }
 
 // String provides string representation of CatalogEntry
@@ -158,7 +160,7 @@ func (c *Catalog) Add(entry CatalogEntry) error {
 
 	// insert entry into files table
 	stm = getSQL("insert_files")
-	_, err = DB.Exec(stm, entry.Lfn, entry.Pfn, bid, did, entry.Bytes, entry.Hash)
+	_, err = DB.Exec(stm, entry.Lfn, entry.Pfn, bid, did, entry.Bytes, entry.Hash, entry.TransferTime, entry.Timestamp)
 	if e != nil {
 		if !strings.Contains(e.Error(), "UNIQUE") {
 			check(fmt.Sprintf("Unable to DB.Exec(%s)", stm), err)
@@ -220,6 +222,37 @@ func (c *Catalog) Records(req TransferRequest) []CatalogEntry {
 	for rows.Next() {
 		rec := CatalogEntry{}
 		err := rows.Scan(&rec.Dataset, &rec.Block, &rec.Lfn, &rec.Pfn, &rec.Bytes, &rec.Hash)
+		if err != nil {
+			log.Println("ERROR rows.Scan", err)
+		}
+		out = append(out, rec)
+	}
+	return out
+}
+
+// Transfers method returns transfers of the agent in given time interval
+func (c *Catalog) Transfers(time0, time1 string) []CatalogEntry {
+	stm := getSQL("transfers")
+	var vals []interface{}
+	stm += fmt.Sprintf(" WHERE TIMESTAMP>=%s AND TIMESTAMP<=%s", time0, time1)
+	vals = append(vals, time0)
+	vals = append(vals, time1)
+
+	if utils.VERBOSE > 0 {
+		log.Println("Records query", stm, vals)
+	}
+
+	// fetch data from DB
+	rows, err := DB.Query(stm, vals...)
+	if err != nil {
+		log.Printf("ERROR DB.Query, query='%s' error=%v\n", stm, err)
+		return []CatalogEntry{}
+	}
+	defer rows.Close()
+	var out []CatalogEntry
+	for rows.Next() {
+		rec := CatalogEntry{}
+		err := rows.Scan(&rec.Bytes, &rec.TransferTime)
 		if err != nil {
 			log.Println("ERROR rows.Scan", err)
 		}

@@ -112,6 +112,26 @@ func AuthHandler(w http.ResponseWriter, r *http.Request) {
 
 // GET methods
 
+// TransfersHandler provides information about files in catalog
+func TransfersHandler(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != "GET" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	time0 := r.FormValue("time0")
+	time1 := r.FormValue("time1")
+	transfers := core.TFC.Transfers(time0, time1)
+	data, err := json.Marshal(transfers)
+	if err != nil {
+		log.Println("ERROR AgentsHandler", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	} else {
+		w.WriteHeader(http.StatusOK)
+	}
+	w.Write(data)
+}
+
 // FilesHandler provides information about files in catalog
 func FilesHandler(w http.ResponseWriter, r *http.Request) {
 
@@ -357,6 +377,7 @@ func UploadDataHandler(w http.ResponseWriter, r *http.Request) {
 	arr := strings.Split(lfn, "/")
 	fname := arr[len(arr)-1]
 	pfn := fmt.Sprintf("%s/%s", _backend, fname)
+	time0 := time.Now().Unix()
 
 	// create a file which we'll write
 	file, e := os.Create(pfn)
@@ -411,7 +432,7 @@ func UploadDataHandler(w http.ResponseWriter, r *http.Request) {
 	// but do not write to catalog since another end should verify first that
 	// data is transferred, then it will update the TFC
 	log.Printf("UploadDataHandler wrote %s:%s to %s:%s\n", srcAlias, fname, dstAlias, pfn)
-	entry := core.CatalogEntry{Lfn: lfn, Pfn: pfn, Dataset: dataset, Block: block, Bytes: totBytes, Hash: hash}
+	entry := core.CatalogEntry{Lfn: lfn, Pfn: pfn, Dataset: dataset, Block: block, Bytes: totBytes, Hash: hash, TransferTime: (time.Now().Unix() - time0), Timestamp: time.Now().Unix()}
 	data, e := json.Marshal(entry)
 	if e != nil {
 		log.Println("ERROR, UploadDataHandler unable to marshal catalog entry", entry, e)

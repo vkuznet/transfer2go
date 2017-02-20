@@ -1,1 +1,1 @@
-INSERT INTO FILES(lfn, pfn, blockid, datasetid, bytes, hash) VALUES(?,?,?,?,?,?)
+INSERT INTO FILES(lfn, pfn, blockid, datasetid, bytes, hash, transfertime, timestamp) VALUES(?,?,?,?,?,?,?,?)

@@ -36,7 +36,7 @@ type AgentStatus struct {
 
 // String provides string representation of given agent status
 func (a *AgentStatus) String() string {
-	return fmt.Sprintf("<Agent name=%s url=%s catalog=%s protocol=%s backend=%s tool=%s toolOpts=%s agents=%v addrs=%v metrics(%s)>", a.Name, a.Url, a.Catalog, a.Protocol, a.Backend, a.Tool, a.ToolOpts, a.Agents, a.Addrs, a.Metrics)
+	return fmt.Sprintf("<Agent name=%s url=%s catalog=%s protocol=%s backend=%s tool=%s toolOpts=%s agents=%v addrs=%v metrics(%v)>", a.Name, a.Url, a.Catalog, a.Protocol, a.Backend, a.Tool, a.ToolOpts, a.Agents, a.Addrs, a.Metrics)
 }
 
 // Processor is an object who process' given task
@@ -157,6 +157,8 @@ func Transfer() Decorator {
 			var trRecords []CatalogEntry // list of successfully transferred records
 			for _, rec := range records {
 
+				time0 := time.Now().Unix()
+
 				AgentMetrics.Bytes.Inc(rec.Bytes)
 
 				// if protocol is not given use default one: HTTP
@@ -183,7 +185,7 @@ func Transfer() Decorator {
 						continue // if we fail on single record we continue with others
 					}
 				}
-				r := CatalogEntry{Dataset: rec.Dataset, Block: rec.Block, Lfn: rec.Lfn, Pfn: rpfn, Bytes: rec.Bytes, Hash: rec.Hash}
+				r := CatalogEntry{Dataset: rec.Dataset, Block: rec.Block, Lfn: rec.Lfn, Pfn: rpfn, Bytes: rec.Bytes, Hash: rec.Hash, TransferTime: (time.Now().Unix() - time0), Timestamp: time.Now().Unix()}
 				trRecords = append(trRecords, r)
 
 				// record how much we transferred
