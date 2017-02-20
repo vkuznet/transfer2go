@@ -100,7 +100,7 @@ func registerAtAgents(aName string) {
 	if aName != "" && len(aName) > 0 {
 		err := register(aName, _alias, _myself) // submit remote registration of given agent name
 		if err != nil {
-			log.Fatal("ERROR Unable to register", _alias, _myself, "at", aName, err)
+			log.Fatalf("ERROR Unable to register: %s %s %s %s %v", _alias, _myself, "at", aName, err)
 		}
 		aurl := fmt.Sprintf("%s/agents", aName)
 		resp := utils.FetchResponse(aurl, []byte{})
