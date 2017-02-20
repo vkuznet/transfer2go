@@ -28,7 +28,7 @@ var VERBOSE int
 func UserDN(r *http.Request) string {
 	var names []interface{}
 	for _, cert := range r.TLS.PeerCertificates {
-		for _, name := range cert.Issuer.Names {
+		for _, name := range cert.Subject.Names {
 			switch v := name.Value.(type) {
 			case string:
 				names = append(names, v)
