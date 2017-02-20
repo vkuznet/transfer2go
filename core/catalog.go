@@ -84,7 +84,7 @@ type CatalogEntry struct {
 
 // String provides string representation of CatalogEntry
 func (c *CatalogEntry) String() string {
-	return fmt.Sprintf("<CatalogEntry: dataset=%s block=%s lfn=%s pfn=%s bytes=%d hash=%s>", c.Dataset, c.Block, c.Lfn, c.Pfn, c.Bytes, c.Hash)
+	return fmt.Sprintf("<CatalogEntry: dataset=%s block=%s lfn=%s pfn=%s bytes=%d hash=%s transferTime=%d timestamp=%d>", c.Dataset, c.Block, c.Lfn, c.Pfn, c.Bytes, c.Hash, c.TransferTime, c.Timestamp)
 }
 
 // Catalog represents Trivial File Catalog (TFC) of the model
@@ -160,10 +160,10 @@ func (c *Catalog) Add(entry CatalogEntry) error {
 
 	// insert entry into files table
 	stm = getSQL("insert_files")
-	_, err = DB.Exec(stm, entry.Lfn, entry.Pfn, bid, did, entry.Bytes, entry.Hash, entry.TransferTime, entry.Timestamp)
+	_, e = DB.Exec(stm, entry.Lfn, entry.Pfn, bid, did, entry.Bytes, entry.Hash, entry.TransferTime, entry.Timestamp)
 	if e != nil {
 		if !strings.Contains(e.Error(), "UNIQUE") {
-			check(fmt.Sprintf("Unable to DB.Exec(%s)", stm), err)
+			check(fmt.Sprintf("Unable to DB.Exec(%s)", stm), e)
 		}
 	}
 
