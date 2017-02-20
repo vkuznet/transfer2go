@@ -28,14 +28,15 @@ var VERBOSE int
 func UserDN(r *http.Request) string {
 	var names []interface{}
 	for _, cert := range r.TLS.PeerCertificates {
-		for _, name := range cert.Subject.Names {
+		for _, name := range cert.Issuer.Names {
 			switch v := name.Value.(type) {
 			case string:
 				names = append(names, v)
 			}
 		}
 	}
-	return fmt.Sprintf("/DC=%s/DC=%s/OU=%s/OU=%s/CN=%s/CN=%s/CN=%s", names...)
+	parts := names[:7]
+	return fmt.Sprintf("/DC=%s/DC=%s/OU=%s/OU=%s/CN=%s/CN=%s/CN=%s", parts...)
 }
 
 // client X509 certificates
