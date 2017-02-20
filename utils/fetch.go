@@ -147,7 +147,7 @@ func FetchResponse(rurl string, args []byte) ResponseType {
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Println("HTTO ERROR", err)
+		log.Println("HTTP ERROR", err)
 		response.Error = err
 		return response
 	}
