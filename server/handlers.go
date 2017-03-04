@@ -58,7 +58,9 @@ func userDNs() []string {
 }
 
 func init() {
-	_userDNs = userDNs()
+	if _config.Auth {
+		_userDNs = userDNs()
+	}
 }
 
 // custom logic for CMS authentication, users may implement their own logic here
@@ -78,7 +80,14 @@ func auth(r *http.Request) bool {
 // AuthHandler authenticate incoming requests and route them to appropriate handler
 func AuthHandler(w http.ResponseWriter, r *http.Request) {
 	// check if server started with hkey file (auth is required)
-	status := auth(r)
+	var status bool
+	
+	if _config.Auth {
+		status = auth(r)
+	} else {
+		status = true
+	}
+	
 	if !status {
 		msg := "You are not allowed to access this resource"
 		http.Error(w, msg, http.StatusForbidden)
