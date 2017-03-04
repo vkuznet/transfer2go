@@ -83,7 +83,9 @@ func main() {
 		if config.Register == "" {
 			log.Println("WARNING this agent is not registered with remote ones, either provide register in your config or invoke register API call")
 		}
-
+		
+		config.Auth = auth
+		
 		server.Server(config)
 	} else {
 		var err error
