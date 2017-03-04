@@ -36,7 +36,7 @@ func main() {
 	flag.StringVar(&register, "register", "", "File with meta-data of records in JSON data format to register at remote agent")
 	
 	var auth bool
-	flag.Bool(&auth, "auth", true, "To disable the auth layer")
+	flag.BoolVar(&auth, "auth", true, "To disable the auth layer")
 	
 	flag.Parse()
 	
