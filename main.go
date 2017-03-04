@@ -34,9 +34,16 @@ func main() {
 	flag.StringVar(&dst, "dst", "", "Destination end-point, either AgentName or AgentName:LFN")
 	var register string
 	flag.StringVar(&register, "register", "", "File with meta-data of records in JSON data format to register at remote agent")
-
+	
+	var auth bool
+	flag.Bool(&auth, "auth", true, "To disable the auth layer")
+	
 	flag.Parse()
-	utils.CheckX509()
+	
+	if auth {
+		utils.CheckX509()
+	}
+	
 	utils.VERBOSE = verbose
 	if configFile != "" {
 		data, err := ioutil.ReadFile(configFile)
