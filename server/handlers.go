@@ -22,6 +22,7 @@ import (
 
 // global variable which we initialize once
 var _userDNs []string
+var authVar bool
 
 func userDNs() []string {
 	var out []string
@@ -57,14 +58,24 @@ func userDNs() []string {
 	return out
 }
 
-func init() {
-	if _config.Auth {
+// func init() {
+// 	//	_userDNs = userDNs()
+//}
+
+func Initialize(authArg bool) {
+	authVar = authArg
+	if authVar {
 		_userDNs = userDNs()
 	}
 }
 
 // custom logic for CMS authentication, users may implement their own logic here
 func auth(r *http.Request) bool {
+
+	if !authVar {
+		return true
+	}
+
 	if utils.VERBOSE > 1 {
 		dump, err := httputil.DumpRequest(r, true)
 		log.Println("AuthHandler HTTP request", r, string(dump), err)
@@ -80,14 +91,7 @@ func auth(r *http.Request) bool {
 // AuthHandler authenticate incoming requests and route them to appropriate handler
 func AuthHandler(w http.ResponseWriter, r *http.Request) {
 	// check if server started with hkey file (auth is required)
-	var status bool
-	
-	if _config.Auth {
-		status = auth(r)
-	} else {
-		status = true
-	}
-	
+	status := auth(r)
 	if !status {
 		msg := "You are not allowed to access this resource"
 		http.Error(w, msg, http.StatusForbidden)
