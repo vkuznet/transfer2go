@@ -39,7 +39,6 @@ type Config struct {
 	Register  string `json:"register"`  // remote agent URL to register
 	ServerKey string `json:"serverkey"` // server key file
 	ServerCrt string `json:"servercrt"` // server crt file
-	Auth	  bool   `json:"auth"`      // disable auth layer
 }
 
 // String returns string representation of Config data type
