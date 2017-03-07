@@ -35,8 +35,17 @@ func main() {
 	var register string
 	flag.StringVar(&register, "register", "", "File with meta-data of records in JSON data format to register at remote agent")
 
+	var authVar bool
+	flag.BoolVar(&authVar, "auth", true, "To disable the auth layer")
+
 	flag.Parse()
-	utils.CheckX509()
+
+	if authVar {
+		utils.CheckX509()
+	}
+
+	server.Initialize(authVar)
+
 	utils.VERBOSE = verbose
 	if configFile != "" {
 		data, err := ioutil.ReadFile(configFile)
