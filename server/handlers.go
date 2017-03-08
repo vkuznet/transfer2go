@@ -59,10 +59,12 @@ func userDNs() []string {
 }
 
 // func init() {
-// 	//	_userDNs = userDNs()
+//	_userDNs = userDNs()
 //}
 
-func Initialize(authArg bool) {
+// Init is custom initialization function, we don't use init() because we want
+// control of authentication from command line
+func Init(authArg bool) {
 	authVar = authArg
 	if authVar {
 		_userDNs = userDNs()
