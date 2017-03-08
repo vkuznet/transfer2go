@@ -35,8 +35,15 @@ func main() {
 	var register string
 	flag.StringVar(&register, "register", "", "File with meta-data of records in JSON data format to register at remote agent")
 
+	var authVar bool
+	flag.BoolVar(&authVar, "auth", true, "To disable the auth layer")
+
 	flag.Parse()
-	utils.CheckX509()
+
+	if authVar {
+		utils.CheckX509()
+	}
+
 	utils.VERBOSE = verbose
 	if configFile != "" {
 		data, err := ioutil.ReadFile(configFile)
@@ -77,6 +84,7 @@ func main() {
 			log.Println("WARNING this agent is not registered with remote ones, either provide register in your config or invoke register API call")
 		}
 
+		server.Init(authVar)
 		server.Server(config)
 	} else {
 		var err error
