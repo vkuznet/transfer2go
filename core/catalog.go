@@ -28,6 +28,30 @@ var DBTYPE string
 // DBSQL represent common record we get from DB SQL statement
 var DBSQL Record
 
+// TFC stands for Trivial File Catalog
+var TFC Catalog
+
+// CatalogEntry represents an entry in TFC
+type CatalogEntry struct {
+	Lfn          string `json:"lfn"`          // lfn stands for Logical File Name
+	Pfn          string `json:"pfn"`          // pfn stands for Physical File Name
+	Dataset      string `json:"dataset"`      // dataset represents collection of blocks
+	Block        string `json:"block"`        // block idetify single block within a dataset
+	Bytes        int64  `json:"bytes"`        // size of the files in bytes
+	Hash         string `json:"hash"`         // hash represents checksum of the pfn
+	TransferTime int64  `json:"transferTime"` // transfer time
+	Timestamp    int64  `json:"timestamp"`    // time stamp
+}
+
+// Catalog represents Trivial File Catalog (TFC) of the model
+type Catalog struct {
+	Type     string `json:"type"`     // catalog type, e.g. sqlite3, etc.
+	Uri      string `json:"uri"`      // catalog uri, e.g. file.db
+	Login    string `json:"login"`    // database login
+	Password string `json:"password"` // database password
+	Owner    string `json:"owner"`    // used by ORACLE DB, defines owner of the database
+}
+
 func check(msg string, err error) {
 	if err != nil {
 		log.Fatalf("ERROR %s, %v\n", msg, err)
@@ -70,30 +94,9 @@ func placeholder(pholder string) string {
 	}
 }
 
-// CatalogEntry represents an entry in TFC
-type CatalogEntry struct {
-	Lfn          string `json:"lfn"`          // lfn stands for Logical File Name
-	Pfn          string `json:"pfn"`          // pfn stands for Physical File Name
-	Dataset      string `json:"dataset"`      // dataset represents collection of blocks
-	Block        string `json:"block"`        // block idetify single block within a dataset
-	Bytes        int64  `json:"bytes"`        // size of the files in bytes
-	Hash         string `json:"hash"`         // hash represents checksum of the pfn
-	TransferTime int64  `json:"transferTime"` // transfer time
-	Timestamp    int64  `json:"timestamp"`    // time stamp
-}
-
 // String provides string representation of CatalogEntry
 func (c *CatalogEntry) String() string {
 	return fmt.Sprintf("<CatalogEntry: dataset=%s block=%s lfn=%s pfn=%s bytes=%d hash=%s transferTime=%d timestamp=%d>", c.Dataset, c.Block, c.Lfn, c.Pfn, c.Bytes, c.Hash, c.TransferTime, c.Timestamp)
-}
-
-// Catalog represents Trivial File Catalog (TFC) of the model
-type Catalog struct {
-	Type     string `json:"type"`     // catalog type, e.g. sqlite3, etc.
-	Uri      string `json:"uri"`      // catalog uri, e.g. file.db
-	Login    string `json:"login"`    // database login
-	Password string `json:"password"` // database password
-	Owner    string `json:"owner"`    // used by ORACLE DB, defines owner of the database
 }
 
 // Dump method returns TFC dump in CSV format
@@ -260,6 +263,3 @@ func (c *Catalog) Transfers(time0, time1 string) []CatalogEntry {
 	}
 	return out
 }
-
-// TFC stands for Trivial File Catalog
-var TFC Catalog
