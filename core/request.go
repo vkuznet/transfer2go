@@ -34,23 +34,11 @@ type AgentStatus struct {
 	Metrics   map[string]int64  `json:"metrics"`  // agent metrics
 }
 
-// String provides string representation of given agent status
-func (a *AgentStatus) String() string {
-	return fmt.Sprintf("<Agent name=%s url=%s catalog=%s protocol=%s backend=%s tool=%s toolOpts=%s agents=%v addrs=%v metrics(%v)>", a.Name, a.Url, a.Catalog, a.Protocol, a.Backend, a.Tool, a.ToolOpts, a.Agents, a.Addrs, a.Metrics)
-}
-
 // Processor is an object who process' given task
 // The logic of the Processor should be implemented.
 type Processor struct {
 }
 
-// Process defines execution process for a given task
-func (e *Processor) Process(t *TransferRequest) error {
-	return nil
-}
-
-// DefaultProcessor is a default processor instance
-var DefaultProcessor = &Processor{}
 
 // Request interface defines a task process
 type Request interface {
@@ -60,13 +48,27 @@ type Request interface {
 // RequestFunc is a function type that implements the Request interface
 type RequestFunc func(*TransferRequest) error
 
+// Decorator wraps a request with extra behavior
+type Decorator func(Request) Request
+
+
+// DefaultProcessor is a default processor instance
+var DefaultProcessor = &Processor{}
+
+// String provides string representation of given agent status
+func (a *AgentStatus) String() string {
+	return fmt.Sprintf("<Agent name=%s url=%s catalog=%s protocol=%s backend=%s tool=%s toolOpts=%s agents=%v addrs=%v metrics(%v)>", a.Name, a.Url, a.Catalog, a.Protocol, a.Backend, a.Tool, a.ToolOpts, a.Agents, a.Addrs, a.Metrics)
+}
+
+// Process defines execution process for a given task
+func (e *Processor) Process(t *TransferRequest) error {
+	return nil
+}
+
 // Process is a method of TransferRequest
 func (f RequestFunc) Process(t *TransferRequest) error {
 	return f(t)
 }
-
-// Decorator wraps a request with extra behavior
-type Decorator func(Request) Request
 
 // filleTransferRequest creates HTTP request to transfer a given file name
 // https://matt.aimonetti.net/posts/2013/07/01/golang-multipart-file-upload-example/
