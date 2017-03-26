@@ -186,15 +186,19 @@ func Server(config Config) {
 	dispatcher.Run()
 	log.Println("Start dispatcher with", config.Workers, "workers, queue size", config.QueueSize)
 
-	// start HTTPS server which require user certificates
-	server := &http.Server{
-		Addr: ":" + port,
-		TLSConfig: &tls.Config{
-			ClientAuth: tls.RequestClientCert,
-		},
+	if authVar {
+		//start HTTPS server which require user certificates
+		server := &http.Server{
+			Addr: ":" + port,
+			TLSConfig: &tls.Config{
+				ClientAuth: tls.RequestClientCert,
+			},
+		}
+		err = server.ListenAndServeTLS(config.ServerCrt, config.ServerKey)
+	} else {
+		err = http.ListenAndServe(":"+port, nil)   // Start server without user certificates
 	}
-	err = server.ListenAndServeTLS(config.ServerCrt, config.ServerKey)
-	//     err = http.ListenAndServe(":"+port, nil)
+
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
