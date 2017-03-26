@@ -21,8 +21,29 @@ import (
 	"github.com/vkuznet/x509proxy"
 )
 
+// ResponseType structure is what we expect to get for our URL call.
+// It contains a request URL, the data chunk and possible error from remote
+type ResponseType struct {
+	Url        string // response url
+	Data       []byte // response data, i.e. what we got with Body of the response
+	Error      error  // http error, a non-2xx return code is not an error
+	Status     string // http status string
+	StatusCode int    // http status code
+}
+
+// UrlRequest structure holds details about url request's attributes
+type UrlRequest struct {
+	rurl string
+	args string
+	out  chan<- ResponseType
+	ts   int64
+}
+
 // VERBOSE variable control verbosity level of client's utilities
 var VERBOSE int
+
+// create global HTTP client and re-use it through the code
+var client = HttpClient()
 
 // UserDN function parses user Distinguished Name (DN) from client's HTTP request
 func UserDN(r *http.Request) string {
@@ -96,29 +117,8 @@ func HttpClient() (client *http.Client) {
 	return
 }
 
-// create global HTTP client and re-use it through the code
-var client = HttpClient()
-
-// ResponseType structure is what we expect to get for our URL call.
-// It contains a request URL, the data chunk and possible error from remote
-type ResponseType struct {
-	Url        string // response url
-	Data       []byte // response data, i.e. what we got with Body of the response
-	Error      error  // http error, a non-2xx return code is not an error
-	Status     string // http status string
-	StatusCode int    // http status code
-}
-
 func (r *ResponseType) String() string {
 	return fmt.Sprintf("<Response: url=%s data=%s error=%v>", r.Url, string(r.Data), r.Error)
-}
-
-// UrlRequest structure holds details about url request's attributes
-type UrlRequest struct {
-	rurl string
-	args string
-	out  chan<- ResponseType
-	ts   int64
 }
 
 // FetchResponse fetches data for provided URL, args is a json dump of arguments

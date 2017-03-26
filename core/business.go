@@ -21,6 +21,45 @@ type Metrics struct {
 	Bytes      metrics.Counter // number of bytes in progress
 }
 
+// TransferRequest data type
+type TransferRequest struct {
+	TimeStamp int64  `json:"ts"`       // timestamp of the request
+	File      string `json:"file"`     // LFN name to be transferred
+	Block     string `json:"block"`    // block name to be transferred
+	Dataset   string `json:"dataset"`  // dataset name to be transferred
+	SrcUrl    string `json:"srcUrl"`   // source agent URL which initiate the transfer
+	SrcAlias  string `json:"srcAlias"` // source agent name
+	DstUrl    string `json:"dstUrl"`   // destination agent URL which will consume the transfer
+	DstAlias  string `json:"dstAlias"` // destination agent name
+	Delay     int    `json:"delay"`    // transfer delay time, i.e. post-pone transfer
+}
+
+// Job represents the job to be run
+type Job struct {
+	TransferRequest TransferRequest
+}
+
+// Worker represents the worker that executes the job
+type Worker struct {
+	Id         int
+	JobPool    chan chan Job
+	JobChannel chan Job
+	quit       chan bool
+}
+
+// Dispatcher implementation
+type Dispatcher struct {
+	// A pool of workers channels that are registered with the dispatcher
+	JobPool    chan chan Job
+	MaxWorkers int
+}
+
+// AgentMetrics defines various metrics about the agent work
+var AgentMetrics Metrics
+
+// JobQueue is a buffered channel that we can send work requests on.
+var JobQueue chan Job
+
 // String representation of Metrics
 func (m *Metrics) String() string {
 	return fmt.Sprintf("<Metrics: in=%d failed=%d total=%d bytes=%d totBytes=%d>", m.In.Count(), m.Failed.Count(), m.Total.Count(), m.Bytes.Count(), m.TotalBytes.Count())
@@ -37,22 +76,6 @@ func (m *Metrics) ToDict() map[string]int64 {
 	return dict
 }
 
-// AgentMetrics defines various metrics about the agent work
-var AgentMetrics Metrics
-
-// TransferRequest data type
-type TransferRequest struct {
-	TimeStamp int64  `json:"ts"`       // timestamp of the request
-	File      string `json:"file"`     // LFN name to be transferred
-	Block     string `json:"block"`    // block name to be transferred
-	Dataset   string `json:"dataset"`  // dataset name to be transferred
-	SrcUrl    string `json:"srcUrl"`   // source agent URL which initiate the transfer
-	SrcAlias  string `json:"srcAlias"` // source agent name
-	DstUrl    string `json:"dstUrl"`   // destination agent URL which will consume the transfer
-	DstAlias  string `json:"dstAlias"` // destination agent name
-	Delay     int    `json:"delay"`    // transfer delay time, i.e. post-pone transfer
-}
-
 // String method return string representation of transfer request
 func (t *TransferRequest) String() string {
 	return fmt.Sprintf("<TransferRequest ts=%d file=%s block=%s dataset=%s srcUrl=%s srcAlias=%s dstUrl=%s dstAlias=%s delay=%d>", t.TimeStamp, t.File, t.Block, t.Dataset, t.SrcUrl, t.SrcAlias, t.DstUrl, t.DstAlias, t.Delay)
@@ -66,22 +89,6 @@ func (t *TransferRequest) Run() error {
 		Transfer(),
 	)
 	return request.Process(t)
-}
-
-// Job represents the job to be run
-type Job struct {
-	TransferRequest TransferRequest
-}
-
-// JobQueue is a buffered channel that we can send work requests on.
-var JobQueue chan Job
-
-// Worker represents the worker that executes the job
-type Worker struct {
-	Id         int
-	JobPool    chan chan Job
-	JobChannel chan Job
-	quit       chan bool
 }
 
 // NewWorker return a new instance of the Worker type
@@ -139,13 +146,6 @@ func (w Worker) Stop() {
 	go func() {
 		w.quit <- true
 	}()
-}
-
-// Dispatcher implementation
-type Dispatcher struct {
-	// A pool of workers channels that are registered with the dispatcher
-	JobPool    chan chan Job
-	MaxWorkers int
 }
 
 // NewDispatcher returns new instance of Dispatcher type

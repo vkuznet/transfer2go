@@ -44,8 +44,6 @@ func main() {
 		utils.CheckX509()
 	}
 
-	server.Initialize(authVar)
-
 	utils.VERBOSE = verbose
 	if configFile != "" {
 		data, err := ioutil.ReadFile(configFile)
@@ -86,6 +84,7 @@ func main() {
 			log.Println("WARNING this agent is not registered with remote ones, either provide register in your config or invoke register API call")
 		}
 
+		server.Init(authVar)
 		server.Server(config)
 	} else {
 		var err error
