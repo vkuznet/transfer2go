@@ -1,0 +1,11 @@
+{
+    "catalog":"test/catalog/catalog.json",
+    "protocol":"cp",
+    "backend":"/tmp/vk",
+    "tool":"/bin/cp",
+    "url":"http://localhost:8989",
+    "mfile":"metrics.log",
+    "minterval":60,
+    "verbose":0,
+    "name":"Test"
+}
