@@ -1,10 +1,11 @@
 package main
 
 import (
-	"net/http"
-	"testing"
 	"encoding/json"
 	"io/ioutil"
+	"net/http"
+	"testing"
+	"os"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/vkuznet/transfer2go/core"
@@ -18,7 +19,7 @@ type tests struct {
 	url                string
 	expectedStatusCode int
 	expectedBody       string
-	result						 bool
+	result             bool
 }
 
 // Function names are according to api endpoints
@@ -26,11 +27,11 @@ type tests struct {
 func TestStatus(t *testing.T) {
 	assert := assert.New(t)
 
-	test := tests {
-			description:        "Check status of server",
-			url:                url + "/status",
-			expectedStatusCode: 200,
-			expectedBody: "Test",
+	test := tests{
+		description:        "Check status of server",
+		url:                url + "/status",
+		expectedStatusCode: 200,
+		expectedBody:       "Test",
 	}
 
 	var data map[string]interface{}
@@ -50,11 +51,11 @@ func TestStatus(t *testing.T) {
 func TestAgents(t *testing.T) {
 	assert := assert.New(t)
 
-	test := tests {
-			description:        "Test the list of connected agents",
-			url:                url + "/agents",
-			expectedStatusCode: 200,
-			expectedBody: "http://localhost:8989",
+	test := tests{
+		description:        "Test the list of connected agents",
+		url:                url + "/agents",
+		expectedStatusCode: 200,
+		expectedBody:       "http://localhost:8989",
 	}
 
 	var data map[string]interface{}
@@ -71,16 +72,21 @@ func TestAgents(t *testing.T) {
 
 }
 
-
 func TestTFC(t *testing.T) {
 	assert := assert.New(t)
 
-	test := tests {
-			description:        "Check TFC upload functionality",
-			url:                url + "/tfc",
-			expectedStatusCode: 200,
-			expectedBody: "http://localhost:8989",
+	test := tests{
+		description:        "Check TFC upload functionality",
+		url:                url + "/tfc",
+		expectedStatusCode: 200,
+		expectedBody:       "http://localhost:8989",
 	}
+
+	f, err := os.Create("data/testdata.txt")
+	d2 := []byte{115, 111, 109, 101, 10}
+	_, err = f.Write(d2)
+	assert.NoError(err)
+	f.Close()
 
 	fname := "data/records.json"
 	c, err := ioutil.ReadFile(fname)
@@ -97,5 +103,8 @@ func TestTFC(t *testing.T) {
 	resp := utils.FetchResponse(des, d)
 
 	assert.Equal(test.expectedStatusCode, resp.StatusCode, test.description)
+
+	err = os.Remove("data/testdata.txt")
+	assert.NoError(err)
 
 }
