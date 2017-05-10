@@ -7,5 +7,6 @@
     "mfile":"metrics.log",
     "minterval":60,
     "verbose":0,
-    "name":"Test"
+    "name":"Test",
+    "staticdir":"static"
 }

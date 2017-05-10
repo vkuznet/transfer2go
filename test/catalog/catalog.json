@@ -1,4 +1,4 @@
 {
     "type":"sqlite3",
-    "uri":"catalog.db"
+    "uri":"test/catalog/catalog.db"
 }

@@ -1,0 +1,6 @@
+[
+    {"lfn":"/store/file.root",
+     "pfn":"test/data/testdata.txt",
+     "block":"abc-123",
+     "dataset":"/a/b/c"}
+]
