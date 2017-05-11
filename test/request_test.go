@@ -152,3 +152,27 @@ func TestReadTFC(t *testing.T) {
 	assert.Equal(test.expectedBody, data[0]["pfn"], test.description)
 
 }
+
+func TestLfnLookup(t *testing.T) {
+	assert := assert.New(t)
+
+	test := tests{
+		description:        "Get TFC records",
+		url:                url + "/tfc?dataset=/a/b/c",
+		expectedStatusCode: 200,
+		expectedBody:       "/store/file.root",
+	}
+
+	var data []map[string]interface{}
+
+	resp, err := http.Get(test.url)
+	actual, err := ioutil.ReadAll(resp.Body)
+
+	defer resp.Body.Close()
+	json.Unmarshal([]byte(actual), &data)
+	assert.NoError(err)
+
+	assert.Equal(test.expectedStatusCode, resp.StatusCode, test.description)
+	assert.Equal(test.expectedBody, data[0]["lfn"], test.description)
+
+}
