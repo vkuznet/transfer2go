@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
-	"testing"
 	"os"
+	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/vkuznet/transfer2go/core"
@@ -72,7 +72,7 @@ func TestAgents(t *testing.T) {
 
 }
 
-func TestTFC(t *testing.T) {
+func TestWriteTFC(t *testing.T) {
 	assert := assert.New(t)
 
 	test := tests{
@@ -106,5 +106,49 @@ func TestTFC(t *testing.T) {
 
 	err = os.Remove("data/testdata.txt")
 	assert.NoError(err)
+
+}
+
+func TestFiles(t *testing.T) {
+	assert := assert.New(t)
+
+	test := tests{
+		description:        "Get the list of files",
+		url:                url + "/files",
+		expectedStatusCode: 200,
+		expectedBody:       "[\"/store/file.root\"]",
+	}
+
+	resp, err := http.Get(test.url)
+	actual, err := ioutil.ReadAll(resp.Body)
+	assert.NoError(err)
+	defer resp.Body.Close()
+
+	assert.Equal(test.expectedStatusCode, resp.StatusCode, test.description)
+	assert.Equal(test.expectedBody, string(actual), test.description)
+
+}
+
+func TestReadTFC(t *testing.T) {
+	assert := assert.New(t)
+
+	test := tests{
+		description:        "Get TFC records",
+		url:                url + "/tfc",
+		expectedStatusCode: 200,
+		expectedBody:       "test/data/testdata.txt",
+	}
+
+	var data []map[string]interface{}
+
+	resp, err := http.Get(test.url)
+	actual, err := ioutil.ReadAll(resp.Body)
+
+	defer resp.Body.Close()
+	json.Unmarshal([]byte(actual), &data)
+	assert.NoError(err)
+
+	assert.Equal(test.expectedStatusCode, resp.StatusCode, test.description)
+	assert.Equal(test.expectedBody, data[0]["pfn"], test.description)
 
 }
