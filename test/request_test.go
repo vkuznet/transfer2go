@@ -55,7 +55,7 @@ func TestAgents(t *testing.T) {
 		description:        "Test the list of connected agents",
 		url:                url + "/agents",
 		expectedStatusCode: 200,
-		expectedBody:       "http://localhost:8989",
+		expectedBody:       "http://localhost:8000",
 	}
 
 	var data map[string]interface{}
@@ -68,7 +68,7 @@ func TestAgents(t *testing.T) {
 	assert.NoError(err)
 
 	assert.Equal(test.expectedStatusCode, resp.StatusCode, test.description)
-	assert.Equal(test.expectedBody, data["Test"], test.description)
+	assert.Equal(test.expectedBody, data["Test2"], test.description)
 
 }
 
