@@ -176,3 +176,19 @@ func TestLfnLookup(t *testing.T) {
 	assert.Equal(test.expectedBody, data[0]["lfn"], test.description)
 
 }
+
+func TestReset(t *testing.T) {
+	assert := assert.New(t)
+
+	test := tests{
+		description:        "Reset protocol",
+		url:                url + "/reset",
+		expectedStatusCode: 200,
+		expectedBody:       "",
+	}
+
+	resp, err := http.Get(test.url)
+	assert.NoError(err)
+	assert.Equal(test.expectedStatusCode, resp.StatusCode, test.description)
+
+}
