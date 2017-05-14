@@ -82,11 +82,8 @@ func TestWriteTFC(t *testing.T) {
 		expectedBody:       "http://localhost:8989",
 	}
 
-	f, err := os.Create("data/testdata.txt")
-	d2 := []byte{115, 111, 109, 101, 10}
-	_, err = f.Write(d2)
+	err := createFile("data/testdata.txt")
 	assert.NoError(err)
-	f.Close()
 
 	fname := "data/records.json"
 	c, err := ioutil.ReadFile(fname)
@@ -104,7 +101,7 @@ func TestWriteTFC(t *testing.T) {
 
 	assert.Equal(test.expectedStatusCode, resp.StatusCode, test.description)
 
-	err = os.Remove("data/testdata.txt")
+	err = deleteFile("data/testdata.txt")
 	assert.NoError(err)
 
 }
@@ -191,4 +188,22 @@ func TestReset(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(test.expectedStatusCode, resp.StatusCode, test.description)
 
+}
+
+func createFile(path string) error {
+	f, err := os.Create(path)
+
+	if err != nil {
+		return err
+	}
+
+	d2 := []byte{115, 111, 109, 101, 10}
+	_, err = f.Write(d2)
+	f.Close()
+	return err
+}
+
+func deleteFile(path string) error {
+	err := os.Remove(path)
+	return err
 }
