@@ -107,6 +107,7 @@ func TestWriteTFC(t *testing.T) {
 
 }
 
+// Test /files endpoint
 func TestFiles(t *testing.T) {
 	assert := assert.New(t)
 
@@ -127,6 +128,7 @@ func TestFiles(t *testing.T) {
 
 }
 
+// Test /tfc get endpoint
 func TestReadTFC(t *testing.T) {
 	assert := assert.New(t)
 
@@ -151,6 +153,7 @@ func TestReadTFC(t *testing.T) {
 
 }
 
+// Database lookup by dataset
 func TestLfnLookup(t *testing.T) {
 	assert := assert.New(t)
 
@@ -175,6 +178,7 @@ func TestLfnLookup(t *testing.T) {
 
 }
 
+// Transfer file from test to test2 using cp protocol
 func TestTransferRequest(t *testing.T) {
 	assert := assert.New(t)
 
@@ -203,6 +207,7 @@ func TestTransferRequest(t *testing.T) {
 
 }
 
+// Reset protocol to default(http)
 func TestReset(t *testing.T) {
 	assert := assert.New(t)
 
