@@ -2,15 +2,15 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
-	"github.com/stretchr/testify/assert"
-	"github.com/vkuznet/transfer2go/core"
-	"github.com/vkuznet/transfer2go/utils"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/vkuznet/transfer2go/core"
+	"github.com/vkuznet/transfer2go/utils"
 )
 
 var url = "http://localhost:8989"
@@ -187,7 +187,7 @@ func TestTransferRequest(t *testing.T) {
 
 	var requests []core.TransferRequest
 	req := core.TransferRequest{SrcUrl: "http://localhost:8989", SrcAlias: "Test", File: "file.root", DstUrl: "http://localhost:8000", DstAlias: "Test2"}
-	furl := fmt.Sprintf("%s/request", req.SrcUrl)
+	furl := req.SrcUrl + "/request"
 	requests = append(requests, req)
 	d, err := json.Marshal(requests)
 	assert.NoError(err)
