@@ -1,5 +1,5 @@
 [
-    {"lfn":"/store/file.root",
+    {"lfn":"file.root",
      "pfn":"test/data/testdata.txt",
      "block":"/a/b/c#123",
      "dataset":"/a/b/c"}

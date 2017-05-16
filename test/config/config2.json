@@ -1,7 +1,7 @@
 {
     "catalog":"test/catalog/catalog2.json",
     "protocol":"cp",
-    "backend":"/tmp/vk",
+    "backend":"test/",
     "tool":"/bin/cp",
     "url":"http://localhost:8000",
     "port": 8000,

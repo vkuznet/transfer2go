@@ -2,18 +2,20 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
+	"github.com/stretchr/testify/assert"
+	"github.com/vkuznet/transfer2go/core"
+	"github.com/vkuznet/transfer2go/utils"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/vkuznet/transfer2go/core"
-	"github.com/vkuznet/transfer2go/utils"
+	"time"
 )
 
 var url = "http://localhost:8989"
 
+// Struct is to make the test cases
 type tests struct {
 	description        string
 	url                string
@@ -22,8 +24,7 @@ type tests struct {
 	result             bool
 }
 
-// Function names are according to api endpoints
-
+// Check status of agent
 func TestStatus(t *testing.T) {
 	assert := assert.New(t)
 
@@ -48,6 +49,7 @@ func TestStatus(t *testing.T) {
 
 }
 
+// Test /agent end point
 func TestAgents(t *testing.T) {
 	assert := assert.New(t)
 
@@ -72,6 +74,7 @@ func TestAgents(t *testing.T) {
 
 }
 
+// Test /tfc endpoint
 func TestWriteTFC(t *testing.T) {
 	assert := assert.New(t)
 
@@ -88,6 +91,7 @@ func TestWriteTFC(t *testing.T) {
 	fname := "data/records.json"
 	c, err := ioutil.ReadFile(fname)
 	assert.NoError(err)
+	time.Sleep(time.Second * 2)
 
 	var records []core.CatalogEntry
 	err = json.Unmarshal([]byte(c), &records)
@@ -101,9 +105,6 @@ func TestWriteTFC(t *testing.T) {
 
 	assert.Equal(test.expectedStatusCode, resp.StatusCode, test.description)
 
-	err = deleteFile("data/testdata.txt")
-	assert.NoError(err)
-
 }
 
 func TestFiles(t *testing.T) {
@@ -113,7 +114,7 @@ func TestFiles(t *testing.T) {
 		description:        "Get the list of files",
 		url:                url + "/files",
 		expectedStatusCode: 200,
-		expectedBody:       "[\"/store/file.root\"]",
+		expectedBody:       "[\"file.root\"]",
 	}
 
 	resp, err := http.Get(test.url)
@@ -157,7 +158,7 @@ func TestLfnLookup(t *testing.T) {
 		description:        "Get TFC records",
 		url:                url + "/tfc?dataset=/a/b/c",
 		expectedStatusCode: 200,
-		expectedBody:       "/store/file.root",
+		expectedBody:       "file.root",
 	}
 
 	var data []map[string]interface{}
@@ -171,6 +172,34 @@ func TestLfnLookup(t *testing.T) {
 
 	assert.Equal(test.expectedStatusCode, resp.StatusCode, test.description)
 	assert.Equal(test.expectedBody, data[0]["lfn"], test.description)
+
+}
+
+func TestTransferRequest(t *testing.T) {
+	assert := assert.New(t)
+
+	test := tests{
+		description:        "Transfer file using cp protocol",
+		url:                url + "/request",
+		expectedStatusCode: 200,
+		expectedBody:       "",
+	}
+
+	var requests []core.TransferRequest
+	req := core.TransferRequest{SrcUrl: "http://localhost:8989", SrcAlias: "Test", File: "file.root", DstUrl: "http://localhost:8000", DstAlias: "Test2"}
+	furl := fmt.Sprintf("%s/request", req.SrcUrl)
+	requests = append(requests, req)
+	d, err := json.Marshal(requests)
+	assert.NoError(err)
+
+	resp := utils.FetchResponse(furl, d)
+	assert.Equal(test.expectedStatusCode, resp.StatusCode, test.description)
+	time.Sleep(time.Second * 2)
+
+	err = deleteFile("data/testdata.txt")
+	assert.NoError(err)
+	err = deleteFile("file.root")
+	assert.NoError(err)
 
 }
 
@@ -190,6 +219,7 @@ func TestReset(t *testing.T) {
 
 }
 
+// Helper function to create test data
 func createFile(path string) error {
 	f, err := os.Create(path)
 

@@ -1,7 +1,7 @@
 {
     "catalog":"test/catalog/catalog1.json",
     "protocol":"cp",
-    "backend":"/tmp/vk",
+    "backend":"/data",
     "tool":"/bin/cp",
     "url":"http://localhost:8989",
     "mfile":"metrics.log",
