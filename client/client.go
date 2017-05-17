@@ -9,10 +9,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"strings"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/vkuznet/transfer2go/core"
 	"github.com/vkuznet/transfer2go/utils"
 )
@@ -138,7 +138,7 @@ func parse(agent, src, dst string) ([][]core.TransferRequest, error) {
 	// check if destination is ok
 	dstUrl, ok := remoteAgents[dst]
 	if !ok {
-		log.Println("Unable to resolve destination", dst, "known agents", remoteAgents)
+		log.Error("Unable to resolve destination", dst, "known agents", remoteAgents)
 		return tr, fmt.Errorf("Unknown destination")
 	}
 
