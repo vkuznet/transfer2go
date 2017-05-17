@@ -49,14 +49,14 @@ func main() {
 		data, err := ioutil.ReadFile(configFile)
 		if err != nil {
 			log.WithFields(log.Fields{
-  			"configFile": configFile,
+				"configFile": configFile,
 			}).Fatal("Unable to read", err)
 		}
 		var config server.Config
 		err = json.Unmarshal(data, &config)
 		if err != nil {
 			log.WithFields(log.Fields{
-  			"configFile": configFile,
+				"configFile": configFile,
 			}).Fatal("Unable to parse", err)
 		}
 		if config.Catalog == "" {

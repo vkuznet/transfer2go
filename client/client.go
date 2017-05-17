@@ -139,9 +139,9 @@ func parse(agent, src, dst string) ([][]core.TransferRequest, error) {
 	dstUrl, ok := remoteAgents[dst]
 	if !ok {
 		log.WithFields(log.Fields{
-    	"Destination": dst,
-    	"known agents": remoteAgents,
-  	}).Error("Unable to resolve destination")
+			"Destination":  dst,
+			"known agents": remoteAgents,
+		}).Error("Unable to resolve destination")
 		return tr, fmt.Errorf("Unknown destination")
 	}
 
@@ -194,8 +194,8 @@ func Transfer(agent, src, dst string) error {
 		case r := <-out:
 			if r.Error != nil {
 				log.WithFields(log.Fields{
-    			"Url": r.Url,
-  			}).Error("ERROR fail with transfer request to", r.Url)
+					"Url": r.Url,
+				}).Error("ERROR fail with transfer request to", r.Url)
 				return r.Error
 			}
 			delete(umap, r.Url) // remove Url from map
@@ -259,7 +259,7 @@ func Register(agent, fname string) error {
 	}
 	log.WithFields(log.Fields{
 		"Agent": agent,
-    "Size": len(uploadRecords),
-  }).Info("Registered records in")
+		"Size":  len(uploadRecords),
+	}).Info("Registered records in")
 	return nil
 }
