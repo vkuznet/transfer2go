@@ -9,9 +9,9 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/vkuznet/transfer2go/client"
 	"github.com/vkuznet/transfer2go/server"
 	"github.com/vkuznet/transfer2go/utils"
@@ -48,20 +48,17 @@ func main() {
 	if configFile != "" {
 		data, err := ioutil.ReadFile(configFile)
 		if err != nil {
-			log.Println("Unable to read", configFile, err)
-			os.Exit(1)
+			log.Fatal("Unable to read", configFile, err)
 		}
 		var config server.Config
 		err = json.Unmarshal(data, &config)
 		if err != nil {
-			log.Println("Unable to parse", configFile, err)
-			os.Exit(1)
+			log.Fatal("Unable to parse", configFile, err)
 		}
 		if config.Catalog == "" {
 			pwd, err := os.Getwd()
 			if err != nil {
-				log.Println("Unable to get current directory", err)
-				os.Exit(1)
+				log.Fatal("Unable to get current directory", err)
 			}
 			config.Catalog = pwd // use current directory as catalog
 		}
@@ -96,8 +93,7 @@ func main() {
 			err = client.Transfer(agent, src, dst)
 		}
 		if err != nil {
-			log.Println(err)
-			os.Exit(1)
+			log.Fatal(err)
 		}
 	}
 }
