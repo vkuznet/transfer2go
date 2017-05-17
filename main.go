@@ -48,12 +48,16 @@ func main() {
 	if configFile != "" {
 		data, err := ioutil.ReadFile(configFile)
 		if err != nil {
-			log.Fatal("Unable to read", configFile, err)
+			log.WithFields(log.Fields{
+  			"configFile": configFile,
+			}).Fatal("Unable to read", err)
 		}
 		var config server.Config
 		err = json.Unmarshal(data, &config)
 		if err != nil {
-			log.Fatal("Unable to parse", configFile, err)
+			log.WithFields(log.Fields{
+  			"configFile": configFile,
+			}).Fatal("Unable to parse", err)
 		}
 		if config.Catalog == "" {
 			pwd, err := os.Getwd()
@@ -78,7 +82,7 @@ func main() {
 			config.Register = agent
 		}
 		if config.Register == "" {
-			log.Println("WARNING this agent is not registered with remote ones, either provide register in your config or invoke register API call")
+			log.Warn("WARNING this agent is not registered with remote ones, either provide register in your config or invoke register API call")
 		}
 
 		server.Init(authVar)
