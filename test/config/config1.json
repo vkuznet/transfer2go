@@ -1,11 +1,12 @@
 {
-    "catalog":"test/catalog/catalog.json",
+    "catalog":"test/catalog/catalog1.json",
     "protocol":"cp",
-    "backend":"/tmp/vk",
+    "backend":"/tmp",
     "tool":"/bin/cp",
     "url":"http://localhost:8989",
     "mfile":"metrics.log",
     "minterval":60,
     "verbose":0,
-    "name":"Test"
+    "name":"Test",
+    "staticdir":"static"
 }

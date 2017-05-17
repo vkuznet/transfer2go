@@ -1,0 +1,13 @@
+{
+    "catalog":"test/catalog/catalog2.json",
+    "protocol":"cp",
+    "backend":"test/",
+    "tool":"/bin/cp",
+    "url":"http://localhost:8000",
+    "port": 8000,
+    "mfile":"metrics2.log",
+    "minterval":60,
+    "verbose":0,
+    "name":"Test2",
+    "staticdir":"static"
+}
