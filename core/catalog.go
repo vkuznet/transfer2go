@@ -6,10 +6,10 @@ package core
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"os/exec"
 	"strings"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/vkuznet/transfer2go/utils"
 
 	// loads sqlite3 database layer
@@ -54,7 +54,10 @@ type Catalog struct {
 
 func check(msg string, err error) {
 	if err != nil {
-		log.Fatalf("ERROR %s, %v\n", msg, err)
+		log.WithFields(log.Fields{
+			"Message": msg,
+			"Err":     err,
+		}).Fatal("Stop process")
 	}
 }
 
@@ -105,13 +108,17 @@ func (c *Catalog) Dump() []byte {
 		//         cmd := fmt.Sprintf("sqlite3 %s .dump", c.Uri)
 		out, err := exec.Command("sqlite3", c.Uri, ".dump").Output()
 		if err != nil {
-			log.Println("ERROR c.Dump", err)
+			log.WithFields(log.Fields{
+				"Err": err,
+			}).Error("c.Dump")
 		}
 		return out
 	}
-	log.Println("Catalog Dump method is not implemented yet for", c.Type)
-	return nil
+	log.WithFields(log.Fields{
+		"Type": c.Type,
+	}).Println("Catalog Dump method is not implemented yet for")
 
+	return nil
 }
 
 // Add method adds entry to a catalog
@@ -173,7 +180,11 @@ func (c *Catalog) Add(entry CatalogEntry) error {
 	tx.Commit()
 
 	if utils.VERBOSE > 0 {
-		log.Println("Committed to Catalog", entry.String(), "datasetid", did, "blockid", bid)
+		log.WithFields(log.Fields{
+			"Entry":      entry.String(),
+			"Dataset Id": did,
+			"Block Id":   bid,
+		}).Println("Committed to Catalog")
 	}
 
 	return nil
@@ -211,13 +222,19 @@ func (c *Catalog) Records(req TransferRequest) []CatalogEntry {
 	}
 
 	if utils.VERBOSE > 0 {
-		log.Println("Records query", stm, vals)
+		log.WithFields(log.Fields{
+			"Query": stm,
+			"Value": vals,
+		}).Println("Records query")
 	}
 
 	// fetch data from DB
 	rows, err := DB.Query(stm, vals...)
 	if err != nil {
-		log.Printf("ERROR DB.Query, query='%s' error=%v\n", stm, err)
+		log.WithFields(log.Fields{
+			"Query": stm,
+			"Error": err,
+		}).Error("DB.Query")
 		return []CatalogEntry{}
 	}
 	defer rows.Close()
@@ -226,7 +243,9 @@ func (c *Catalog) Records(req TransferRequest) []CatalogEntry {
 		rec := CatalogEntry{}
 		err := rows.Scan(&rec.Dataset, &rec.Block, &rec.Lfn, &rec.Pfn, &rec.Bytes, &rec.Hash)
 		if err != nil {
-			log.Println("ERROR rows.Scan", err)
+			log.WithFields(log.Fields{
+				"Err": err,
+			}).Error("rows.Scan")
 		}
 		out = append(out, rec)
 	}
@@ -242,13 +261,19 @@ func (c *Catalog) Transfers(time0, time1 string) []CatalogEntry {
 	vals = append(vals, time1)
 
 	if utils.VERBOSE > 0 {
-		log.Println("Records query", stm, vals)
+		log.WithFields(log.Fields{
+			"Query": stm,
+			"Value": vals,
+		}).Println("Records query", stm, vals)
 	}
 
 	// fetch data from DB
 	rows, err := DB.Query(stm, vals...)
 	if err != nil {
-		log.Printf("ERROR DB.Query, query='%s' error=%v\n", stm, err)
+		log.WithFields(log.Fields{
+			"Query": stm,
+			"Err":   err,
+		}).Error("DB.Query")
 		return []CatalogEntry{}
 	}
 	defer rows.Close()
@@ -257,7 +282,9 @@ func (c *Catalog) Transfers(time0, time1 string) []CatalogEntry {
 		rec := CatalogEntry{}
 		err := rows.Scan(&rec.Bytes, &rec.TransferTime)
 		if err != nil {
-			log.Println("ERROR rows.Scan", err)
+			log.WithFields(log.Fields{
+				"Err": err,
+			}).Error("rows.Scan")
 		}
 		out = append(out, rec)
 	}
