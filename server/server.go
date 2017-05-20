@@ -9,10 +9,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"strings"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/vkuznet/transfer2go/core"
 	"github.com/vkuznet/transfer2go/utils"
 
@@ -72,12 +72,18 @@ func init() {
 
 // register a new (alias, agent) pair in agent (register)
 func register(register, alias, agent string) error {
-	log.Printf("Register %s as %s on %s\n", agent, alias, register)
+	log.WithFields(log.Fields{
+		"Agent":    agent,
+		"Alias":    alias,
+		"Register": register,
+	}).Println("Register agent as alias on register")
 	// register myself with another agent
 	params := AgentInfo{Agent: _myself, Alias: _alias}
 	data, err := json.Marshal(params)
 	if err != nil {
-		log.Println("ERROR, unable to marshal params", params)
+		log.WithFields(log.Fields{
+			"Params": params,
+		}).Error("Unable to marshal params", params)
 	}
 	url := fmt.Sprintf("%s/register", register)
 	resp := utils.FetchResponse(url, data) // POST request
@@ -92,7 +98,10 @@ func register(register, alias, agent string) error {
 func registerAtAgents(aName string) {
 	// register itself
 	if _, ok := _agents[_alias]; ok {
-		log.Fatal("ERROR unable to register", _alias, "at", _agents, "since this name already exists")
+		log.WithFields(log.Fields{
+			"Alias":  _alias,
+			"Agents": _agents,
+		}).Fatal("Unable to register, alias, since this name already exists")
 	}
 	_agents[_alias] = _myself
 
@@ -100,7 +109,12 @@ func registerAtAgents(aName string) {
 	if aName != "" && len(aName) > 0 {
 		err := register(aName, _alias, _myself) // submit remote registration of given agent name
 		if err != nil {
-			log.Fatalf("ERROR Unable to register: %s %s %s %s %v", _alias, _myself, "at", aName, err)
+			log.WithFields(log.Fields{
+				"Alias": _alias,
+				"Self":  _myself,
+				"Name":  aName,
+				"Error": err,
+			}).Fatal("Unable to register")
 		}
 		aurl := fmt.Sprintf("%s/agents", aName)
 		resp := utils.FetchResponse(aurl, []byte{})
@@ -145,7 +159,9 @@ func Server(config Config) {
 		port = fmt.Sprintf("%d", config.Port)
 	}
 	config.Base = base
-	log.Println("Agent", config.String())
+	log.WithFields(log.Fields{
+		"Config": config.String(),
+	}).Println("Agent")
 
 	// register self agent URI in remote agent and vice versa
 	registerAtAgents(config.Register)
@@ -153,11 +169,15 @@ func Server(config Config) {
 	// define catalog
 	c, e := ioutil.ReadFile(config.Catalog)
 	if e != nil {
-		log.Fatalf("Unable to read catalog file, error=%v\n", e)
+		log.WithFields(log.Fields{
+			"Error": e,
+		}).Fatal("Unable to read catalog file")
 	}
 	err := json.Unmarshal([]byte(c), &core.TFC)
 	if err != nil {
-		log.Fatalf("Unable to parse catalog JSON file, error=%v\n", err)
+		log.WithFields(log.Fields{
+			"Error": err,
+		}).Fatal("Unable to parse catalog JSON file")
 	}
 	// open up Catalog DB
 	dbtype := core.TFC.Type
@@ -166,17 +186,23 @@ func Server(config Config) {
 	db, dberr := sql.Open(dbtype, dburi)
 	defer db.Close()
 	if dberr != nil {
-		log.Fatalf("ERROR sql.Open, %v\n", dberr)
+		log.WithFields(log.Fields{
+			"DB Error": dberr,
+		}).Fatal("sql.Open")
 	}
 	dberr = db.Ping()
 	if dberr != nil {
-		log.Fatalf("ERROR db.Ping, %v\n", dberr)
+		log.WithFields(log.Fields{
+			"DB Error": dberr,
+		}).Fatal("db.Ping")
 	}
 
 	core.DB = db
 	core.DBTYPE = dbtype
 	core.DBSQL = core.LoadSQL(dbtype, dbowner)
-	log.Println("Catalog", core.TFC)
+	log.WithFields(log.Fields{
+		"Catalog": core.TFC,
+	}).Println("")
 
 	// define handlers
 	http.HandleFunc(fmt.Sprintf("%s/", base), AuthHandler)
@@ -184,7 +210,10 @@ func Server(config Config) {
 	// initialize task dispatcher
 	dispatcher := core.NewDispatcher(config.Workers, config.QueueSize, config.Mfile, config.Minterval)
 	dispatcher.Run()
-	log.Println("Start dispatcher with", config.Workers, "workers, queue size", config.QueueSize)
+	log.WithFields(log.Fields{
+		"Workers":   config.Workers,
+		"QueueSize": config.QueueSize,
+	}).Println("Start dispatcher with workers of queue size")
 
 	if authVar {
 		//start HTTPS server which require user certificates
@@ -196,10 +225,12 @@ func Server(config Config) {
 		}
 		err = server.ListenAndServeTLS(config.ServerCrt, config.ServerKey)
 	} else {
-		err = http.ListenAndServe(":"+port, nil)   // Start server without user certificates
+		err = http.ListenAndServe(":"+port, nil) // Start server without user certificates
 	}
 
 	if err != nil {
-		log.Fatal("ListenAndServe: ", err)
+		log.WithFields(log.Fields{
+			"Error": err,
+		}).Fatal("ListenAndServe: ")
 	}
 }
