@@ -39,6 +39,7 @@ type AgentStatus struct {
 type Processor struct {
 }
 
+
 // Request interface defines a task process
 type Request interface {
 	Process(*TransferRequest) error
@@ -49,6 +50,7 @@ type RequestFunc func(*TransferRequest) error
 
 // Decorator wraps a request with extra behavior
 type Decorator func(Request) Request
+
 
 // DefaultProcessor is a default processor instance
 var DefaultProcessor = &Processor{}
