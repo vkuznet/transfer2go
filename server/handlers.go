@@ -9,13 +9,13 @@ import (
 	"fmt"
 	"hash/adler32"
 	"io"
-	"log"
 	"net/http"
 	"net/http/httputil"
 	"os"
 	"strings"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/vkuznet/transfer2go/core"
 	"github.com/vkuznet/transfer2go/utils"
 )
@@ -29,13 +29,17 @@ func userDNs() []string {
 	rurl := "https://cmsweb.cern.ch/sitedb/data/prod/people"
 	resp := utils.FetchResponse(rurl, []byte{})
 	if resp.Error != nil {
-		log.Println("ERROR unable to fetch SiteDB records", resp.Error)
+		log.WithFields(log.Fields{
+			"Error": resp.Error,
+		}).Error("Unable to fetch SiteDB records", resp.Error)
 		return out
 	}
 	var rec map[string]interface{}
 	err := json.Unmarshal(resp.Data, &rec)
 	if err != nil {
-		log.Println("ERROR unable to unmarshal response", err)
+		log.WithFields(log.Fields{
+			"Error": err,
+		}).Error("Unable to unmarshal response", err)
 		return out
 	}
 	desc := rec["desc"].(map[string]interface{})
@@ -80,12 +84,18 @@ func auth(r *http.Request) bool {
 
 	if utils.VERBOSE > 1 {
 		dump, err := httputil.DumpRequest(r, true)
-		log.Println("AuthHandler HTTP request", r, string(dump), err)
+		log.WithFields(log.Fields{
+			"Request": r,
+			"Dump":    string(dump),
+			"Error":   err,
+		}).Println("AuthHandler HTTP request")
 	}
 	userDN := utils.UserDN(r)
 	match := utils.InList(userDN, _userDNs)
 	if !match {
-		log.Println("ERROR Auth userDN", userDN, "not found in SiteDB")
+		log.WithFields(log.Fields{
+			"User DN": userDN,
+		}).Error("Auth userDN not found in SiteDB")
 	}
 	return match
 }
@@ -139,7 +149,9 @@ func TransfersHandler(w http.ResponseWriter, r *http.Request) {
 	transfers := core.TFC.Transfers(time0, time1)
 	data, err := json.Marshal(transfers)
 	if err != nil {
-		log.Println("ERROR AgentsHandler", err)
+		log.WithFields(log.Fields{
+			"Error": err,
+		}).Error("AgentsHandler", err)
 		w.WriteHeader(http.StatusInternalServerError)
 	} else {
 		w.WriteHeader(http.StatusOK)
@@ -160,7 +172,9 @@ func FilesHandler(w http.ResponseWriter, r *http.Request) {
 	files := core.TFC.Files(dataset, block, lfn)
 	data, err := json.Marshal(files)
 	if err != nil {
-		log.Println("ERROR AgentsHandler", err)
+		log.WithFields(log.Fields{
+			"Error": err,
+		}).Error("AgentsHandler", err)
 		w.WriteHeader(http.StatusInternalServerError)
 	} else {
 		w.WriteHeader(http.StatusOK)
@@ -179,7 +193,9 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 	astats := core.AgentStatus{Addrs: addrs, Catalog: core.TFC.Type, Name: _alias, Url: _myself, Protocol: _protocol, Backend: _backend, Tool: _tool, ToolOpts: _toolOpts, Agents: _agents, TimeStamp: time.Now().Unix(), Metrics: core.AgentMetrics.ToDict()}
 	data, err := json.Marshal(astats)
 	if err != nil {
-		log.Println("ERROR AgentsHandler", err)
+		log.WithFields(log.Fields{
+			"Error": err,
+		}).Error("AgentsHandler")
 		w.WriteHeader(http.StatusInternalServerError)
 	} else {
 		w.WriteHeader(http.StatusOK)
@@ -196,7 +212,9 @@ func AgentsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	data, err := json.Marshal(_agents)
 	if err != nil {
-		log.Println("ERROR AgentsHandler", err)
+		log.WithFields(log.Fields{
+			"Error": err,
+		}).Error("AgentsHandler", err)
 		w.WriteHeader(http.StatusInternalServerError)
 	} else {
 		w.WriteHeader(http.StatusOK)
@@ -223,7 +241,11 @@ func ResetHandler(w http.ResponseWriter, r *http.Request) {
 	_protocol = "http"
 	_backend = ""
 	_tool = ""
-	log.Printf("ResetHandler switched to protocol=%s backend=%s tool=%s\n", _protocol, _backend, _tool)
+	log.WithFields(log.Fields{
+		"Protocol": _protocol,
+		"Backend":  _backend,
+		"Tool":     _tool,
+	}).Printf("ResetHandler switched to")
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -242,7 +264,10 @@ func TFCHandler(w http.ResponseWriter, r *http.Request) {
 		records := core.TFC.Records(core.TransferRequest{})
 		data, err := json.Marshal(records)
 		if err != nil {
-			log.Println("ERROR TFCHandler unable to marshal", records, err)
+			log.WithFields(log.Fields{
+				"Records": records,
+				"Error":   err,
+			}).Error("TFCHandler unable to marshal", records, err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -253,13 +278,19 @@ func TFCHandler(w http.ResponseWriter, r *http.Request) {
 	var records []core.CatalogEntry
 	err := json.NewDecoder(r.Body).Decode(&records)
 	if err != nil {
-		log.Println("ERROR TFCHandler unable to decode", r.Body, err)
+		log.WithFields(log.Fields{
+			"Request Body": r.Body,
+			"Error":        err,
+		}).Error("TFCHandler unable to decode", r.Body, err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	for _, rec := range records {
 		err = core.TFC.Add(rec)
-		log.Println("TFCHandler adds", rec.String(), err)
+		log.WithFields(log.Fields{
+			"Record": rec.String(),
+			"Error":  err,
+		}).Println("TFCHandler adds")
 	}
 	w.WriteHeader(http.StatusOK)
 }
@@ -276,7 +307,10 @@ func RegisterAgentHandler(w http.ResponseWriter, r *http.Request) {
 	var agentParams AgentInfo
 	err := json.NewDecoder(r.Body).Decode(&agentParams)
 	if err != nil {
-		log.Println("ERROR RegisterAgentHandler unable to decode", r.Body, err)
+		log.WithFields(log.Fields{
+			"Request Body": r.Body,
+			"Error":        err,
+		}).Error("RegisterAgentHandler unable to decode")
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -309,7 +343,10 @@ func RegisterProtocolHandler(w http.ResponseWriter, r *http.Request) {
 	var protocolParams AgentProtocol
 	err := json.NewDecoder(r.Body).Decode(&protocolParams)
 	if err != nil {
-		log.Println("ERROR RegisterProtocolHandler unable to decode", r.Body, err)
+		log.WithFields(log.Fields{
+			"Request Body": r.Body,
+			"Error":        err,
+		}).Error("RegisterProtocolHandler unable to decode", r.Body, err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -319,7 +356,11 @@ func RegisterProtocolHandler(w http.ResponseWriter, r *http.Request) {
 		_backend = protocolParams.Backend
 		_tool = protocolParams.Tool
 		_toolOpts = protocolParams.ToolOpts
-		log.Printf("INFO RegisterProtocolHandler switched to protocol=%s backend=%s tool=%s\n", _protocol, _backend, _tool)
+		log.WithFields(log.Fields{
+			"Protocol": _protocol,
+			"Backend":  _backend,
+			"Tool":     _tool,
+		}).Println("RegisterProtocolHandler switched to")
 		w.WriteHeader(http.StatusOK)
 		return
 	}
@@ -334,14 +375,18 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 	if utils.VERBOSE > 0 {
-		log.Println("RequestHandler received request", r)
+		log.WithFields(log.Fields{
+			"Request": r,
+		}).Println("RequestHandler received request")
 	}
 
 	// Read the body into a string for json decoding
 	var requests = &[]core.TransferRequest{}
 	err := json.NewDecoder(r.Body).Decode(&requests)
 	if err != nil {
-		log.Println("ERROR RequestHandler unable to decode []TransferRequest", err)
+		log.WithFields(log.Fields{
+			"Error": err,
+		}).Error("RequestHandler unable to decode []TransferRequest", err)
 		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -371,12 +416,16 @@ func UploadDataHandler(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	if utils.VERBOSE > 0 {
-		log.Println("HEADER UploadDataHandler", r.Header)
+		log.WithFields(log.Fields{
+			"Header": r.Header,
+		}).Println("HEADER UploadDataHandler", r.Header)
 	}
 	// create multipart reader
 	mr, e := r.MultipartReader()
 	if e != nil {
-		log.Println("ERROR UploadDataHandler unable to establish MultipartReader", e)
+		log.WithFields(log.Fields{
+			"Error": e,
+		}).Error("UploadDataHandler unable to establish MultipartReader", e)
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
@@ -398,7 +447,10 @@ func UploadDataHandler(w http.ResponseWriter, r *http.Request) {
 	file, e := os.Create(pfn)
 	defer file.Close()
 	if e != nil {
-		log.Println("ERROR UploadDataHandler unable to open", pfn, e)
+		log.WithFields(log.Fields{
+			"PFN":   pfn,
+			"Error": e,
+		}).Error("ERROR UploadDataHandler unable to open", pfn, e)
 		http.Error(w, e.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -416,7 +468,9 @@ func UploadDataHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if e != nil {
-			log.Println("ERROR UploadDataHandler unable to read chunk from the stream", e)
+			log.WithFields(log.Fields{
+				"Error": e,
+			}).Error("UploadDataHandler unable to read chunk from the stream", e)
 			break
 		}
 		// here is pipe: mr->p->hasher->file
@@ -425,20 +479,30 @@ func UploadDataHandler(w http.ResponseWriter, r *http.Request) {
 		// in case we don't need hasher the code would be
 		// b, e := io.Copy(file, p)
 		if e != nil {
-			log.Println("ERROR UploadDataHandler unable to copy chunk", e)
+			log.WithFields(log.Fields{
+				"Error": e,
+			}).Error("UploadDataHandler unable to copy chunk", e)
 			break
 		}
 		totBytes += b
 	}
 	if srcBytes != fmt.Sprintf("%d", totBytes) {
-		log.Println("ERROR UploadDataHandler bytes mismatch", srcBytes, totBytes, e)
+		log.WithFields(log.Fields{
+			"Source Bytes": srcBytes,
+			"Total Bytes":  totBytes,
+			"Error":        e,
+		}).Error("UploadDataHandler bytes mismatch", srcBytes, totBytes, e)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	hash := hex.EncodeToString(hasher.Sum(nil))
 	if srcHash != hash {
-		log.Println("ERROR UploadDataHandler hash mismatch", srcHash, hash, e)
+		log.WithFields(log.Fields{
+			"Source Hash": srcHash,
+			"Hash":        hash,
+			"Error":       e,
+		}).Error("UploadDataHandler hash mismatch", srcHash, hash, e)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -446,11 +510,19 @@ func UploadDataHandler(w http.ResponseWriter, r *http.Request) {
 	// send back catalog entry which can be used for verification
 	// but do not write to catalog since another end should verify first that
 	// data is transferred, then it will update the TFC
-	log.Printf("UploadDataHandler wrote %s:%s to %s:%s\n", srcAlias, fname, dstAlias, pfn)
+	log.WithFields(log.Fields{
+		"Source Alias": srcAlias,
+		"Fname":        fname,
+		"Dest Alias":   dstAlias,
+		"PFN":          pfn,
+	}).Println("UploadDataHandler wrote")
 	entry := core.CatalogEntry{Lfn: lfn, Pfn: pfn, Dataset: dataset, Block: block, Bytes: totBytes, Hash: hash, TransferTime: (time.Now().Unix() - time0), Timestamp: time.Now().Unix()}
 	data, e := json.Marshal(entry)
 	if e != nil {
-		log.Println("ERROR, UploadDataHandler unable to marshal catalog entry", entry, e)
+		log.WithFields(log.Fields{
+			"Entry": entry,
+			"Error": e,
+		}).Error("UploadDataHandler unable to marshal catalog entry", entry, e)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}

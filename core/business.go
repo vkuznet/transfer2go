@@ -9,6 +9,7 @@ import (
 	"os"
 	"time"
 
+	logs "github.com/sirupsen/logrus"
 	"github.com/rcrowley/go-metrics"
 )
 
@@ -117,15 +118,17 @@ func (w Worker) Start() {
 					msg := fmt.Sprintf("WARNING %v experienced an error %v, put on hold", job.TransferRequest, err.Error())
 					// decide if we'll drop the request or put it on hold by increasing its delay and put back to job channel
 					if job.TransferRequest.Delay > 300 {
-						log.Println("ERROR ", job.TransferRequest, "exceed number of iteration, discard request")
+						logs.WithFields(logs.Fields{
+							"Transfer Request":  job.TransferRequest,
+						}).Error("Exceed number of iteration, discard request")
 						AgentMetrics.Failed.Inc(1)
 					} else if job.TransferRequest.Delay > 0 {
 						job.TransferRequest.Delay *= 2
-						log.Println(msg)
+						logs.Println(msg)
 						w.JobChannel <- job
 					} else {
 						job.TransferRequest.Delay = 60
-						log.Println(msg)
+						logs.Println(msg)
 						w.JobChannel <- job
 					}
 				} else {
@@ -153,7 +156,9 @@ func NewDispatcher(maxWorkers, maxQueue int, mfile string, minterval int64) *Dis
 	// register metrics
 	f, e := os.OpenFile(mfile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if e != nil {
-		log.Fatalf("error opening file: %v", e)
+		logs.WithFields(logs.Fields{
+			"Error":  e,
+		}).Error("Error opening file:")
 	}
 	defer f.Close()
 

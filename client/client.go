@@ -9,10 +9,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"strings"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/vkuznet/transfer2go/core"
 	"github.com/vkuznet/transfer2go/utils"
 )
@@ -138,7 +138,10 @@ func parse(agent, src, dst string) ([][]core.TransferRequest, error) {
 	// check if destination is ok
 	dstUrl, ok := remoteAgents[dst]
 	if !ok {
-		log.Println("Unable to resolve destination", dst, "known agents", remoteAgents)
+		log.WithFields(log.Fields{
+			"Destination":  dst,
+			"known agents": remoteAgents,
+		}).Error("Unable to resolve destination")
 		return tr, fmt.Errorf("Unknown destination")
 	}
 
@@ -190,7 +193,9 @@ func Transfer(agent, src, dst string) error {
 		select {
 		case r := <-out:
 			if r.Error != nil {
-				log.Println("ERROR fail with transfer request to", r.Url)
+				log.WithFields(log.Fields{
+					"Url": r.Url,
+				}).Error("ERROR fail with transfer request to", r.Url)
 				return r.Error
 			}
 			delete(umap, r.Url) // remove Url from map
@@ -252,6 +257,9 @@ func Register(agent, fname string) error {
 	if resp.Error != nil {
 		return fmt.Errorf("Unable to upload, url=%s, data=%s, err=%v\n", url, string(resp.Data), resp.Error)
 	}
-	log.Println("Registered", len(uploadRecords), "records in", agent)
+	log.WithFields(log.Fields{
+		"Agent": agent,
+		"Size":  len(uploadRecords),
+	}).Info("Registered records in")
 	return nil
 }

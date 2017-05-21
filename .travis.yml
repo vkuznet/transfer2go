@@ -8,3 +8,4 @@ install:
   - go get github.com/pkg/profile
   - go get github.com/rcrowley/go-metrics
   - go get github.com/mattn/go-sqlite3
+  - go get github.com/sirupsen/logrus

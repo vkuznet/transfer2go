@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/http/httputil"
 	"os"
@@ -18,6 +17,7 @@ import (
 	"regexp"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/vkuznet/x509proxy"
 )
 
@@ -75,9 +75,15 @@ func tlsCerts() ([]tls.Certificate, error) {
 		}
 	}
 	if VERBOSE > 1 {
-		log.Println("uproxy", uproxy)
-		log.Println("uckey", uckey)
-		log.Println("ucert", ucert)
+		log.WithFields(log.Fields{
+			"uproxy": uproxy,
+		}).Println("")
+		log.WithFields(log.Fields{
+			"uckey": uckey,
+		}).Println("")
+		log.WithFields(log.Fields{
+			"ucert": ucert,
+		}).Println("")
 	}
 
 	if uproxy == "" && uckey == "" { // user doesn't have neither proxy or user certs
@@ -138,17 +144,25 @@ func FetchResponse(rurl string, args []byte) ResponseType {
 	} else {
 		req, e = http.NewRequest("GET", rurl, nil)
 		if e != nil {
-			log.Println("Unable to make GET request", e)
+			log.WithFields(log.Fields{
+				"Error": e,
+			}).Error("Unable to make GET request")
 		}
 		req.Header.Add("Accept", "*/*")
 	}
 	if VERBOSE > 1 {
 		dump1, err1 := httputil.DumpRequestOut(req, true)
-		log.Println("HTTP request", req, string(dump1), err1)
+		log.WithFields(log.Fields{
+			"Request": req,
+			"Dump":    string(dump1),
+			"Error":   err1,
+		}).Println("HTTP request")
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Println("HTTP ERROR", err)
+		log.WithFields(log.Fields{
+			"Error": err,
+		}).Error("HTTP", err)
 		response.Error = err
 		return response
 	}
@@ -156,14 +170,27 @@ func FetchResponse(rurl string, args []byte) ResponseType {
 	response.StatusCode = resp.StatusCode
 	if VERBOSE > 0 {
 		if len(args) > 0 {
-			log.Println("HTTP POST", rurl, string(args), err, time.Now().Sub(startTime))
+			log.WithFields(log.Fields{
+				"URL":   rurl,
+				"Args":  string(args),
+				"Error": err,
+				"Time":  time.Now().Sub(startTime),
+			}).Println("HTTP POST")
 		} else {
-			log.Println("HTTP GET", rurl, string(args), err, time.Now().Sub(startTime))
+			log.WithFields(log.Fields{
+				"URL":   rurl,
+				"Args":  string(args),
+				"Error": err,
+				"Time":  time.Now().Sub(startTime),
+			}).Println("HTTP GET")
 		}
 	}
 	if VERBOSE > 1 {
 		dump2, err2 := httputil.DumpResponse(resp, true)
-		log.Println("HTTP response", string(dump2), err2)
+		log.WithFields(log.Fields{
+			"Dump":  string(dump2),
+			"Error": err2,
+		}).Println("HTTP response")
 	}
 	if err != nil {
 		response.Error = err
@@ -183,7 +210,10 @@ func Fetch(rurl string, args []byte, ch chan<- ResponseType) {
 	var resp, r ResponseType
 	resp = FetchResponse(rurl, args)
 	if resp.Error != nil {
-		log.Println("TRANSFER2GO WARNING, fail to fetch data", rurl, "error", resp.Error)
+		log.WithFields(log.Fields{
+			"URL":   rurl,
+			"Error": resp.Error,
+		}).Warn("Fail to fetch data")
 		for i := 1; i <= urlRetry; i++ {
 			sleep := time.Duration(i) * time.Second
 			time.Sleep(sleep)
@@ -191,12 +221,20 @@ func Fetch(rurl string, args []byte, ch chan<- ResponseType) {
 			if r.Error == nil {
 				break
 			}
-			log.Println("TRANSFER2GO WARNING", rurl, "retry", i, "error", r.Error)
+			log.WithFields(log.Fields{
+				"URL":   rurl,
+				"retry": i,
+				"Error": r.Error,
+			}).Warn("TRANSFER2GO")
 		}
 		resp = r
 	}
 	if resp.Error != nil {
-		log.Println("TRANSFER2GO ERROR, fail to fetch data", rurl, "retries", urlRetry, "error", resp.Error)
+		log.WithFields(log.Fields{
+			"URL":   rurl,
+			"Retry": urlRetry,
+			"Error": resp.Error,
+		}).Error("TRANSFER2GO, fail to fetch data")
 	}
 	ch <- resp
 }
@@ -211,7 +249,9 @@ func validateUrl(rurl string) bool {
 				return true
 			}
 		}
-		log.Println("ERROR invalid URL:", rurl)
+		log.WithFields(log.Fields{
+			"URL": rurl,
+		}).Error("Invalid URL:", rurl)
 	}
 	return false
 }

@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -16,6 +15,7 @@ import (
 	"path/filepath"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/vkuznet/transfer2go/utils"
 )
 
@@ -125,11 +125,15 @@ func httpTransfer(c CatalogEntry, t *TransferRequest) (string, error) {
 func Transfer() Decorator {
 	return func(r Request) Request {
 		return RequestFunc(func(t *TransferRequest) error {
-			log.Println("Request Transfer", t.String())
+			log.WithFields(log.Fields{
+				"Request": t.String(),
+			}).Println("Request Transfer", t.String())
 			records := TFC.Records(*t)
 			if len(records) == 0 {
 				// file does not exists in TFC, nothing to do, return immediately
-				log.Printf("WARNING %v does match anything in TFC of this agent\n", t)
+				log.WithFields(log.Fields{
+					"TransferRequest": t,
+				}).Warn("Does match anything in TFC of this agent\n", t)
 				return r.Process(t)
 			}
 			// obtain information about source and destination agents
@@ -166,10 +170,16 @@ func Transfer() Decorator {
 				// if protocol is not given use default one: HTTP
 				var rpfn string // remote PFN
 				if srcAgent.Protocol == "" || srcAgent.Protocol == "http" {
-					log.Println("Transfer via HTTP protocol to", dstAgent.String())
+					log.WithFields(log.Fields{
+						"dstAgent": dstAgent.String(),
+					}).Println("Transfer via HTTP protocol to", dstAgent.String())
 					rpfn, err = httpTransfer(rec, t)
 					if err != nil {
-						log.Println("ERROR Transfer", rec.String(), t.String(), err)
+						log.WithFields(log.Fields{
+							"TransferRequest": t.String(),
+							"Record":          rec.String(),
+							"Err":             err,
+						}).Error("Transfer", rec.String(), t.String(), err)
 						continue // if we fail on single record we continue with others
 					}
 				} else {
@@ -179,13 +189,21 @@ func Transfer() Decorator {
 					var cmd *exec.Cmd
 					if srcAgent.ToolOpts == "" {
 						cmd = exec.Command(srcAgent.Tool, rec.Pfn, rpfn)
-					}else{
+					} else{
 						cmd = exec.Command(srcAgent.Tool, srcAgent.ToolOpts, rec.Pfn, rpfn)
-					}				
-					log.Println("Transfer command", cmd)
+					}
+					log.WithFields(log.Fields{
+						"Command": cmd,
+					}).Println("Transfer command")
 					err = cmd.Run()
 					if err != nil {
-						log.Println("ERROR Transfer", srcAgent.Tool, srcAgent.ToolOpts, rec.Pfn, rpfn, err)
+						log.WithFields(log.Fields{
+							"Tool":         srcAgent.Tool,
+							"Tool options": srcAgent.ToolOpts,
+							"PFN":          rec.Pfn,
+							"Remote PFN":   rpfn,
+							"Err":          err,
+						}).Error("Transfer")
 						continue // if we fail on single record we continue with others
 					}
 				}
@@ -229,7 +247,10 @@ func Pause(interval time.Duration) Decorator {
 	return func(r Request) Request {
 		return RequestFunc(func(t *TransferRequest) error {
 			if interval > 0 {
-				log.Println("TransferRequest", t, "is paused by", interval)
+				log.WithFields(log.Fields{
+					"Request":  t,
+					"Interval": interval,
+				}).Println("TransferRequest is paused by")
 				time.Sleep(interval)
 			}
 			return r.Process(t)
@@ -241,7 +262,9 @@ func Pause(interval time.Duration) Decorator {
 func Tracer() Decorator {
 	return func(r Request) Request {
 		return RequestFunc(func(t *TransferRequest) error {
-			log.Println("Trace", t)
+			log.WithFields(log.Fields{
+				"TransferRequest": t,
+			}).Println("Trace")
 			return r.Process(t)
 		})
 	}
