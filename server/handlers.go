@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"hash/adler32"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
 	"os"
@@ -130,6 +131,8 @@ func AuthHandler(w http.ResponseWriter, r *http.Request) {
 		RegisterAgentHandler(w, r)
 	case "protocol":
 		RegisterProtocolHandler(w, r)
+	case "verbose":
+		VerboseHandler(w, r)
 	default:
 		DefaultHandler(w, r)
 	}
@@ -528,4 +531,28 @@ func UploadDataHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusOK)
 	w.Write(data)
+}
+
+// helper data structure to change verbosity level of the running server
+type level struct {
+	Level int `json:"level"`
+}
+
+// VerboseHandler sets verbosity level for the server
+func VerboseHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		log.Warn("Unable to parse request body: ", err)
+	}
+	var v level
+	err = json.Unmarshal(body, &v)
+	if err == nil {
+		log.Info("Switch to verbose level: ", v.Level)
+		utils.VERBOSE = v.Level
+	}
+	w.WriteHeader(http.StatusOK)
 }
