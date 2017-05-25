@@ -14,7 +14,6 @@ import (
 	"net/http/httputil"
 	"os"
 	"os/user"
-	"regexp"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -42,8 +41,11 @@ type UrlRequest struct {
 // VERBOSE variable control verbosity level of client's utilities
 var VERBOSE int
 
-// create global HTTP client and re-use it through the code
-var client = HttpClient()
+// global HTTP client
+var _client = HttpClient()
+
+// global client's x509 certificates
+var _certs []tls.Certificate
 
 // UserDN function parses user Distinguished Name (DN) from client's HTTP request
 func UserDN(r *http.Request) string {
@@ -62,6 +64,9 @@ func UserDN(r *http.Request) string {
 
 // client X509 certificates
 func tlsCerts() ([]tls.Certificate, error) {
+	if len(_certs) != 0 {
+		return _certs, nil // use cached certs
+	}
 	uproxy := os.Getenv("X509_USER_PROXY")
 	uckey := os.Getenv("X509_USER_KEY")
 	ucert := os.Getenv("X509_USER_CERT")
@@ -95,32 +100,32 @@ func tlsCerts() ([]tls.Certificate, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse proxy X509 proxy set by X509_USER_PROXY: %v", err)
 		}
-		return []tls.Certificate{x509cert}, nil
+		_certs = []tls.Certificate{x509cert}
+		return _certs, nil
 	}
 	x509cert, err := tls.LoadX509KeyPair(ucert, uckey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse user X509 certificate: %v", err)
 	}
-	return []tls.Certificate{x509cert}, nil
+	_certs = []tls.Certificate{x509cert}
+	return _certs, nil
 }
 
-// HttpClient is HTTP client for urlfetch server
-func HttpClient() (client *http.Client) {
+// HttpClient provides HTTP client
+func HttpClient() *http.Client {
 	// get X509 certs
 	certs, err := tlsCerts()
 	if err != nil {
 		panic(err.Error())
 	}
 	if len(certs) == 0 {
-		client = &http.Client{}
-		return
+		return &http.Client{}
 	}
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{Certificates: certs,
 			InsecureSkipVerify: true},
 	}
-	client = &http.Client{Transport: tr}
-	return
+	return &http.Client{Transport: tr}
 }
 
 func (r *ResponseType) String() string {
@@ -158,7 +163,7 @@ func FetchResponse(rurl string, args []byte) ResponseType {
 			"Error":   err1,
 		}).Println("HTTP request")
 	}
-	resp, err := client.Do(req)
+	resp, err := _client.Do(req)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"Error": err,
@@ -242,12 +247,8 @@ func Fetch(rurl string, args []byte, ch chan<- ResponseType) {
 // Helper function which validates given URL
 func validateUrl(rurl string) bool {
 	if len(rurl) > 0 {
-		pat := "(https|http)://[-A-Za-z0-9_+&@#/%?=~_|!:,.;]*[-A-Za-z0-9+&@#/%=~_|]"
-		matched, err := regexp.MatchString(pat, rurl)
-		if err == nil {
-			if matched == true {
-				return true
-			}
+		if PatternUrl.MatchString(rurl) {
+			return true
 		}
 		log.WithFields(log.Fields{
 			"URL": rurl,
