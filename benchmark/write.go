@@ -4,9 +4,9 @@
 package main
 
 import (
+	"fmt"
 	"math/rand"
 	"os"
-	"strconv"
 	"time"
 )
 
@@ -27,26 +27,36 @@ func main() {
 	defer f.Close()
 
 	for i := 1; i <= 100; i++ {
-		dataset := String(5)
-		f.WriteString("insert into DATASETS values (" + strconv.Itoa(i) + ", " + "\"" + dataset + "\"" + ");\n")
+		datasetID := i
+		dataset := "/" + String(3) + "/" + String(3) + "/" + String(3)
+		putDataset := fmt.Sprintf("insert into DATASETS values (%d, %s); \n", datasetID, "\""+dataset+"\"")
+		f.WriteString(putDataset)
+
 		for j := 1; j <= 100; j++ {
-			block := String(4)
-			f.WriteString("insert into BLOCKS values (" + strconv.Itoa(i*1000+j) + ", " + "\"" + block + "\"" + ");\n")
+			blockHash := String(4)
+			block := fmt.Sprintf("%s#%s", dataset, blockHash)
+			blockID := i*1000 + j
+			putBlock := fmt.Sprintf("insert into BLOCKS values (%d, %s, %d); \n", blockID, "\""+block+"\"", datasetID)
+			f.WriteString(putBlock)
+
 			for k := 1; k <= 100; k++ {
-				file := dataset + "-" + block + "-" + String(5) + strconv.Itoa(i) + ".root"
+				lfn := dataset + "-" + block + "-" + String(5) + ".root"
+				pfn := "/path/file3.root"
 				id := i*1000000 + j*1000 + k
-				f.WriteString("insert into FILES values (" + strconv.Itoa(id) + ", " + "\"" + file + "\"" + ", \"" + "/path/file3.root" + "\", " + strconv.Itoa(j) + ", " + strconv.Itoa(i) + ", 10, " + "\"" + "hash" + "\"" + ", 123" + ", 123" + ");\n")
+				putFile := fmt.Sprintf("insert into FILES values(%d, %s, %s, %d, %d, %d, %s, %d, %d); \n", id, "\""+lfn+"\"", "\""+pfn+"\"", blockID, datasetID, 10, "\"hash\"", 123, 123)
+				f.WriteString(putFile)
 			}
+
 		}
+
 	}
+
 }
 
-// Get max length of random string
 func String(length int) string {
 	return StringWithCharset(length, charset)
 }
 
-// Function to generate random string
 func StringWithCharset(length int, charset string) string {
 	b := make([]byte, length)
 	for i := range b {

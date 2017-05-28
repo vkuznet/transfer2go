@@ -152,7 +152,7 @@ func (c *Catalog) Add(entry CatalogEntry) error {
 
 	// insert block into block table
 	stm = getSQL("insert_blocks")
-	_, e = DB.Exec(stm, entry.Block)
+	_, e = DB.Exec(stm, entry.Block, did)
 	if e != nil {
 		if !strings.Contains(e.Error(), "UNIQUE") {
 			check("Unable to insert into blocks table", e)
