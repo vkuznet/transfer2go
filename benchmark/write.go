@@ -18,7 +18,7 @@ var seededRand *rand.Rand = rand.New(
 
 func main() {
 
-	f, err := os.OpenFile("data.sql", os.O_APPEND|os.O_WRONLY, 0600)
+	f, err := os.OpenFile("data2.sql", os.O_APPEND|os.O_WRONLY, 0600)
 
 	if err != nil {
 		panic(err)
@@ -29,26 +29,27 @@ func main() {
 	for i := 1; i <= 100; i++ {
 		datasetID := i
 		dataset := "/" + String(3) + "/" + String(3) + "/" + String(3)
-		putDataset := fmt.Sprintf("insert into DATASETS values (%d, %s); \n", datasetID, "\""+dataset+"\"")
+		putDataset := fmt.Sprintf("insert into DATASETS values (%d, \"%s\"); \n", datasetID, dataset)
 		f.WriteString(putDataset)
 
 		for j := 1; j <= 100; j++ {
 			blockHash := String(4)
 			block := fmt.Sprintf("%s#%s", dataset, blockHash)
 			blockID := i*1000 + j
-			putBlock := fmt.Sprintf("insert into BLOCKS values (%d, %s, %d); \n", blockID, "\""+block+"\"", datasetID)
+			putBlock := fmt.Sprintf("insert into BLOCKS values (%d, \"%s\", %d); \n", blockID, block, datasetID)
 			f.WriteString(putBlock)
 
 			for k := 1; k <= 100; k++ {
 				lfn := dataset + "-" + block + "-" + String(5) + ".root"
 				pfn := "/path/file3.root"
 				id := i*1000000 + j*1000 + k
-				putFile := fmt.Sprintf("insert into FILES values(%d, %s, %s, %d, %d, %d, %s, %d, %d); \n", id, "\""+lfn+"\"", "\""+pfn+"\"", blockID, datasetID, 10, "\"hash\"", 123, 123)
+				putFile := fmt.Sprintf("insert into FILES values(%d, \"%s\", \"%s\", %d, %d, %d, \"%s\", %d, %d); \n", id, lfn, pfn, blockID, datasetID, 10, "hash", 123, 123)
 				f.WriteString(putFile)
+				break
 			}
-
+			break
 		}
-
+		break
 	}
 
 }
