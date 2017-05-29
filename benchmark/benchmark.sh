@@ -4,10 +4,9 @@ echo "Time taken to insert the data"
 time sqlite3 test.db < data.sql
 
 echo "Time taken to query"
-time sqlite3 test.db "select * from datasets where id=59;" >/dev/null 2>&1 \
-&& sqlite3 test.db "select * from blocks where datasetid=59;" >/dev/null 2>&1 \
-&& sqlite3 test.db "select * from blocks where datasetid=59 AND id=59066;" >/dev/null 2>&1 \
-&& sqlite3 test.db "select * from blocks where datasetid=59 AND id=59033;" >/dev/null 2>&1 \
-&& sqlite3 test.db "select * from files where datasetid=59 AND id=59033 AND id=59033004;" >/dev/null 2>&1 \
-&& sqlite3 test.db "select * from files where datasetid=59 AND id=59033 AND id=59033019;" >/dev/null 2>&1 \
-&& sqlite3 test.db "select * from files where lfn=\"/1GN/XBy/iFl-/1GN/XBy/iFl#XCAo-y6F4v.root\";" >/dev/null 2>&1
+time sqlite3 test.db << EOF >/dev/null 2>&1
+_datasets = select * from datasets;
+_blocks = select * from blocks where datasetid=(select id from _datasets where dataset="/41Z/6Ik/KAy");
+select * from files where blockid=(select id from _blocks where block="/41Z/6Ik/KAy#tfKr");
+select * from files as F join blocks as B on F.blockid=B.id join datasets as D ON F.datasetid = D.id where d.dataset="/41Z/6Ik/KAy";
+EOF
