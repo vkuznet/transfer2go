@@ -45,11 +45,8 @@ func main() {
 				id := i*1000000 + j*1000 + k
 				putFile := fmt.Sprintf("insert into FILES values(%d, \"%s\", \"%s\", %d, %d, %d, \"%s\", %d, %d); \n", id, lfn, pfn, blockID, datasetID, 10, "hash", 123, 123)
 				f.WriteString(putFile)
-				break
 			}
-			break
 		}
-		break
 	}
 
 }
