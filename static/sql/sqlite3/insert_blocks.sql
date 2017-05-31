@@ -1,1 +1,1 @@
-INSERT INTO BLOCKS(block) VALUES(?)
+INSERT INTO BLOCKS(block, datasetid) VALUES(?,?)
