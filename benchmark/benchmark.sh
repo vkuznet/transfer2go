@@ -4,9 +4,42 @@ echo "Time taken to insert the data"
 time sqlite3 test.db < data.sql
 
 echo "Time taken to query"
-time sqlite3 test.db << EOF >/dev/null 2>&1
-_datasets = select * from datasets;
-_blocks = select * from blocks where datasetid=(select id from _datasets where dataset="/41Z/6Ik/KAy");
-select * from files where blockid=(select id from _blocks where block="/41Z/6Ik/KAy#tfKr");
-select * from files as F join blocks as B on F.blockid=B.id join datasets as D ON F.datasetid = D.id where d.dataset="/41Z/6Ik/KAy";
-EOF
+
+begin=$(date +%s) 
+
+max_1=3
+max_2=3
+i=1
+j=1
+
+output=`sqlite3 test.db "select * from datasets;"`
+
+
+for d_row in ${output[@]}
+do
+	if (( $i > $max_1 ))
+	then
+		break
+	fi
+	
+	j=0;
+	dataset="$(cut -d'|' -f2 <<<"$d_row")"
+    blocks=`sqlite3 test.db "select * from blocks as B JOIN datasets as D on B.datasetid=D.id where dataset=\"$dataset\";"`
+    
+    for b_row in ${blocks[@]}
+	do
+		if (( $j > $max_2 ))
+		then
+			break
+		fi
+		block="$(cut -d'|' -f2 <<<"$b_row")"
+    	files=`sqlite3 test.db "select * from files as F JOIN blocks as B on F.blockid=B.id where block=\"$block\";"`
+    	j=$((j+1))
+	done
+	i=$((i+1))
+done
+
+end=$(date +%s)
+tottime=$(expr $end - $begin)
+
+echo $tottime
