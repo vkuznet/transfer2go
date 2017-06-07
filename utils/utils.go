@@ -15,6 +15,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"text/template"
 
 	log "github.com/sirupsen/logrus"
@@ -218,4 +219,19 @@ func CheckX509() {
 		log.Println(msg)
 		os.Exit(-1)
 	}
+}
+
+// SourceLine returns callers, i.e. file_name:line_number
+func SourceLine() string {
+	var out []string
+	for i := 0; i < 2; i++ {
+		_, file, line, ok := runtime.Caller(i)
+		if ok {
+			slash := strings.LastIndex(file, "/")
+			file = file[slash+1:]
+			msg := fmt.Sprintf("%s:%d", file, line)
+			out = append(out, msg)
+		}
+	}
+	return strings.Join(out, " -> ")
 }
