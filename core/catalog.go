@@ -1,7 +1,7 @@
 package core
 
 // transfer2go implementation of Trivial File Catalog (TFC)
-// Copyright (c) 2017 - Valentin Kuznetsov <vkuznet@gmail.com>
+// Author: Valentin Kuznetsov <vkuznet@gmail.com>
 
 import (
 	"database/sql"

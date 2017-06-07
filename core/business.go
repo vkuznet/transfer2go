@@ -1,7 +1,7 @@
 package core
 
 // transfer2go core data transfer module
-// Copyright (c) 2017 - Valentin Kuznetsov <vkuznet@gmail.com>
+// Auuthor: Valentin Kuznetsov <vkuznet@gmail.com>
 
 import (
 	"fmt"
@@ -9,8 +9,8 @@ import (
 	"os"
 	"time"
 
-	logs "github.com/sirupsen/logrus"
 	"github.com/rcrowley/go-metrics"
+	logs "github.com/sirupsen/logrus"
 )
 
 // Metrics of the agent
@@ -119,7 +119,7 @@ func (w Worker) Start() {
 					// decide if we'll drop the request or put it on hold by increasing its delay and put back to job channel
 					if job.TransferRequest.Delay > 300 {
 						logs.WithFields(logs.Fields{
-							"Transfer Request":  job.TransferRequest,
+							"Transfer Request": job.TransferRequest,
 						}).Error("Exceed number of iteration, discard request")
 						AgentMetrics.Failed.Inc(1)
 					} else if job.TransferRequest.Delay > 0 {
@@ -157,7 +157,7 @@ func NewDispatcher(maxWorkers, maxQueue int, mfile string, minterval int64) *Dis
 	f, e := os.OpenFile(mfile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if e != nil {
 		logs.WithFields(logs.Fields{
-			"Error":  e,
+			"Error": e,
 		}).Error("Error opening file:")
 	}
 	defer f.Close()

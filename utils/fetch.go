@@ -2,7 +2,7 @@ package utils
 
 // transfer2go/utils - Go utilities for transfer2go
 //
-// Copyright (c) 2017 - Valentin Kuznetsov <vkuznet@gmail.com>
+// Author: Valentin Kuznetsov <vkuznet@gmail.com>
 
 import (
 	"bytes"

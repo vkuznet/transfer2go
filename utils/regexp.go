@@ -1,5 +1,9 @@
 package utils
 
+// transfer2go/utils - regexp for transfer2go
+//
+// Author: Valentin Kuznetsov <vkuznet@gmail.com>
+
 import (
 	"regexp"
 )

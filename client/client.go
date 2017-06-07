@@ -2,7 +2,7 @@ package client
 
 // transfer2go/client - Go implementation transfer2go client
 //
-// Copyright (c) 2017 - Valentin Kuznetsov <vkuznet@gmail.com>
+// Author: Valentin Kuznetsov <vkuznet@gmail.com>
 //
 
 import (

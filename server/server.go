@@ -1,7 +1,7 @@
 package server
 
 // transfer2go agent server implementation
-// Copyright (c) 2017 - Valentin Kuznetsov <vkuznet@gmail.com>
+// Author: Valentin Kuznetsov <vkuznet@gmail.com>
 
 import (
 	"crypto/tls"

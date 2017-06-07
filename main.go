@@ -1,6 +1,6 @@
 // transfer2go - Go implementation of loosely coupled, distributed agents for data transfer
 //
-// Copyright (c) 2017 - Valentin Kuznetsov <vkuznet@gmail.com>
+// Author: Valentin Kuznetsov <vkuznet@gmail.com>
 //
 package main
 
