@@ -1,4 +1,4 @@
-package utils
+package core
 
 // transfer2go/utils - Go utilities for transfer2go
 //
@@ -6,14 +6,11 @@ package utils
 
 import (
 	"container/heap"
-	"fmt"
-
-	"github.com/vkuznet/transfer2go/core"
 )
 
 // An Item is something we manage in a priority queue.
 type Item struct {
-	value    core.TransferRequest
+	value    TransferRequest
 	priority int
 	index    int
 }
@@ -51,15 +48,15 @@ func (pq *PriorityQueue) Pop() interface{} {
 }
 
 // update modifies the priority and value of an Item in the queue.
-func (pq *PriorityQueue) update(item *Item, value string, priority int) {
+func (pq *PriorityQueue) update(item *Item, value TransferRequest, priority int) {
 	item.value = value
 	item.priority = priority
 	heap.Fix(pq, item.index)
 }
 
-func InitHeap() {
+func InitHeap() PriorityQueue {
 	// Create a priority queue
-	pq := make(PriorityQueue)
+	pq := make(PriorityQueue, 0)
 	heap.Init(&pq)
 	return pq
 }
