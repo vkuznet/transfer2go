@@ -115,7 +115,7 @@ func main() {
 func info() string {
 	goVersion := runtime.Version()
 	tstamp := time.Now()
-	return fmt.Sprintf("Build: %s %s", goVersion, tstamp)
+	return fmt.Sprintf("Build: git={{VERSION}} go=%s date=%s", goVersion, tstamp)
 }
 
 // helper function to construct site name
