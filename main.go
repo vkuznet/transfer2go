@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"runtime"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/vkuznet/transfer2go/client"
@@ -26,6 +28,8 @@ func main() {
 	flag.StringVar(&configFile, "config", "", "Agent configuration file")
 	var verbose int
 	flag.IntVar(&verbose, "verbose", 0, "Verbosity level")
+	var version bool
+	flag.BoolVar(&version, "version", false, "Show version")
 
 	// client options
 	var src string
@@ -40,6 +44,11 @@ func main() {
 
 	flag.Parse()
 
+	if version {
+		fmt.Println(info())
+		os.Exit(0)
+
+	}
 	if authVar {
 		utils.CheckX509()
 	}
@@ -100,6 +109,13 @@ func main() {
 			log.Fatal(err)
 		}
 	}
+}
+
+// helper function to return current version
+func info() string {
+	goVersion := runtime.Version()
+	tstamp := time.Now()
+	return fmt.Sprintf("Build: %s %s", goVersion, tstamp)
 }
 
 // helper function to construct site name
