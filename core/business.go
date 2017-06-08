@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"time"
 	"strings"
+	"time"
 
 	"github.com/rcrowley/go-metrics"
 	logs "github.com/sirupsen/logrus"
@@ -62,6 +62,8 @@ var AgentMetrics Metrics
 
 // JobQueue is a buffered channel that we can send work requests on.
 var JobQueue chan Job
+
+var RequestQueue PriorityQueue
 
 // String representation of Metrics
 func (m *Metrics) String() string {
@@ -181,33 +183,38 @@ func NewDispatcher(maxWorkers, maxQueue int, mfile string, minterval int64) *Dis
 }
 
 // Run function starts the worker and dispatch it as go-routine
-func (d *Dispatcher) Run(queue PriorityQueue) {
+func (d *Dispatcher) Run() {
 	// starting n number of workers
 	for i := 0; i < d.MaxWorkers; i++ {
 		worker := NewWorker(i, d.JobPool)
 		worker.Start()
 	}
 
-	go d.store(queue)
+	RequestQueue = InitHeap()
+	go d.store()
 }
 
 // Whenever new job comes in put it in heap. And also store it in sqlite db.
-func (d *Dispatcher) store(queue PriorityQueue) {
+func (d *Dispatcher) store() {
 	for {
 		select {
 		case job := <-JobQueue:
 			item := &Item{
-				value:    job.TransferRequest,
+				Value:    job.TransferRequest,
 				priority: 1,
 				Id:       time.Now().Unix(),
 			}
-			heap.Push(&queue, item)
+			heap.Push(&RequestQueue, item)
 			stm := getSQL("insert_request")
 			_, err := DB.Exec(stm, item.Id, job.TransferRequest.File, job.TransferRequest.Block, job.TransferRequest.Dataset, job.TransferRequest.SrcUrl, job.TransferRequest.DstUrl)
 			if err != nil {
 				if !strings.Contains(err.Error(), "UNIQUE") {
 					check("Unable to insert into blocks table", err)
 				}
+			} else {
+				logs.WithFields(logs.Fields{
+					"Request": job.TransferRequest,
+				}).Println("Request Registered")
 			}
 		default:
 			time.Sleep(time.Duration(10) * time.Millisecond)

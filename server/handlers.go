@@ -133,6 +133,8 @@ func AuthHandler(w http.ResponseWriter, r *http.Request) {
 		RegisterProtocolHandler(w, r)
 	case "verbose":
 		VerboseHandler(w, r)
+	case "list":
+		ListRequest(w, r)
 	default:
 		DefaultHandler(w, r)
 	}
@@ -183,6 +185,29 @@ func FilesHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}
 	w.Write(data)
+}
+
+// List all transfer Requests
+func ListRequest(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != "GET" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	var requests []core.Item
+	for i := 0; i < len(core.RequestQueue); i++ {
+		requests = append(requests, *core.RequestQueue[i])
+	}
+	data, err := json.Marshal(requests)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"Error": err,
+		}).Error("ListRequest handler")
+		w.WriteHeader(http.StatusInternalServerError)
+	} else {
+		w.WriteHeader(http.StatusOK)
+		w.Write(data)
+	}
 }
 
 // StatusHandler provides information about the agent

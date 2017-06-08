@@ -10,7 +10,7 @@ import (
 
 // An Item is something we manage in a priority queue.
 type Item struct {
-	value    TransferRequest
+	Value    TransferRequest
 	priority int
 	index    int
 	Id       int64 // Use timestamp of request as unique id
@@ -50,7 +50,7 @@ func (pq *PriorityQueue) Pop() interface{} {
 
 // update modifies the priority and value of an Item in the queue.
 func (pq *PriorityQueue) update(item *Item, value TransferRequest, priority int) {
-	item.value = value
+	item.Value = value
 	item.priority = priority
 	heap.Fix(pq, item.index)
 }
