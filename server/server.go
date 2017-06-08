@@ -206,10 +206,10 @@ func Server(config Config) {
 
 	// define handlers
 	http.HandleFunc(fmt.Sprintf("%s/", base), AuthHandler)
-
-	// initialize task dispatcher
+	queue := core.InitHeap()
+ 	// initialize task dispatcher
 	dispatcher := core.NewDispatcher(config.Workers, config.QueueSize, config.Mfile, config.Minterval)
-	dispatcher.Run()
+	dispatcher.Run(queue)
 	log.WithFields(log.Fields{
 		"Workers":   config.Workers,
 		"QueueSize": config.QueueSize,

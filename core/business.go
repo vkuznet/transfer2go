@@ -1,16 +1,18 @@
 package core
 
 // transfer2go core data transfer module
-// Copyright (c) 2017 - Valentin Kuznetsov <vkuznet@gmail.com>
+// Author - Valentin Kuznetsov <vkuznet@gmail.com>
 
 import (
+	"container/heap"
 	"fmt"
 	"log"
 	"os"
 	"time"
+	"strings"
 
-	logs "github.com/sirupsen/logrus"
 	"github.com/rcrowley/go-metrics"
+	logs "github.com/sirupsen/logrus"
 )
 
 // Metrics of the agent
@@ -119,7 +121,7 @@ func (w Worker) Start() {
 					// decide if we'll drop the request or put it on hold by increasing its delay and put back to job channel
 					if job.TransferRequest.Delay > 300 {
 						logs.WithFields(logs.Fields{
-							"Transfer Request":  job.TransferRequest,
+							"Transfer Request": job.TransferRequest,
 						}).Error("Exceed number of iteration, discard request")
 						AgentMetrics.Failed.Inc(1)
 					} else if job.TransferRequest.Delay > 0 {
@@ -157,7 +159,7 @@ func NewDispatcher(maxWorkers, maxQueue int, mfile string, minterval int64) *Dis
 	f, e := os.OpenFile(mfile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if e != nil {
 		logs.WithFields(logs.Fields{
-			"Error":  e,
+			"Error": e,
 		}).Error("Error opening file:")
 	}
 	defer f.Close()
@@ -179,17 +181,41 @@ func NewDispatcher(maxWorkers, maxQueue int, mfile string, minterval int64) *Dis
 }
 
 // Run function starts the worker and dispatch it as go-routine
-func (d *Dispatcher) Run() {
+func (d *Dispatcher) Run(queue PriorityQueue) {
 	// starting n number of workers
 	for i := 0; i < d.MaxWorkers; i++ {
 		worker := NewWorker(i, d.JobPool)
 		worker.Start()
 	}
 
-	go d.dispatch()
+	go d.store(queue)
 }
 
-func (d *Dispatcher) dispatch() {
+// Whenever new job comes in put it in heap. And also store it in sqlite db.
+func (d *Dispatcher) store(queue PriorityQueue) {
+	for {
+		select {
+		case job := <-JobQueue:
+			item := &Item{
+				value:    job.TransferRequest,
+				priority: 1,
+				Id:       time.Now().Unix(),
+			}
+			heap.Push(&queue, item)
+			stm := getSQL("insert_request")
+			_, err := DB.Exec(stm, item.Id, job.TransferRequest.File, job.TransferRequest.Block, job.TransferRequest.Dataset, job.TransferRequest.SrcUrl, job.TransferRequest.DstUrl)
+			if err != nil {
+				if !strings.Contains(err.Error(), "UNIQUE") {
+					check("Unable to insert into blocks table", err)
+				}
+			}
+		default:
+			time.Sleep(time.Duration(10) * time.Millisecond)
+		}
+	}
+}
+
+func (d *Dispatcher) dispatch(queue PriorityQueue) {
 	for {
 		select {
 		case job := <-JobQueue:

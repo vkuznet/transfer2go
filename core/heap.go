@@ -2,7 +2,7 @@ package core
 
 // transfer2go/utils - Go utilities for transfer2go
 //
-// Copyright (c) 2017 - Valentin Kuznetsov <vkuznet@gmail.com>
+// Author - Rishi Shah <rishiloyola98245@gmail.com>
 
 import (
 	"container/heap"
@@ -13,6 +13,7 @@ type Item struct {
 	value    TransferRequest
 	priority int
 	index    int
+	Id       int64 // Use timestamp of request as unique id
 }
 
 // A PriorityQueue implements heap.Interface and holds Items.

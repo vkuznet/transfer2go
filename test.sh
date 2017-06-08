@@ -12,4 +12,4 @@ sleep 1
 
 sleep 1
 
-cd test && go test
+cd test && go test request_test.go
