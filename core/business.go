@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -182,6 +183,40 @@ func NewDispatcher(maxWorkers, maxQueue int, mfile string, minterval int64) *Dis
 	return &Dispatcher{JobPool: pool, MaxWorkers: maxWorkers}
 }
 
+// initialize heap from db
+func InitHeap() PriorityQueue {
+	// Create a priority queue
+	pq := make(PriorityQueue, 0)
+	heap.Init(&pq)
+	// Load from database
+	stm := getSQL("list_request")
+	rows, err := DB.Query(stm, "pending")
+	check("Unable to perform DB.Query over Request table", err)
+	cols, err := rows.Columns()
+	check("Unable to perform DB.Query over Request table", err)
+	pointers := make([]interface{}, len(cols))
+	container := make([]string, len(cols)) // A pointer to Columns of db
+	for i, _ := range pointers {
+		pointers[i] = &container[i]
+	}
+	defer rows.Close()
+	for rows.Next() {
+		rows.Scan(pointers...)
+		id, err := strconv.ParseInt(container[0], 10, 64)
+		check("Unable to read id", err)
+		priority, err := strconv.Atoi(container[7])
+		check("Unable to read priority", err)
+		item := &Item{
+			Value:    TransferRequest{SrcUrl: container[4], DstUrl: container[5], File: container[1], Block: container[2], Dataset: container[3]},
+			priority: priority,
+			Id:       id,
+		}
+		heap.Push(&RequestQueue, item)
+	}
+	log.Println("Requests restored from db")
+	return pq
+}
+
 // Run function starts the worker and dispatch it as go-routine
 func (d *Dispatcher) Run() {
 	// starting n number of workers
@@ -206,7 +241,7 @@ func (d *Dispatcher) store() {
 			}
 			heap.Push(&RequestQueue, item)
 			stm := getSQL("insert_request")
-			_, err := DB.Exec(stm, item.Id, job.TransferRequest.File, job.TransferRequest.Block, job.TransferRequest.Dataset, job.TransferRequest.SrcUrl, job.TransferRequest.DstUrl)
+			_, err := DB.Exec(stm, item.Id, job.TransferRequest.File, job.TransferRequest.Block, job.TransferRequest.Dataset, job.TransferRequest.SrcUrl, job.TransferRequest.DstUrl, "pending", 1)
 			if err != nil {
 				if !strings.Contains(err.Error(), "UNIQUE") {
 					check("Unable to insert into blocks table", err)

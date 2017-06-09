@@ -54,10 +54,3 @@ func (pq *PriorityQueue) update(item *Item, value TransferRequest, priority int)
 	item.priority = priority
 	heap.Fix(pq, item.index)
 }
-
-func InitHeap() PriorityQueue {
-	// Create a priority queue
-	pq := make(PriorityQueue, 0)
-	heap.Init(&pq)
-	return pq
-}
