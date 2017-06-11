@@ -1,7 +1,7 @@
 package core
 
 // transfer2go core data transfer module
-// Auuthor: Valentin Kuznetsov <vkuznet@gmail.com>
+// Author - Valentin Kuznetsov <vkuznet@gmail.com>
 
 import (
 	"fmt"
