@@ -134,7 +134,8 @@ func AuthHandler(w http.ResponseWriter, r *http.Request) {
 	case "verbose":
 		VerboseHandler(w, r)
 	case "list":
-		ListRequest(w, r)
+		// TODO: check whether parameter is there or not....
+		ListHandler(w, r, strings.Split(r.URL.RawQuery, "=")[1])
 	default:
 		DefaultHandler(w, r)
 	}
@@ -188,17 +189,16 @@ func FilesHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // List all transfer Requests
-func ListRequest(w http.ResponseWriter, r *http.Request) {
+func ListHandler(w http.ResponseWriter, r *http.Request, query string) {
 
 	if r.Method != "GET" {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	var requests []core.Item
-	for i := 0; i < len(core.RequestQueue); i++ {
-		requests = append(requests, *core.RequestQueue[i])
-	}
+
+	requests, err := core.GetRequest(query)
 	data, err := json.Marshal(requests)
+
 	if err != nil {
 		log.WithFields(log.Fields{
 			"Error": err,

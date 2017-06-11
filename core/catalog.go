@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"errors"
+	"strconv"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/vkuznet/transfer2go/utils"
@@ -289,4 +291,64 @@ func (c *Catalog) Transfers(time0, time1 string) []CatalogEntry {
 		out = append(out, rec)
 	}
 	return out
+}
+
+
+// Get specific type of transfer requests according to query
+func GetRequest(query string) ([]*Item, error) {
+	var (
+		err error
+		rows *sql.Rows
+	)
+	switch query {
+	case "pending":
+		stm := getSQL("list_request")
+		rows, err = DB.Query(stm, query)
+	case "finished":
+		stm := getSQL("list_request")
+		rows, err = DB.Query(stm, query)
+	case "all":
+		stm := getSQL("list_request")
+		// TODO: Match all the kind of requests...
+		rows, err = DB.Query(stm, "%")
+	default:
+		return nil, errors.New("Requested request type could not find")
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	cols, err := rows.Columns()
+	defer rows.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	pointers := make([]interface{}, len(cols))
+	container := make([]string, len(cols)) // A pointer to Columns of db
+	var requests []*Item
+
+	for i, _ := range pointers {
+		pointers[i] = &container[i]
+	}
+
+	for rows.Next() {
+		rows.Scan(pointers...)
+		id, err := strconv.ParseInt(container[0], 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		priority, err := strconv.Atoi(container[7])
+		if err != nil {
+			return nil, err
+		}
+		// Sqlite columns => 0:request-id 1:file 2:block 3:dataset 4:srcurl 5:dsturl 6:status 7:Request priority
+		item := &Item{
+			Value:    TransferRequest{SrcUrl: container[4], DstUrl: container[5], File: container[1], Block: container[2], Dataset: container[3]},
+			priority: priority,
+			Id:       id,
+		}
+		requests = append(requests, item)
+	}
+	return requests, err
 }

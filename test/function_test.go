@@ -54,7 +54,7 @@ func TestList(t *testing.T) {
 
 	test := tests{
 		description:        "Get all the list of requests",
-		url:                url + "/list",
+		url:                url + "/list?type=pending",
 		expectedStatusCode: 200,
 		expectedBody:       url,
 	}
