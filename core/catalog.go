@@ -295,7 +295,7 @@ func (c *Catalog) Transfers(time0, time1 string) []CatalogEntry {
 
 
 // Get specific type of transfer requests according to query
-func GetRequest(query string) ([]*Item, error) {
+func (c *Catalog) GetRequest(query string) ([]*Item, error) {
 	var (
 		err error
 		rows *sql.Rows

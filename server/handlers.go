@@ -134,8 +134,9 @@ func AuthHandler(w http.ResponseWriter, r *http.Request) {
 	case "verbose":
 		VerboseHandler(w, r)
 	case "list":
-		// TODO: check whether parameter is there or not....
-		ListHandler(w, r, strings.Split(r.URL.RawQuery, "=")[1])
+		ListHandler(w, r, r.URL.RawQuery)
+	case "action":
+		ActionHandler(w, r)
 	default:
 		DefaultHandler(w, r)
 	}
@@ -196,17 +197,24 @@ func ListHandler(w http.ResponseWriter, r *http.Request, query string) {
 		return
 	}
 
-	requests, err := core.GetRequest(query)
-	data, err := json.Marshal(requests)
+	parameter := strings.Split(query, "=")
 
-	if err != nil {
-		log.WithFields(log.Fields{
-			"Error": err,
-		}).Error("ListRequest handler")
-		w.WriteHeader(http.StatusInternalServerError)
+	if parameter[0] == "type" && (parameter[len(parameter)-1] == "pending" || parameter[len(parameter)-1] == "all" || parameter[len(parameter)-1] == "all") {
+		requests, err := core.TFC.GetRequest(parameter[1])
+		data, err := json.Marshal(requests)
+
+		if err != nil {
+			log.WithFields(log.Fields{
+				"Error": err,
+			}).Error("ListRequest handler")
+			w.WriteHeader(http.StatusInternalServerError)
+		} else {
+			w.WriteHeader(http.StatusOK)
+			w.Write(data)
+		}
 	} else {
-		w.WriteHeader(http.StatusOK)
-		w.Write(data)
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Could not find type url parameter"))
 	}
 }
 
@@ -278,6 +286,35 @@ func ResetHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // POST methods
+
+// This handler handles operations on requests
+func ActionHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	defer r.Body.Close()
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"Error": err,
+		}).Error("ActionHandler unable to parse body")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	var data []map[string]string
+	err = json.Unmarshal([]byte(body), &data)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"Error": err,
+		}).Error("ActionHandler unable to parse json body")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	for i := 0; i < len(data); i++ {
+		fmt.Println(data[i]["id"])
+	}
+}
 
 // TFCHandler registers given record in local TFC
 func TFCHandler(w http.ResponseWriter, r *http.Request) {

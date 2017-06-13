@@ -96,6 +96,30 @@ func (t *TransferRequest) Run() error {
 	return request.Process(t)
 }
 
+// Store method stores a job in heap and db
+func (t *TransferRequest) Store() error {
+	item := &Item{
+		Value:    *t,
+		priority: 1,
+		Id:       time.Now().Unix(),
+	}
+	stm := getSQL("insert_request")
+	_, err := DB.Exec(stm, item.Id, t.File, t.Block, t.Dataset, t.SrcUrl, t.DstUrl, "pending", 1)
+	if err != nil {
+		if !strings.Contains(err.Error(), "UNIQUE") {
+			logs.WithFields(logs.Fields{
+				"Error": err,
+			}).Println("Unable to store request in DB")
+		}
+	} else {
+		logs.WithFields(logs.Fields{
+			"Request": t,
+		}).Println("Request Registered")
+		heap.Push(&RequestQueue, item)
+	}
+	return err
+}
+
 // NewWorker return a new instance of the Worker type
 func NewWorker(wid int, jobPool chan chan Job) Worker {
 	return Worker{
@@ -118,7 +142,7 @@ func (w Worker) Start() {
 				// Add info to agents metrics
 				AgentMetrics.In.Inc(1)
 				// we have received a work request.
-				if err := job.TransferRequest.Run(); err != nil {
+				if err := job.TransferRequest.Store(); err != nil {
 					msg := fmt.Sprintf("WARNING %v experienced an error %v, put on hold", job.TransferRequest, err.Error())
 					// decide if we'll drop the request or put it on hold by increasing its delay and put back to job channel
 					if job.TransferRequest.Delay > 300 {
@@ -186,7 +210,7 @@ func NewDispatcher(maxWorkers, maxQueue int, mfile string, minterval int64) *Dis
 func InitHeap() PriorityQueue {
 	pq := make(PriorityQueue, 0) // Create a priority queue
 	heap.Init(&pq)
-	requests, err := GetRequest("pending") // Load requests from database
+	requests, err := TFC.GetRequest("pending") // Load requests from database
 	check("Unable To fetch data", err)
 	for i := 0; i < len(requests); i++ {
 		heap.Push(&RequestQueue, requests[i])
@@ -204,38 +228,10 @@ func (d *Dispatcher) Run() {
 	}
 
 	RequestQueue = InitHeap()
-	go d.store()
+	go d.dispatch()
 }
 
-// Whenever new job comes in put it in heap. And also store it in sqlite db.
-func (d *Dispatcher) store() {
-	for {
-		select {
-		case job := <-JobQueue:
-			item := &Item{
-				Value:    job.TransferRequest,
-				priority: 1,
-				Id:       time.Now().Unix(),
-			}
-			heap.Push(&RequestQueue, item)
-			stm := getSQL("insert_request")
-			_, err := DB.Exec(stm, item.Id, job.TransferRequest.File, job.TransferRequest.Block, job.TransferRequest.Dataset, job.TransferRequest.SrcUrl, job.TransferRequest.DstUrl, "pending", 1)
-			if err != nil {
-				if !strings.Contains(err.Error(), "UNIQUE") {
-					check("Unable to insert into blocks table", err)
-				}
-			} else {
-				logs.WithFields(logs.Fields{
-					"Request": job.TransferRequest,
-				}).Println("Request Registered")
-			}
-		default:
-			time.Sleep(time.Duration(10) * time.Millisecond)
-		}
-	}
-}
-
-func (d *Dispatcher) dispatch(queue PriorityQueue) {
+func (d *Dispatcher) dispatch() {
 	for {
 		select {
 		case job := <-JobQueue:
