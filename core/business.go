@@ -39,7 +39,9 @@ type TransferRequest struct {
 
 // Job represents the job to be run
 type Job struct {
-	TransferRequest TransferRequest
+	TransferRequest TransferRequest `json:"request"`
+	Action          string          `json:"action"`
+	Id              int64           `json:"id,string"` // Get unique request id
 }
 
 // Worker represents the worker that executes the job
@@ -64,6 +66,9 @@ var AgentMetrics Metrics
 var JobQueue chan Job
 
 var RequestQueue PriorityQueue
+
+// An instance of dispatcher to handle the transfer process
+var TransferQueue chan Job
 
 // String representation of Metrics
 func (m *Metrics) String() string {
@@ -94,6 +99,13 @@ func (t *TransferRequest) Run() error {
 		Transfer(),
 	)
 	return request.Process(t)
+}
+
+// Delete request from PriorityQueue
+func (t *TransferRequest) Delete() error  {
+	// TODO update status in DB and remove request from heap
+	logs.Println("Delete Request")
+	return nil
 }
 
 // Store method stores a job in heap and db
@@ -132,6 +144,7 @@ func NewWorker(wid int, jobPool chan chan Job) Worker {
 // Start method starts the run loop for the worker, listening for a quit channel in
 // case we need to stop it
 func (w Worker) Start() {
+	var err error
 	go func() {
 		for {
 			// register the current worker into the worker queue.
@@ -142,7 +155,20 @@ func (w Worker) Start() {
 				// Add info to agents metrics
 				AgentMetrics.In.Inc(1)
 				// we have received a work request.
-				if err := job.TransferRequest.Store(); err != nil {
+				switch job.Action {
+				case "store":
+					err = job.TransferRequest.Store()
+				case "delete":
+					err = job.TransferRequest.Delete()
+				case "transfer":
+					err = job.TransferRequest.Run()
+				default:
+					logs.WithFields(logs.Fields{
+						"Action":           job.Action,
+					}).Error("Can't perform requested action")
+				}
+
+				if err != nil {
 					msg := fmt.Sprintf("WARNING %v experienced an error %v, put on hold", job.TransferRequest, err.Error())
 					// decide if we'll drop the request or put it on hold by increasing its delay and put back to job channel
 					if job.TransferRequest.Delay > 300 {
@@ -180,7 +206,14 @@ func (w Worker) Stop() {
 }
 
 // NewDispatcher returns new instance of Dispatcher type
-func NewDispatcher(maxWorkers, maxQueue int, mfile string, minterval int64) *Dispatcher {
+func NewDispatcher(maxWorkers int) *Dispatcher {
+	// define pool of workers
+	pool := make(chan chan Job, maxWorkers)
+	return &Dispatcher{JobPool: pool, MaxWorkers: maxWorkers}
+}
+
+// initialize RequestQueue, transferQueue and JobQueue
+func InitQueue(transferQueueSize int, jobQueueSize int, mfile string, minterval int64) {
 	// register metrics
 	f, e := os.OpenFile(mfile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if e != nil {
@@ -200,41 +233,65 @@ func NewDispatcher(maxWorkers, maxQueue int, mfile string, minterval int64) *Dis
 	AgentMetrics = Metrics{In: inT, Failed: failT, Total: totT, TotalBytes: totB, Bytes: bytesT}
 	go metrics.Log(r, time.Duration(minterval)*time.Second, log.New(f, "metrics: ", log.Lmicroseconds))
 
-	// define pool of workers and jobqueue
-	pool := make(chan chan Job, maxWorkers)
-	JobQueue = make(chan Job, maxQueue)
-	return &Dispatcher{JobPool: pool, MaxWorkers: maxWorkers}
-}
+	JobQueue = make(chan Job, jobQueueSize)
+	TransferQueue = make(chan Job, transferQueueSize)
+	RequestQueue := make(PriorityQueue, 0) // Create a priority queue
 
-// initialize heap from db
-func InitHeap() PriorityQueue {
-	pq := make(PriorityQueue, 0) // Create a priority queue
-	heap.Init(&pq)
+	// Load pending requests from DB
+	heap.Init(&RequestQueue)
 	requests, err := TFC.GetRequest("pending") // Load requests from database
 	check("Unable To fetch data", err)
 	for i := 0; i < len(requests); i++ {
 		heap.Push(&RequestQueue, requests[i])
 	}
 	logs.Println("Requests restored from db")
-	return pq
 }
 
 // Run function starts the worker and dispatch it as go-routine
-func (d *Dispatcher) Run() {
+func (d *Dispatcher) StorageRunner() {
 	// starting n number of workers
 	for i := 0; i < d.MaxWorkers; i++ {
 		worker := NewWorker(i, d.JobPool)
 		worker.Start()
 	}
 
-	RequestQueue = InitHeap()
-	go d.dispatch()
+	go d.dispatchToStorage()
 }
 
-func (d *Dispatcher) dispatch() {
+func (d *Dispatcher) dispatchToStorage() {
 	for {
 		select {
 		case job := <-JobQueue:
+			// a job request has been received
+			go func(job Job) {
+				// try to obtain a worker job channel that is available.
+				// this will block until a worker is idle
+				jobChannel := <-d.JobPool
+
+				// dispatch the job to the worker job channel
+				jobChannel <- job
+			}(job)
+		default:
+			time.Sleep(time.Duration(10) * time.Millisecond) // wait for a job
+		}
+	}
+}
+
+// Run function starts the worker and dispatch it as go-routine
+func (d *Dispatcher) TransferRunner() {
+	// starting n number of workers
+	for i := 0; i < d.MaxWorkers; i++ {
+		worker := NewWorker(i, d.JobPool)
+		worker.Start()
+	}
+
+	go d.dispatchToTransfer()
+}
+
+func (d *Dispatcher) dispatchToTransfer() {
+	for {
+		select {
+		case job := <-TransferQueue:
 			// a job request has been received
 			go func(job Job) {
 				// try to obtain a worker job channel that is available.

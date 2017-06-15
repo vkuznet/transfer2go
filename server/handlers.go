@@ -294,16 +294,9 @@ func ActionHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer r.Body.Close()
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		log.WithFields(log.Fields{
-			"Error": err,
-		}).Error("ActionHandler unable to parse body")
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	var data []map[string]string
-	err = json.Unmarshal([]byte(body), &data)
+
+	var data = []core.Job{}
+	err := json.NewDecoder(r.Body).Decode(&data)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"Error": err,
@@ -311,8 +304,10 @@ func ActionHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	for i := 0; i < len(data); i++ {
-		fmt.Println(data[i]["id"])
+
+	for _, job := range data {
+		// Push the job onto the queue.
+		core.TransferQueue <- job
 	}
 }
 
@@ -461,7 +456,7 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) {
 	for _, r := range *requests {
 
 		// let's create a job with the payload
-		work := core.Job{TransferRequest: r}
+		work := core.Job{TransferRequest: r, Action: "store"}
 
 		// Push the work onto the queue.
 		core.JobQueue <- work

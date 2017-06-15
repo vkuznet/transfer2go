@@ -207,9 +207,17 @@ func Server(config Config) {
 	// define handlers
 	http.HandleFunc(fmt.Sprintf("%s/", base), AuthHandler)
 
+	// initialize job queues
+	core.InitQueue(config.QueueSize, config.QueueSize, config.Mfile, config.Minterval)
+
  	// initialize task dispatcher
-	dispatcher := core.NewDispatcher(config.Workers, config.QueueSize, config.Mfile, config.Minterval)
-	dispatcher.Run()
+	dispatcher := core.NewDispatcher(config.Workers)
+	dispatcher.StorageRunner()
+
+	// initialize transfer workers
+	transporter := core.NewDispatcher(config.Workers)
+	transporter.TransferRunner()
+
 	log.WithFields(log.Fields{
 		"Workers":   config.Workers,
 		"QueueSize": config.QueueSize,
