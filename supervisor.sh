@@ -4,8 +4,7 @@ set -e
 
 trap 'kill %1; kill %2' ERR EXIT
 
-cmd=./transfer2go
-
+cmd=$PWD/transfer2go
 args=${1+"$@"}
 
 echo "Your supervisor is started."
