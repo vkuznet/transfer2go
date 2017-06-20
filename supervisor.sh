@@ -2,16 +2,15 @@
 
 set -e
 
-trap 'kill %1; kill %2' ERR EXIT
-
-cmd=$PWD/transfer2go
-args=${1+"$@"}
-
+cmd=$1
+echo $cmd
+args=${@:2}
+echo $args
 echo "Your supervisor is started."
 
 service(){
   for (( ; ; )); do
-    local pid=`ps auxwww | egrep "$cmd" | grep -v grep | awk 'BEGIN{ORS=" "} {print $2}'`
+    local pid=`ps auxwww | egrep "$cmd" | grep -v -e bash -e grep | awk 'BEGIN{ORS=" "} {print $2}'`
     echo "PID=$pid"
     if [ -z "$pid" ]; then
       local tstamp=`date "+%Y/%m/%d %H:%M:%S"`
