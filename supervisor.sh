@@ -3,9 +3,7 @@
 set -e
 
 cmd=$1
-echo $cmd
 args=${@:2}
-echo $args
 echo "Your supervisor is started."
 
 service(){
