@@ -5,6 +5,7 @@ package core
 
 import (
 	"container/heap"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -26,22 +27,25 @@ type Metrics struct {
 
 // TransferRequest data type
 type TransferRequest struct {
-	TimeStamp int64  `json:"ts"`       // timestamp of the request
-	File      string `json:"file"`     // LFN name to be transferred
-	Block     string `json:"block"`    // block name to be transferred
-	Dataset   string `json:"dataset"`  // dataset name to be transferred
-	SrcUrl    string `json:"srcUrl"`   // source agent URL which initiate the transfer
-	SrcAlias  string `json:"srcAlias"` // source agent name
-	DstUrl    string `json:"dstUrl"`   // destination agent URL which will consume the transfer
-	DstAlias  string `json:"dstAlias"` // destination agent name
-	Delay     int    `json:"delay"`    // transfer delay time, i.e. post-pone transfer
+	TimeStamp     int64          `json:"ts"`       // timestamp of the request
+	File          string         `json:"file"`     // LFN name to be transferred
+	Block         string         `json:"block"`    // block name to be transferred
+	Dataset       string         `json:"dataset"`  // dataset name to be transferred
+	SrcUrl        string         `json:"srcUrl"`   // source agent URL which initiate the transfer
+	SrcAlias      string         `json:"srcAlias"` // source agent name
+	DstUrl        string         `json:"dstUrl"`   // destination agent URL which will consume the transfer
+	DstAlias      string         `json:"dstAlias"` // destination agent name
+	Delay         int            `json:"delay"`    // transfer delay time, i.e. post-pone transfer
+	Id            int64          `json:"id"`       // unique id of each request
+	Priority      int            `json:"priority"` // priority of request
+	Status				string				 `json:"status"`	 // Identify the category of request
+	FailedRecords []CatalogEntry // Store records which are failed
 }
 
 // Job represents the job to be run
 type Job struct {
 	TransferRequest TransferRequest `json:"request"`
 	Action          string          `json:"action"`
-	Id              int64           `json:"id,string"` // Get unique request id
 }
 
 // Worker represents the worker that executes the job
@@ -65,6 +69,7 @@ var AgentMetrics Metrics
 // JobQueue is a buffered channel that we can send work requests on.
 var JobQueue chan Job
 
+// A queue to sort the requests according to priority.
 var RequestQueue PriorityQueue
 
 // An instance of dispatcher to handle the transfer process
@@ -98,25 +103,55 @@ func (t *TransferRequest) Run() error {
 		Pause(interval), // will pause a given request for a given interval
 		Transfer(),
 	)
+	TFC.RetriveRequest(t)
 	return request.Process(t)
 }
 
-// Delete request from PriorityQueue
-func (t *TransferRequest) Delete() error  {
-	// TODO update status in DB and remove request from heap
-	logs.Println("Delete Request")
-	return nil
+// Delete request from PriorityQueue. The complexity is O(n) where n = heap.Len()
+func (t *TransferRequest) Delete() error {
+	var index int
+	var err error
+
+	for _, item := range RequestQueue {
+		if item.Value.Id == t.Id {
+			index = item.index
+			break
+		}
+	}
+
+	if index < RequestQueue.Len() && index > 0 {
+		err = TFC.UpdateRequest(t.Id, t.Status)
+		if err != nil {
+			logs.WithFields(logs.Fields{
+				"Error": err,
+			}).Println("Unable to update delete status in DB")
+		} else {
+			logs.WithFields(logs.Fields{
+				"Request": t,
+			}).Println("Request Deleted from heap")
+			// TODO: May be we need to add lock over here.
+			heap.Remove(&RequestQueue, index)
+		}
+	} else {
+		logs.WithFields(logs.Fields{
+			"ID": t.Id,
+		}).Println("Unable to find requested request in heap")
+		err = errors.New("Can't find request in heap")
+	}
+
+	return err
 }
 
 // Store method stores a job in heap and db
 func (t *TransferRequest) Store() error {
+	t.Id = time.Now().Unix()
+	t.Priority = 1
 	item := &Item{
 		Value:    *t,
-		priority: 1,
-		Id:       time.Now().Unix(),
+		priority: t.Priority,
 	}
 	stm := getSQL("insert_request")
-	_, err := DB.Exec(stm, item.Id, t.File, t.Block, t.Dataset, t.SrcUrl, t.DstUrl, "pending", 1)
+	_, err := DB.Exec(stm, t.Id, t.File, t.Block, t.Dataset, t.SrcUrl, t.DstUrl, "pending", 1)
 	if err != nil {
 		if !strings.Contains(err.Error(), "UNIQUE") {
 			logs.WithFields(logs.Fields{
@@ -164,17 +199,23 @@ func (w Worker) Start() {
 					err = job.TransferRequest.Run()
 				default:
 					logs.WithFields(logs.Fields{
-						"Action":           job.Action,
+						"Action": job.Action,
 					}).Error("Can't perform requested action")
 				}
 
-				if err != nil {
-					msg := fmt.Sprintf("WARNING %v experienced an error %v, put on hold", job.TransferRequest, err.Error())
+				if err != nil || job.TransferRequest.Status != "" {
+					msg := fmt.Sprintf("WARNING %v experienced an error %v, %v, put on hold", job.TransferRequest, err.Error(), job.TransferRequest.Status)
 					// decide if we'll drop the request or put it on hold by increasing its delay and put back to job channel
 					if job.TransferRequest.Delay > 300 {
 						logs.WithFields(logs.Fields{
 							"Transfer Request": job.TransferRequest,
 						}).Error("Exceed number of iteration, discard request")
+						if job.Action == "transfer" {
+							job.Action = "delete"
+							job.TransferRequest.Delay = 0
+							job.TransferRequest.Status = "error"
+							w.JobChannel <- job
+						}
 						AgentMetrics.Failed.Inc(1)
 					} else if job.TransferRequest.Delay > 0 {
 						job.TransferRequest.Delay *= 2
@@ -186,6 +227,13 @@ func (w Worker) Start() {
 						w.JobChannel <- job
 					}
 				} else {
+					// If job type is transfer and we get success then delete that request from heap. Make the status in DB to finished.
+					if job.Action == "transfer" {
+						job.Action = "delete"
+						job.TransferRequest.Delay = 0
+						job.TransferRequest.Status = "success"
+						w.JobChannel <- job
+					}
 					// decrement transfer counter
 					AgentMetrics.In.Dec(1)
 				}
@@ -242,7 +290,7 @@ func InitQueue(transferQueueSize int, jobQueueSize int, mfile string, minterval 
 	requests, err := TFC.GetRequest("pending") // Load requests from database
 	check("Unable To fetch data", err)
 	for i := 0; i < len(requests); i++ {
-		heap.Push(&RequestQueue, requests[i])
+		heap.Push(&RequestQueue, &Item{Value: requests[i], priority: requests[i].Priority})
 	}
 	logs.Println("Requests restored from db")
 }

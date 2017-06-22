@@ -5,11 +5,11 @@ package core
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"os/exec"
-	"strings"
-	"errors"
 	"strconv"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/vkuznet/transfer2go/utils"
@@ -293,24 +293,51 @@ func (c *Catalog) Transfers(time0, time1 string) []CatalogEntry {
 	return out
 }
 
+func (c *Catalog) UpdateRequest(id int64, status string) error {
+	stm := getSQL("update_request")
+	_, err := DB.Exec(stm, status, id)
+	return err
+}
+
+func (c *Catalog) RetriveRequest(request *TransferRequest) {
+	request.Status = ""
+	stm := getSQL("request_by_id")
+	rows, err := DB.Query(stm, request.Id)
+	if err != nil {
+		request.Status = err.Error()
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+  	if err := rows.Scan(&request.File, &request.Block, &request.Dataset, &request.SrcUrl, &request.DstUrl, &request.Priority); err != nil {
+			request.Status = err.Error()
+			return
+  	}
+  }
+}
 
 // Get specific type of transfer requests according to query
-func (c *Catalog) GetRequest(query string) ([]*Item, error) {
+func (c *Catalog) GetRequest(query string) ([]TransferRequest, error) {
 	var (
-		err error
+		err  error
 		rows *sql.Rows
 	)
 	switch query {
 	case "pending":
-		stm := getSQL("list_request")
+		stm := getSQL("request_by_status") // Request is waiting for the approval
 		rows, err = DB.Query(stm, query)
 	case "finished":
-		stm := getSQL("list_request")
+		stm := getSQL("request_by_status") // Request is successfuly transfered
 		rows, err = DB.Query(stm, query)
 	case "all":
-		stm := getSQL("list_request")
-		// TODO: Match all the kind of requests...
-		rows, err = DB.Query(stm, "%")
+		stm := getSQL("all_request") // Get all the requests
+		rows, err = DB.Query(stm)
+	case "deleted":
+		stm := getSQL("request_by_status") // Request is deleted without transfer
+		rows, err = DB.Query(stm, query)
+	case "error":
+		stm := getSQL("request_by_status") // Error occured while transfering data
+		rows, err = DB.Query(stm, query)
 	default:
 		return nil, errors.New("Requested request type could not find")
 	}
@@ -326,7 +353,7 @@ func (c *Catalog) GetRequest(query string) ([]*Item, error) {
 
 	pointers := make([]interface{}, len(cols))
 	container := make([]string, len(cols)) // A pointer to Columns of db
-	var requests []*Item
+	var requests []TransferRequest
 
 	for i, _ := range pointers {
 		pointers[i] = &container[i]
@@ -343,12 +370,8 @@ func (c *Catalog) GetRequest(query string) ([]*Item, error) {
 			return nil, err
 		}
 		// Sqlite columns => 0:request-id 1:file 2:block 3:dataset 4:srcurl 5:dsturl 6:status 7:Request priority
-		item := &Item{
-			Value:    TransferRequest{SrcUrl: container[4], DstUrl: container[5], File: container[1], Block: container[2], Dataset: container[3]},
-			priority: priority,
-			Id:       id,
-		}
-		requests = append(requests, item)
+		r := TransferRequest{SrcUrl: container[4], DstUrl: container[5], File: container[1], Block: container[2], Dataset: container[3], Id: id, Priority: priority}
+		requests = append(requests, r)
 	}
 	return requests, err
 }

@@ -59,7 +59,7 @@ func TestList(t *testing.T) {
 		expectedBody:       url,
 	}
 
-	var data []map[string]map[string]interface{}
+	var data []map[string]interface{}
 	resp, err := http.Get(test.url)
 	assert.NoError(err)
 	actual, err := ioutil.ReadAll(resp.Body)
@@ -67,5 +67,5 @@ func TestList(t *testing.T) {
 	defer resp.Body.Close()
 	json.Unmarshal([]byte(actual), &data)
 	assert.Equal(test.expectedStatusCode, resp.StatusCode, test.description)
-	assert.Equal(test.expectedBody, data[0]["Value"]["srcUrl"], test.description)
+	assert.Equal(test.expectedBody, data[0]["srcUrl"], test.description)
 }

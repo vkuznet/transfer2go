@@ -13,7 +13,6 @@ type Item struct {
 	Value    TransferRequest
 	priority int
 	index    int
-	Id       int64 // Use timestamp of request as unique id
 }
 
 // A PriorityQueue implements heap.Interface and holds Items.

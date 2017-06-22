@@ -199,7 +199,7 @@ func ListHandler(w http.ResponseWriter, r *http.Request, query string) {
 
 	parameter := strings.Split(query, "=")
 
-	if parameter[0] == "type" && (parameter[len(parameter)-1] == "pending" || parameter[len(parameter)-1] == "all" || parameter[len(parameter)-1] == "all") {
+	if parameter[0] == "type" {
 		requests, err := core.TFC.GetRequest(parameter[1])
 		data, err := json.Marshal(requests)
 

@@ -39,7 +39,6 @@ type AgentStatus struct {
 type Processor struct {
 }
 
-
 // Request interface defines a task process
 type Request interface {
 	Process(*TransferRequest) error
@@ -50,7 +49,6 @@ type RequestFunc func(*TransferRequest) error
 
 // Decorator wraps a request with extra behavior
 type Decorator func(Request) Request
-
 
 // DefaultProcessor is a default processor instance
 var DefaultProcessor = &Processor{}
@@ -128,7 +126,14 @@ func Transfer() Decorator {
 			log.WithFields(log.Fields{
 				"Request": t.String(),
 			}).Println("Request Transfer", t.String())
-			records := TFC.Records(*t)
+			var records []CatalogEntry
+			// Consider those requests which are failed in previous iteration.
+			// If it is nil then request must be passing through first iteration.
+			if t.FailedRecords != nil {
+				records = t.FailedRecords
+			} else {
+				records = TFC.Records(*t)
+			}
 			if len(records) == 0 {
 				// file does not exists in TFC, nothing to do, return immediately
 				log.WithFields(log.Fields{
@@ -161,6 +166,9 @@ func Transfer() Decorator {
 			// TODO: I need to implement bulk transfer for all files in found records
 			// so far I loop over them individually and transfer one by one
 			var trRecords []CatalogEntry // list of successfully transferred records
+			var failedRecords []CatalogEntry
+			// Overwrite the previous error status
+			t.Status = ""
 			for _, rec := range records {
 
 				time0 := time.Now().Unix()
@@ -180,6 +188,8 @@ func Transfer() Decorator {
 							"Record":          rec.String(),
 							"Err":             err,
 						}).Error("Transfer", rec.String(), t.String(), err)
+						t.Status = err.Error()
+						failedRecords = append(failedRecords, rec)
 						continue // if we fail on single record we continue with others
 					}
 				} else {
@@ -189,7 +199,7 @@ func Transfer() Decorator {
 					var cmd *exec.Cmd
 					if srcAgent.ToolOpts == "" {
 						cmd = exec.Command(srcAgent.Tool, rec.Pfn, rpfn)
-					} else{
+					} else {
 						cmd = exec.Command(srcAgent.Tool, srcAgent.ToolOpts, rec.Pfn, rpfn)
 					}
 					log.WithFields(log.Fields{
@@ -204,6 +214,8 @@ func Transfer() Decorator {
 							"Remote PFN":   rpfn,
 							"Err":          err,
 						}).Error("Transfer")
+						t.Status = err.Error()
+						failedRecords = append(failedRecords, rec)
 						continue // if we fail on single record we continue with others
 					}
 				}
@@ -226,7 +238,7 @@ func Transfer() Decorator {
 			if resp.Error != nil {
 				return resp.Error
 			}
-
+			t.FailedRecords = failedRecords
 			return r.Process(t)
 		})
 	}
