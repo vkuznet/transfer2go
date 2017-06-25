@@ -370,7 +370,7 @@ func (c *Catalog) GetRequest(query string) ([]TransferRequest, error) {
 			return nil, err
 		}
 		// Sqlite columns => 0:request-id 1:file 2:block 3:dataset 4:srcurl 5:dsturl 6:status 7:Request priority
-		r := TransferRequest{SrcUrl: container[4], DstUrl: container[5], File: container[1], Block: container[2], Dataset: container[3], Id: id, Priority: priority}
+		r := TransferRequest{SrcUrl: container[4], DstUrl: container[5], File: container[1], Block: container[2], Dataset: container[3], Id: id, Priority: priority, Status: container[6]}
 		requests = append(requests, r)
 	}
 	return requests, err

@@ -206,6 +206,7 @@ func Server(config Config) {
 
 	// define handlers
 	http.HandleFunc(fmt.Sprintf("%s/", base), AuthHandler)
+	http.Handle("/index/", http.StripPrefix("/index/",http.FileServer(http.Dir("html"))))
 
 	// initialize job queues
 	core.InitQueue(config.QueueSize, config.QueueSize, config.Mfile, config.Minterval)

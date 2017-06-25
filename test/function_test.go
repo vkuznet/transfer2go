@@ -49,11 +49,12 @@ func TestTransferRequest(t *testing.T) {
 	time.Sleep(time.Second * 2)
 }
 
+// Get the list of pending requests
 func TestList(t *testing.T) {
 	assert := assert.New(t)
 
 	test := tests{
-		description:        "Get all the list of requests",
+		description:        "Get all the pending list of requests",
 		url:                url + "/list?type=pending",
 		expectedStatusCode: 200,
 		expectedBody:       url,
