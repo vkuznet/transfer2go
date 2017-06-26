@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"testing"
 	"time"
+	"os"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/vkuznet/transfer2go/core"
@@ -69,4 +70,76 @@ func TestList(t *testing.T) {
 	json.Unmarshal([]byte(actual), &data)
 	assert.Equal(test.expectedStatusCode, resp.StatusCode, test.description)
 	assert.Equal(test.expectedBody, data[0]["srcUrl"], test.description)
+}
+
+func TestWriteTFC(t *testing.T) {
+	assert := assert.New(t)
+
+	test := tests{
+		description:        "Check TFC upload functionality",
+		url:                url + "/tfc",
+		expectedStatusCode: 200,
+		expectedBody:       "http://localhost:8989",
+	}
+
+	err := createFile("data/testdata.txt")
+	assert.NoError(err)
+
+	fname := "data/records.json"
+	c, err := ioutil.ReadFile(fname)
+	assert.NoError(err)
+	time.Sleep(time.Second * 2)
+
+	var records []core.CatalogEntry
+	err = json.Unmarshal([]byte(c), &records)
+	assert.NoError(err)
+
+	d, err := json.Marshal(records)
+	assert.NoError(err)
+
+	des := url + "/tfc"
+	resp := utils.FetchResponse(des, d)
+
+	assert.Equal(test.expectedStatusCode, resp.StatusCode, test.description)
+
+}
+
+// Test /files endpoint. Returns list of files in the agent
+func TestFiles(t *testing.T) {
+	assert := assert.New(t)
+
+	test := tests{
+		description:        "Get the list of files",
+		url:                url + "/files",
+		expectedStatusCode: 200,
+		expectedBody:       "[\"file.root\"]",
+	}
+
+	resp, err := http.Get(test.url)
+	actual, err := ioutil.ReadAll(resp.Body)
+	assert.NoError(err)
+	defer resp.Body.Close()
+
+	assert.Equal(test.expectedStatusCode, resp.StatusCode, test.description)
+	assert.Equal(test.expectedBody, string(actual), test.description)
+
+}
+
+// Helper function to create test data
+func createFile(path string) error {
+	f, err := os.Create(path)
+
+	if err != nil {
+		return err
+	}
+
+	d2 := []byte{115, 111, 109, 101, 10}
+	_, err = f.Write(d2)
+	f.Close()
+	return err
+}
+
+func deleteFile(path string) error {
+	err := os.Remove(path)
+	return err
 }

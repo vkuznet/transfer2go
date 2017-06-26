@@ -49,7 +49,7 @@ func TestStatus(t *testing.T) {
 
 }
 
-// Test /agent end point
+// Test /agent end point. Returns list of registered agents
 func TestAgents(t *testing.T) {
 	assert := assert.New(t)
 
@@ -74,7 +74,7 @@ func TestAgents(t *testing.T) {
 
 }
 
-// Test /tfc endpoint
+// Test /tfc endpoint. Upload TFC records to the agent
 func TestWriteTFC(t *testing.T) {
 	assert := assert.New(t)
 
@@ -107,7 +107,7 @@ func TestWriteTFC(t *testing.T) {
 
 }
 
-// Test /files endpoint
+// Test /files endpoint. Returns list of files in the agent
 func TestFiles(t *testing.T) {
 	assert := assert.New(t)
 
@@ -128,7 +128,7 @@ func TestFiles(t *testing.T) {
 
 }
 
-// Test /tfc get endpoint
+// Test /tfc get endpoint. Return list of TFC records
 func TestReadTFC(t *testing.T) {
 	assert := assert.New(t)
 
