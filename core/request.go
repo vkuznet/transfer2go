@@ -125,7 +125,7 @@ func Transfer() Decorator {
 		return RequestFunc(func(t *TransferRequest) error {
 			log.WithFields(log.Fields{
 				"Request": t.String(),
-			}).Println("Request Transfer", t.String())
+			}).Println("Request Transfer")
 			var records []CatalogEntry
 			// Consider those requests which are failed in previous iteration.
 			// If it is nil then request must be passing through first iteration.
@@ -138,7 +138,7 @@ func Transfer() Decorator {
 				// file does not exists in TFC, nothing to do, return immediately
 				log.WithFields(log.Fields{
 					"TransferRequest": t,
-				}).Warn("Does match anything in TFC of this agent\n", t)
+				}).Warn("Does not match anything in TFC of this agent\n", t)
 				return r.Process(t)
 			}
 			// obtain information about source and destination agents

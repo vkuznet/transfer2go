@@ -109,9 +109,8 @@ func (t *TransferRequest) Run() error {
 
 // Delete request from PriorityQueue. The complexity is O(n) where n = heap.Len()
 func (t *TransferRequest) Delete() error {
-	var index int
+	index := -1
 	var err error
-
 	for _, item := range RequestQueue {
 		if item.Value.Id == t.Id {
 			index = item.index
@@ -119,7 +118,7 @@ func (t *TransferRequest) Delete() error {
 		}
 	}
 
-	if index < RequestQueue.Len() && index > 0 {
+	if index < RequestQueue.Len() && index >= 0 {
 		err = TFC.UpdateRequest(t.Id, t.Status)
 		if err != nil {
 			logs.WithFields(logs.Fields{
@@ -283,7 +282,7 @@ func InitQueue(transferQueueSize int, jobQueueSize int, mfile string, minterval 
 
 	JobQueue = make(chan Job, jobQueueSize)
 	TransferQueue = make(chan Job, transferQueueSize)
-	RequestQueue := make(PriorityQueue, 0) // Create a priority queue
+	RequestQueue = make(PriorityQueue, 0) // Create a priority queue
 
 	// Load pending requests from DB
 	heap.Init(&RequestQueue)
