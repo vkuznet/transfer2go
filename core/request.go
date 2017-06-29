@@ -5,7 +5,9 @@ package core
 
 import (
 	"bytes"
+	"container/heap"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -117,6 +119,45 @@ func httpTransfer(c CatalogEntry, t *TransferRequest) (string, error) {
 		return "", err
 	}
 	return r.Pfn, nil
+}
+
+// Delete returns a Decorator that deletes request from heap
+func Delete() Decorator {
+	return func(r Request) Request {
+		return RequestFunc(func(t *TransferRequest) error {
+			// Delete request from PriorityQueue. The complexity is O(n) where n = heap.Len()
+			index := -1
+			var err error
+
+			for _, item := range RequestQueue {
+				if item.Value.Id == t.Id {
+					index = item.index
+					break
+				}
+			}
+
+			if index < RequestQueue.Len() && index >= 0 {
+				err = TFC.UpdateRequest(t.Id, "deleted")
+				if err != nil {
+					t.Status = "error"
+					return err
+				} else {
+					// TODO: May be we need to add lock over here.
+					heap.Remove(&RequestQueue, index)
+					t.Status = "deleted"
+					log.WithFields(log.Fields{
+						"Request": t,
+					}).Println("Request Deleted")
+				}
+			} else {
+				t.Status = "error"
+				err = errors.New("Can't find request in heap")
+				return err
+			}
+
+			return r.Process(t)
+		})
+	}
 }
 
 // Transfer returns a Decorator that performs request transfers

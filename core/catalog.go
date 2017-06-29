@@ -293,27 +293,47 @@ func (c *Catalog) Transfers(time0, time1 string) []CatalogEntry {
 	return out
 }
 
+// Update the status of request
 func (c *Catalog) UpdateRequest(id int64, status string) error {
 	stm := getSQL("update_request")
 	_, err := DB.Exec(stm, status, id)
 	return err
 }
 
-func (c *Catalog) RetriveRequest(request *TransferRequest) {
-	request.Status = ""
+func (c *Catalog) RetriveRequest(request *TransferRequest) error {
 	stm := getSQL("request_by_id")
 	rows, err := DB.Query(stm, request.Id)
 	if err != nil {
 		request.Status = err.Error()
-		return
+		return err
 	}
 	defer rows.Close()
 	for rows.Next() {
-  	if err := rows.Scan(&request.File, &request.Block, &request.Dataset, &request.SrcUrl, &request.DstUrl, &request.Priority); err != nil {
+		if err := rows.Scan(&request.File, &request.Block, &request.Dataset, &request.SrcUrl, &request.DstUrl, &request.Priority); err != nil {
 			request.Status = err.Error()
-			return
-  	}
-  }
+			return err
+		}
+	}
+	return nil
+}
+
+// Get the status of request
+func (c *Catalog) GetStatus(id int64) (error, string) {
+	var status string
+	stm := getSQL("get_status")
+	rows, err := DB.Query(stm, id)
+
+	if err != nil {
+		return err, ""
+	}
+	for rows.Next() {
+		if err := rows.Scan(&status); err != nil {
+			return err, ""
+		}
+	}
+
+	defer rows.Close()
+	return err, status
 }
 
 // Get specific type of transfer requests according to query

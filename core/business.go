@@ -5,7 +5,6 @@ package core
 
 import (
 	"container/heap"
-	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -38,7 +37,7 @@ type TransferRequest struct {
 	Delay         int            `json:"delay"`    // transfer delay time, i.e. post-pone transfer
 	Id            int64          `json:"id"`       // unique id of each request
 	Priority      int            `json:"priority"` // priority of request
-	Status				string				 `json:"status"`	 // Identify the category of request
+	Status        string         `json:"status"`   // Identify the category of request
 	FailedRecords []CatalogEntry // Store records which are failed
 }
 
@@ -103,42 +102,16 @@ func (t *TransferRequest) Run() error {
 		Pause(interval), // will pause a given request for a given interval
 		Transfer(),
 	)
-	TFC.RetriveRequest(t)
 	return request.Process(t)
 }
 
-// Delete request from PriorityQueue. The complexity is O(n) where n = heap.Len()
 func (t *TransferRequest) Delete() error {
-	index := -1
-	var err error
-	for _, item := range RequestQueue {
-		if item.Value.Id == t.Id {
-			index = item.index
-			break
-		}
-	}
-
-	if index < RequestQueue.Len() && index >= 0 {
-		err = TFC.UpdateRequest(t.Id, t.Status)
-		if err != nil {
-			logs.WithFields(logs.Fields{
-				"Error": err,
-			}).Println("Unable to update delete status in DB")
-		} else {
-			logs.WithFields(logs.Fields{
-				"Request": t,
-			}).Println("Request Deleted from heap")
-			// TODO: May be we need to add lock over here.
-			heap.Remove(&RequestQueue, index)
-		}
-	} else {
-		logs.WithFields(logs.Fields{
-			"ID": t.Id,
-		}).Println("Unable to find requested request in heap")
-		err = errors.New("Can't find request in heap")
-	}
-
-	return err
+	interval := time.Duration(t.Delay) * time.Second
+	request := Decorate(DefaultProcessor,
+		Pause(interval), // will pause a given request for a given interval
+		Delete(),
+	)
+	return request.Process(t)
 }
 
 // Store method stores a job in heap and db
@@ -164,6 +137,66 @@ func (t *TransferRequest) Store() error {
 		heap.Push(&RequestQueue, item)
 	}
 	return err
+}
+
+// Function to handle failed jobs
+func (j *Job) RequestFails() {
+	switch j.Action {
+	case "store":
+		// TODO: notify client about error
+	case "delete":
+		// TODO: notify site manager about error. Also do not change the status in DB.
+		err := TFC.UpdateRequest(j.TransferRequest.Id, "pending")
+		if err != nil {
+
+		}
+	case "transfer":
+		err := TFC.UpdateRequest(j.TransferRequest.Id, "error")
+		if err == nil {
+			// Transfer process fails and successfully updated status in DB.
+			index := -1
+			for _, item := range RequestQueue {
+				if item.Value.Id == j.TransferRequest.Id {
+					index = item.index
+					break
+				}
+			}
+			if index < RequestQueue.Len() && index >= 0 {
+				heap.Remove(&RequestQueue, index)
+			} else {
+				// Transfer process fails but can't find it in heap.
+			}
+		} else {
+			// Transfer process fails and cant updated status in DB.
+		}
+	}
+}
+
+// Function to handle success jobs
+func (j *Job) RequestSuccess() {
+	switch j.Action {
+	case "store":
+	case "delete":
+	case "transfer":
+		err := TFC.UpdateRequest(j.TransferRequest.Id, "finished")
+		if err == nil {
+			// Transfer process passed and successfully updated status in DB.
+			index := -1
+			for _, item := range RequestQueue {
+				if item.Value.Id == j.TransferRequest.Id {
+					index = item.index
+					break
+				}
+			}
+			if index < RequestQueue.Len() && index >= 0 {
+				heap.Remove(&RequestQueue, index)
+			} else {
+				// Transfer process passed but can't find it in heap.
+			}
+		} else {
+			// Transfer process passed and cant updated status in DB.
+		}
+	}
 }
 
 // NewWorker return a new instance of the Worker type
@@ -202,19 +235,14 @@ func (w Worker) Start() {
 					}).Error("Can't perform requested action")
 				}
 
-				if err != nil || job.TransferRequest.Status != "" {
+				if err != nil || job.TransferRequest.Status == "error" {
 					msg := fmt.Sprintf("WARNING %v experienced an error %v, %v, put on hold", job.TransferRequest, err.Error(), job.TransferRequest.Status)
 					// decide if we'll drop the request or put it on hold by increasing its delay and put back to job channel
 					if job.TransferRequest.Delay > 300 {
 						logs.WithFields(logs.Fields{
 							"Transfer Request": job.TransferRequest,
 						}).Error("Exceed number of iteration, discard request")
-						if job.Action == "transfer" {
-							job.Action = "delete"
-							job.TransferRequest.Delay = 0
-							job.TransferRequest.Status = "error"
-							w.JobChannel <- job
-						}
+						job.RequestFails()
 						AgentMetrics.Failed.Inc(1)
 					} else if job.TransferRequest.Delay > 0 {
 						job.TransferRequest.Delay *= 2
@@ -226,13 +254,7 @@ func (w Worker) Start() {
 						w.JobChannel <- job
 					}
 				} else {
-					// If job type is transfer and we get success then delete that request from heap. Make the status in DB to finished.
-					if job.Action == "transfer" {
-						job.Action = "delete"
-						job.TransferRequest.Delay = 0
-						job.TransferRequest.Status = "success"
-						w.JobChannel <- job
-					}
+					job.RequestSuccess()
 					// decrement transfer counter
 					AgentMetrics.In.Dec(1)
 				}
@@ -341,6 +363,24 @@ func (d *Dispatcher) dispatchToTransfer() {
 		case job := <-TransferQueue:
 			// a job request has been received
 			go func(job Job) {
+				// Update the status of request in DB
+				err, status := TFC.GetStatus(job.TransferRequest.Id)
+				if status == "pending" {
+					err = TFC.UpdateRequest(job.TransferRequest.Id, "processing")
+				} else {
+					return
+				}
+				err = TFC.RetriveRequest(&job.TransferRequest)
+				if err != nil {
+					// TODO: push in error queue.
+					return
+				}
+				err = TFC.UpdateRequest(job.TransferRequest.Id, "processing")
+				if err != nil {
+					// TODO: push in error queue.
+					return
+				}
+				job.TransferRequest.Status = "processing"
 				// try to obtain a worker job channel that is available.
 				// this will block until a worker is idle
 				jobChannel := <-d.JobPool
