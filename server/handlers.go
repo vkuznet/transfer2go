@@ -200,7 +200,7 @@ func ListHandler(w http.ResponseWriter, r *http.Request, query string) {
 	parameter := strings.Split(query, "=")
 
 	if parameter[0] == "type" {
-		requests, err := core.TFC.GetRequest(parameter[1])
+		requests, err := core.TFC.ListRequest(parameter[1])
 		data, err := json.Marshal(requests)
 
 		if err != nil {
@@ -459,7 +459,7 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) {
 		work := core.Job{TransferRequest: r, Action: "store"}
 
 		// Push the work onto the queue.
-		core.JobQueue <- work
+		core.StorageQueue <- work
 	}
 
 	w.WriteHeader(http.StatusOK)

@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"testing"
 	"time"
-	"os"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/vkuznet/transfer2go/core"
@@ -28,7 +28,7 @@ type tests struct {
 }
 
 // This function helps to register fake requests
-func TestTransferRequest(t *testing.T) {
+func TestRegister(t *testing.T) {
 	assert := assert.New(t)
 
 	test := tests{
@@ -39,7 +39,7 @@ func TestTransferRequest(t *testing.T) {
 	}
 
 	var requests []core.TransferRequest
-	req := core.TransferRequest{SrcUrl: "http://localhost:8989", SrcAlias: "Test", File: "file.root", DstUrl: "http://localhost:8000", DstAlias: "Test2"}
+	req := core.TransferRequest{SrcUrl: "http://localhost:8989", SrcAlias: "Test", File: "file.root", DstUrl: "http://localhost:8000", DstAlias: "Test2", Priority: 1}
 	furl := req.SrcUrl + "/request"
 	requests = append(requests, req)
 	d, err := json.Marshal(requests)
@@ -72,11 +72,12 @@ func TestList(t *testing.T) {
 	assert.Equal(test.expectedBody, data[0]["srcUrl"], test.description)
 }
 
+// Upload file
 func TestWriteTFC(t *testing.T) {
 	assert := assert.New(t)
 
 	test := tests{
-		description:        "Check TFC upload functionality",
+		description:        "Check file upload functionality",
 		url:                url + "/tfc",
 		expectedStatusCode: 200,
 		expectedBody:       "http://localhost:8989",

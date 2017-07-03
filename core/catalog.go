@@ -293,6 +293,18 @@ func (c *Catalog) Transfers(time0, time1 string) []CatalogEntry {
 	return out
 }
 
+// Insert new request
+func (c *Catalog) InsertRequest(request TransferRequest) error {
+	stm := getSQL("insert_request")
+	_, e := DB.Exec(stm, request.Id, request.File, request.Block, request.Dataset, request.SrcUrl, request.DstUrl, "pending", request.Priority)
+	if e != nil {
+		if !strings.Contains(e.Error(), "UNIQUE") {
+			check("Unable to insert into datasets table", e)
+		}
+	}
+	return e
+}
+
 // Update the status of request
 func (c *Catalog) UpdateRequest(id int64, status string) error {
 	stm := getSQL("update_request")
@@ -300,6 +312,7 @@ func (c *Catalog) UpdateRequest(id int64, status string) error {
 	return err
 }
 
+// Get the request details based on request id
 func (c *Catalog) RetriveRequest(request *TransferRequest) error {
 	stm := getSQL("request_by_id")
 	rows, err := DB.Query(stm, request.Id)
@@ -336,8 +349,8 @@ func (c *Catalog) GetStatus(id int64) (error, string) {
 	return err, status
 }
 
-// Get specific type of transfer requests according to query
-func (c *Catalog) GetRequest(query string) ([]TransferRequest, error) {
+// Get specific type of transfer requests according to status
+func (c *Catalog) ListRequest(query string) ([]TransferRequest, error) {
 	var (
 		err  error
 		rows *sql.Rows

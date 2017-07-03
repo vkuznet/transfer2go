@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/rcrowley/go-metrics"
@@ -65,8 +64,8 @@ type Dispatcher struct {
 // AgentMetrics defines various metrics about the agent work
 var AgentMetrics Metrics
 
-// JobQueue is a buffered channel that we can send work requests on.
-var JobQueue chan Job
+// StorageQueue is a buffered channel that we can send work requests on.
+var StorageQueue chan Job
 
 // A queue to sort the requests according to priority.
 var RequestQueue PriorityQueue
@@ -116,27 +115,12 @@ func (t *TransferRequest) Delete() error {
 
 // Store method stores a job in heap and db
 func (t *TransferRequest) Store() error {
-	t.Id = time.Now().Unix()
-	t.Priority = 1
-	item := &Item{
-		Value:    *t,
-		priority: t.Priority,
-	}
-	stm := getSQL("insert_request")
-	_, err := DB.Exec(stm, t.Id, t.File, t.Block, t.Dataset, t.SrcUrl, t.DstUrl, "pending", 1)
-	if err != nil {
-		if !strings.Contains(err.Error(), "UNIQUE") {
-			logs.WithFields(logs.Fields{
-				"Error": err,
-			}).Println("Unable to store request in DB")
-		}
-	} else {
-		logs.WithFields(logs.Fields{
-			"Request": t,
-		}).Println("Request Registered")
-		heap.Push(&RequestQueue, item)
-	}
-	return err
+	interval := time.Duration(t.Delay) * time.Second
+	request := Decorate(DefaultProcessor,
+		Pause(interval), // will pause a given request for a given interval
+		Store(),
+	)
+	return request.Process(t)
 }
 
 // Function to handle failed jobs
@@ -281,8 +265,8 @@ func NewDispatcher(maxWorkers int) *Dispatcher {
 	return &Dispatcher{JobPool: pool, MaxWorkers: maxWorkers}
 }
 
-// initialize RequestQueue, transferQueue and JobQueue
-func InitQueue(transferQueueSize int, jobQueueSize int, mfile string, minterval int64) {
+// initialize RequestQueue, transferQueue and StorageQueue
+func InitQueue(transferQueueSize int, storageQueueSize int, mfile string, minterval int64) {
 	// register metrics
 	f, e := os.OpenFile(mfile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if e != nil {
@@ -302,13 +286,13 @@ func InitQueue(transferQueueSize int, jobQueueSize int, mfile string, minterval 
 	AgentMetrics = Metrics{In: inT, Failed: failT, Total: totT, TotalBytes: totB, Bytes: bytesT}
 	go metrics.Log(r, time.Duration(minterval)*time.Second, log.New(f, "metrics: ", log.Lmicroseconds))
 
-	JobQueue = make(chan Job, jobQueueSize)
+	StorageQueue = make(chan Job, storageQueueSize)
 	TransferQueue = make(chan Job, transferQueueSize)
 	RequestQueue = make(PriorityQueue, 0) // Create a priority queue
 
 	// Load pending requests from DB
 	heap.Init(&RequestQueue)
-	requests, err := TFC.GetRequest("pending") // Load requests from database
+	requests, err := TFC.ListRequest("pending") // Load requests from database
 	check("Unable To fetch data", err)
 	for i := 0; i < len(requests); i++ {
 		heap.Push(&RequestQueue, &Item{Value: requests[i], priority: requests[i].Priority})
@@ -330,7 +314,7 @@ func (d *Dispatcher) StorageRunner() {
 func (d *Dispatcher) dispatchToStorage() {
 	for {
 		select {
-		case job := <-JobQueue:
+		case job := <-StorageQueue:
 			// a job request has been received
 			go func(job Job) {
 				// try to obtain a worker job channel that is available.

@@ -121,6 +121,27 @@ func httpTransfer(c CatalogEntry, t *TransferRequest) (string, error) {
 	return r.Pfn, nil
 }
 
+// Store returns a Decorator that stores request
+func Store() Decorator {
+	return func(r Request) Request {
+		return RequestFunc(func(t *TransferRequest) error {
+			t.Id = time.Now().Unix()
+			item := &Item{
+				Value:    *t,
+				priority: t.Priority,
+			}
+			fmt.Println(*t)
+			err := TFC.InsertRequest(*t)
+			if err != nil {
+				return err
+			} else {
+				heap.Push(&RequestQueue, item)
+			}
+			return r.Process(t)
+		})
+	}
+}
+
 // Delete returns a Decorator that deletes request from heap
 func Delete() Decorator {
 	return func(r Request) Request {
