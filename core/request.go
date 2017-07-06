@@ -137,6 +137,9 @@ func Store() Decorator {
 			} else {
 				heap.Push(&RequestQueue, item)
 			}
+			log.WithFields(log.Fields{
+				"Request": t,
+			}).Println("Request Saved")
 			return r.Process(t)
 		})
 	}
@@ -181,8 +184,52 @@ func Delete() Decorator {
 	}
 }
 
+// Transfer returns a Decorator that performs request transfers by pull model
+func PullTransfer() Decorator {
+	return func(r Request) Request {
+		return RequestFunc(func(t *TransferRequest) error {
+			log.WithFields(log.Fields{
+				"Request": t.String(),
+			}).Println("Request Transfer")
+			// obtain information about source and destination agents
+			url := fmt.Sprintf("%s/status", t.DstUrl)
+			resp := utils.FetchResponse(url, []byte{})
+			if resp.Error != nil {
+				return resp.Error
+			}
+			var dstAgent AgentStatus
+			err := json.Unmarshal(resp.Data, &dstAgent)
+			if err != nil {
+				return err
+			}
+			url = fmt.Sprintf("%s/status", t.SrcUrl)
+			resp = utils.FetchResponse(url, []byte{})
+			if resp.Error != nil {
+				return resp.Error
+			}
+			var srcAgent AgentStatus
+			err = json.Unmarshal(resp.Data, &srcAgent)
+			if err != nil {
+				return err
+			}
+			// if both are up then send acknowledge message to destination on /pullack url.
+			body, err := json.Marshal(t)
+			if err != nil {
+				return err
+			}
+			url = fmt.Sprintf("%s/pull", t.DstUrl)
+			resp = utils.FetchResponse(url, body)
+			// check return status code
+			if resp.StatusCode != 200 {
+				return fmt.Errorf("Response %s, error=%s", resp.Status, string(resp.Data))
+			}
+			return r.Process(t)
+		})
+	}
+}
+
 // Transfer returns a Decorator that performs request transfers
-func Transfer() Decorator {
+func PushTransfer() Decorator {
 	return func(r Request) Request {
 		return RequestFunc(func(t *TransferRequest) error {
 			log.WithFields(log.Fields{

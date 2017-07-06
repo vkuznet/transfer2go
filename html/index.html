@@ -104,7 +104,7 @@ button {
     for (var i = 1, row; row = table.rows[i]; i++) {
       if(row.cells[row.cells.length-1].getElementsByTagName("SELECT")[0].value=="transfer"){
         actionArr.push({
-          action: row.cells[row.cells.length-1].getElementsByTagName("SELECT")[0].value,
+          action: "pull" + row.cells[row.cells.length-1].getElementsByTagName("SELECT")[0].value,
           request: {id: parseInt(row.cells[1].innerHTML)}
         });
       }else if(row.cells[row.cells.length-1].getElementsByTagName("SELECT")[0].value=="delete"){

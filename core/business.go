@@ -73,6 +73,9 @@ var RequestQueue PriorityQueue
 // An instance of dispatcher to handle the transfer process
 var TransferQueue chan Job
 
+//
+var TransferType string
+
 // String representation of Metrics
 func (m *Metrics) String() string {
 	return fmt.Sprintf("<Metrics: in=%d failed=%d total=%d bytes=%d totBytes=%d>", m.In.Count(), m.Failed.Count(), m.Total.Count(), m.Bytes.Count(), m.TotalBytes.Count())
@@ -94,12 +97,22 @@ func (t *TransferRequest) String() string {
 	return fmt.Sprintf("<TransferRequest ts=%d file=%s block=%s dataset=%s srcUrl=%s srcAlias=%s dstUrl=%s dstAlias=%s delay=%d>", t.TimeStamp, t.File, t.Block, t.Dataset, t.SrcUrl, t.SrcAlias, t.DstUrl, t.DstAlias, t.Delay)
 }
 
-// Run method perform a job on transfer request
-func (t *TransferRequest) Run() error {
+// RunPush method perform a job on transfer request. It will use push model
+func (t *TransferRequest) RunPush() error {
 	interval := time.Duration(t.Delay) * time.Second
 	request := Decorate(DefaultProcessor,
 		Pause(interval), // will pause a given request for a given interval
-		Transfer(),
+		PushTransfer(),
+	)
+	return request.Process(t)
+}
+
+// RunPull method perform a job on transfer request. It will use pull model
+func (t *TransferRequest) RunPull() error {
+	interval := time.Duration(t.Delay) * time.Second
+	request := Decorate(DefaultProcessor,
+		Pause(interval), // will pause a given request for a given interval
+		PullTransfer(),
 	)
 	return request.Process(t)
 }
@@ -129,15 +142,17 @@ func (j *Job) RequestFails() {
 	case "store":
 		// TODO: notify client about error
 	case "delete":
-		// TODO: notify site manager about error. Also do not change the status in DB.
+		// TODO: notify client about error
 		err := TFC.UpdateRequest(j.TransferRequest.Id, "pending")
 		if err != nil {
 
 		}
-	case "transfer":
+	case "pulltransfer":
+		// If transfer process fails update request status in DB
+		// Also delete that request from heap
 		err := TFC.UpdateRequest(j.TransferRequest.Id, "error")
 		if err == nil {
-			// Transfer process fails and successfully updated status in DB.
+			// Request Status changed to error
 			index := -1
 			for _, item := range RequestQueue {
 				if item.Value.Id == j.TransferRequest.Id {
@@ -146,13 +161,16 @@ func (j *Job) RequestFails() {
 				}
 			}
 			if index < RequestQueue.Len() && index >= 0 {
+				// Remove request from heap
 				heap.Remove(&RequestQueue, index)
 			} else {
-				// Transfer process fails but can't find it in heap.
+				// Updated status in DB but couldn't find request in heap
 			}
 		} else {
-			// Transfer process fails and cant updated status in DB.
+			// Could not updat status in DB
 		}
+	case "pushtransfer":
+		// Send error message to destination
 	}
 }
 
@@ -160,11 +178,14 @@ func (j *Job) RequestFails() {
 func (j *Job) RequestSuccess() {
 	switch j.Action {
 	case "store":
+		// TODO: notify client about error
 	case "delete":
-	case "transfer":
+		// TODO: notify client about error
+	case "pulltransfer":
 		err := TFC.UpdateRequest(j.TransferRequest.Id, "finished")
 		if err == nil {
-			// Transfer process passed and successfully updated status in DB.
+			// If transfer process finish update request status in DB
+			// Also delete that request from heap
 			index := -1
 			for _, item := range RequestQueue {
 				if item.Value.Id == j.TransferRequest.Id {
@@ -175,11 +196,13 @@ func (j *Job) RequestSuccess() {
 			if index < RequestQueue.Len() && index >= 0 {
 				heap.Remove(&RequestQueue, index)
 			} else {
-				// Transfer process passed but can't find it in heap.
+				// Updated status in DB but could not find request in heap
 			}
 		} else {
-			// Transfer process passed and cant updated status in DB.
+			// Could not update status from DB
 		}
+	case "pushtransfer":
+		// Send success message to destination
 	}
 }
 
@@ -211,8 +234,10 @@ func (w Worker) Start() {
 					err = job.TransferRequest.Store()
 				case "delete":
 					err = job.TransferRequest.Delete()
-				case "transfer":
-					err = job.TransferRequest.Run()
+				case "pushtransfer":
+					err = job.TransferRequest.RunPush()
+				case "pulltransfer":
+					err = job.TransferRequest.RunPull()
 				default:
 					logs.WithFields(logs.Fields{
 						"Action": job.Action,
@@ -286,18 +311,20 @@ func InitQueue(transferQueueSize int, storageQueueSize int, mfile string, minter
 	AgentMetrics = Metrics{In: inT, Failed: failT, Total: totT, TotalBytes: totB, Bytes: bytesT}
 	go metrics.Log(r, time.Duration(minterval)*time.Second, log.New(f, "metrics: ", log.Lmicroseconds))
 
-	StorageQueue = make(chan Job, storageQueueSize)
-	TransferQueue = make(chan Job, transferQueueSize)
-	RequestQueue = make(PriorityQueue, 0) // Create a priority queue
-
-	// Load pending requests from DB
-	heap.Init(&RequestQueue)
-	requests, err := TFC.ListRequest("pending") // Load requests from database
-	check("Unable To fetch data", err)
-	for i := 0; i < len(requests); i++ {
-		heap.Push(&RequestQueue, &Item{Value: requests[i], priority: requests[i].Priority})
+	if TransferType == "pull" {
+		StorageQueue = make(chan Job, storageQueueSize)
+		RequestQueue = make(PriorityQueue, 0) // Create a priority queue
+		// Load pending requests from DB
+		heap.Init(&RequestQueue)
+		requests, err := TFC.ListRequest("pending") // Load requests from database
+		check("Unable To fetch data", err)
+		for i := 0; i < len(requests); i++ {
+			heap.Push(&RequestQueue, &Item{Value: requests[i], priority: requests[i].Priority})
+		}
+		logs.Println("Requests restored from db")
 	}
-	logs.Println("Requests restored from db")
+
+	TransferQueue = make(chan Job, transferQueueSize)
 }
 
 // Run function starts the worker and dispatch it as go-routine
@@ -347,24 +374,26 @@ func (d *Dispatcher) dispatchToTransfer() {
 		case job := <-TransferQueue:
 			// a job request has been received
 			go func(job Job) {
-				// Update the status of request in DB
-				err, status := TFC.GetStatus(job.TransferRequest.Id)
-				if status == "pending" {
+				if TransferType == "pull" {
+					// Update the status of request in DB
+					err, status := TFC.GetStatus(job.TransferRequest.Id)
+					if status == "pending" {
+						err = TFC.UpdateRequest(job.TransferRequest.Id, "processing")
+					} else {
+						return
+					}
+					err = TFC.RetriveRequest(&job.TransferRequest)
+					if err != nil {
+						// TODO: push in error queue.
+						return
+					}
 					err = TFC.UpdateRequest(job.TransferRequest.Id, "processing")
-				} else {
-					return
+					if err != nil {
+						// TODO: push in error queue.
+						return
+					}
+					job.TransferRequest.Status = "processing"
 				}
-				err = TFC.RetriveRequest(&job.TransferRequest)
-				if err != nil {
-					// TODO: push in error queue.
-					return
-				}
-				err = TFC.UpdateRequest(job.TransferRequest.Id, "processing")
-				if err != nil {
-					// TODO: push in error queue.
-					return
-				}
-				job.TransferRequest.Status = "processing"
 				// try to obtain a worker job channel that is available.
 				// this will block until a worker is idle
 				jobChannel := <-d.JobPool

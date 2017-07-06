@@ -39,6 +39,7 @@ type Config struct {
 	Register  string `json:"register"`  // remote agent URL to register
 	ServerKey string `json:"serverkey"` // server key file
 	ServerCrt string `json:"servercrt"` // server crt file
+	Type 			string `json:"type"`			// Configure server type push/pull
 }
 
 // String returns string representation of Config data type
@@ -208,6 +209,9 @@ func Server(config Config) {
 	http.HandleFunc(fmt.Sprintf("%s/", base), AuthHandler)
 	http.Handle("/index/", http.StripPrefix("/index/",http.FileServer(http.Dir("html"))))
 
+	// initialize transfer model
+	core.TransferType = config.Type
+	
 	// initialize job queues
 	core.InitQueue(config.QueueSize, config.QueueSize, config.Mfile, config.Minterval)
 
@@ -222,6 +226,7 @@ func Server(config Config) {
 	log.WithFields(log.Fields{
 		"Workers":   config.Workers,
 		"QueueSize": config.QueueSize,
+		"Transfer Type": config.Type,
 	}).Println("Start dispatcher with workers of queue size")
 
 	if authVar {

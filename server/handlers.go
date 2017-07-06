@@ -134,9 +134,11 @@ func AuthHandler(w http.ResponseWriter, r *http.Request) {
 	case "verbose":
 		VerboseHandler(w, r)
 	case "list":
-		ListHandler(w, r, r.URL.RawQuery)
+		ListHandler(w, r)
 	case "action":
 		ActionHandler(w, r)
+	case "pull":
+		PullHandler(w, r)
 	default:
 		DefaultHandler(w, r)
 	}
@@ -190,8 +192,9 @@ func FilesHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // List all transfer Requests
-func ListHandler(w http.ResponseWriter, r *http.Request, query string) {
+func ListHandler(w http.ResponseWriter, r *http.Request) {
 
+	query := r.URL.RawQuery
 	if r.Method != "GET" {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
@@ -286,6 +289,44 @@ func ResetHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // POST methods
+
+// Handle pull acknowledge message from main agent.
+func PullHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	defer r.Body.Close()
+	var data = core.TransferRequest{}
+	err := json.NewDecoder(r.Body).Decode(&data)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"Error": err,
+		}).Error("PullHandler unable to parse json body")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	var requests []core.Job
+	requests = append(requests, core.Job{TransferRequest: data, Action: "pushtransfer"})
+	body, err := json.Marshal(requests)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"Error": err,
+		}).Error("PullHandler unable to send json body to Source")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	url := fmt.Sprintf("%s/action", data.SrcUrl)
+	resp := utils.FetchResponse(url, body)
+	// check return status code
+	if resp.StatusCode != 200 {
+		log.WithFields(log.Fields{
+			"Error": err,
+		}).Error("PullHandler unable to send transfer request to Source")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+}
 
 // This handler handles operations on requests
 func ActionHandler(w http.ResponseWriter, r *http.Request) {
