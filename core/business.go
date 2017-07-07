@@ -375,20 +375,34 @@ func (d *Dispatcher) dispatchToTransfer() {
 			// a job request has been received
 			go func(job Job) {
 				if TransferType == "pull" {
-					// Update the status of request in DB
-					err, status := TFC.GetStatus(job.TransferRequest.Id)
+					status, err := TFC.GetStatus(job.TransferRequest.Id)
+					if err != nil {
+						logs.WithFields(logs.Fields{
+							"Error": err,
+						}).Error("Error getting request status")
+						// TODO: push in error queue.
+						return
+					}
 					if status == "pending" {
+						// Update the status of request in DB
 						err = TFC.UpdateRequest(job.TransferRequest.Id, "processing")
+						job.TransferRequest.Status = "processing"
+						if err != nil {
+							logs.WithFields(logs.Fields{
+								"Error": err,
+							}).Error("Error updating request status")
+							// TODO: push in error queue.
+							return
+						}
 					} else {
 						return
 					}
 					err = TFC.RetriveRequest(&job.TransferRequest)
 					if err != nil {
-						// TODO: push in error queue.
-						return
-					}
-					err = TFC.UpdateRequest(job.TransferRequest.Id, "processing")
-					if err != nil {
+						logs.WithFields(logs.Fields{
+							"Error": err,
+						}).Error("Error retriving request data")
+						job.RequestFails()
 						// TODO: push in error queue.
 						return
 					}

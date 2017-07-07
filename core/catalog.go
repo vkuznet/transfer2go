@@ -71,8 +71,9 @@ func LoadSQL(dbtype, owner string) Record {
 	tmplData["Owner"] = owner
 	sdir := fmt.Sprintf("%s/sql/%s", utils.STATICDIR, dbtype)
 	for _, f := range utils.ListFiles(sdir) {
-		k := strings.Split(f, ".")[0]
-		dbsql[k] = utils.ParseTmpl(sdir, f, tmplData)
+		path := strings.Split(f, "/")
+		k := strings.Split(path[len(path)-1], ".")[0]
+		dbsql[k] = utils.ParseTmpl(f, tmplData)
 	}
 	return dbsql
 }
@@ -331,22 +332,22 @@ func (c *Catalog) RetriveRequest(request *TransferRequest) error {
 }
 
 // Get the status of request
-func (c *Catalog) GetStatus(id int64) (error, string) {
+func (c *Catalog) GetStatus(id int64) (string, error) {
 	var status string
 	stm := getSQL("get_status")
 	rows, err := DB.Query(stm, id)
 
 	if err != nil {
-		return err, ""
+		return "", err
 	}
 	for rows.Next() {
 		if err := rows.Scan(&status); err != nil {
-			return err, ""
+			return "", err
 		}
 	}
 
 	defer rows.Close()
-	return err, status
+	return status, err
 }
 
 // Get specific type of transfer requests according to status

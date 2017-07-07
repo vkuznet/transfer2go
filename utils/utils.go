@@ -9,7 +9,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"hash/adler32"
-	"io/ioutil"
 	"net"
 	"os"
 	"os/user"
@@ -26,18 +25,21 @@ var STATICDIR string
 // ListFiles function list files in given directory
 func ListFiles(dir string) []string {
 	var out []string
-	entries, err := ioutil.ReadDir(dir)
+	err := filepath.Walk(dir, func(path string, f os.FileInfo, err error) error {
+		if err != nil {
+      return err
+    }
+    if !f.IsDir() {
+			out = append(out, path)
+    }
+    return nil
+  })
 	if err != nil {
 		log.WithFields(log.Fields{
 			"Directory": dir,
 			"Error":     err,
 		}).Println("Unable to read directory")
 		return nil
-	}
-	for _, f := range entries {
-		if !f.IsDir() {
-			out = append(out, f.Name())
-		}
 	}
 	return out
 }
@@ -52,10 +54,9 @@ func fileNames(tdir string, filenames ...string) []string {
 }
 
 // ParseTmpl is a template parser with given data
-func ParseTmpl(tdir, tmpl string, data interface{}) string {
+func ParseTmpl(tmpl string, data interface{}) string {
 	buf := new(bytes.Buffer)
-	filenames := fileNames(tdir, tmpl)
-	t := template.Must(template.ParseFiles(filenames...))
+	t := template.Must(template.ParseFiles(tmpl))
 	err := t.Execute(buf, data)
 	if err != nil {
 		panic(err)
