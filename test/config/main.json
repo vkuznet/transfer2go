@@ -1,5 +1,5 @@
 {
-    "catalog":"test/catalog/catalog1.json",
+    "catalog":"test/catalog/main.json",
     "protocol":"cp",
     "backend":"/tmp",
     "tool":"/bin/cp",

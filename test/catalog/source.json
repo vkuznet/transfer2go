@@ -1,0 +1,5 @@
+{
+    "type":"sqlite3",
+    "uri":"test/catalog/source.db"
+}
+
