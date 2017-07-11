@@ -133,6 +133,12 @@ func AuthHandler(w http.ResponseWriter, r *http.Request) {
 		RegisterProtocolHandler(w, r)
 	case "verbose":
 		VerboseHandler(w, r)
+	case "list":
+		ListHandler(w, r)
+	case "action":
+		ActionHandler(w, r)
+	case "pull":
+		PullHandler(w, r)
 	default:
 		DefaultHandler(w, r)
 	}
@@ -183,6 +189,36 @@ func FilesHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}
 	w.Write(data)
+}
+
+// List all transfer Requests
+func ListHandler(w http.ResponseWriter, r *http.Request) {
+
+	query := r.URL.RawQuery
+	if r.Method != "GET" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	parameter := strings.Split(query, "=")
+
+	if parameter[0] == "type" {
+		requests, err := core.TFC.ListRequest(parameter[1])
+		data, err := json.Marshal(requests)
+
+		if err != nil {
+			log.WithFields(log.Fields{
+				"Error": err,
+			}).Error("ListRequest handler")
+			w.WriteHeader(http.StatusInternalServerError)
+		} else {
+			w.WriteHeader(http.StatusOK)
+			w.Write(data)
+		}
+	} else {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Could not find type url parameter"))
+	}
 }
 
 // StatusHandler provides information about the agent
@@ -253,6 +289,68 @@ func ResetHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // POST methods
+
+// Handle pull acknowledge message from main agent.
+func PullHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	defer r.Body.Close()
+	var data = core.TransferRequest{}
+	err := json.NewDecoder(r.Body).Decode(&data)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"Error": err,
+		}).Error("PullHandler unable to parse json body")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	var requests []core.Job
+	requests = append(requests, core.Job{TransferRequest: data, Action: "pushtransfer"})
+	body, err := json.Marshal(requests)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"Error": err,
+		}).Error("PullHandler unable to send json body to Source")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	url := fmt.Sprintf("%s/action", data.SrcUrl)
+	resp := utils.FetchResponse(url, body)
+	// check return status code
+	if resp.StatusCode != 200 {
+		log.WithFields(log.Fields{
+			"Error": err,
+		}).Error("PullHandler unable to send transfer request to Source")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+}
+
+// This handler handles operations on requests
+func ActionHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	defer r.Body.Close()
+
+	var data = []core.Job{}
+	err := json.NewDecoder(r.Body).Decode(&data)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"Error": err,
+		}).Error("ActionHandler unable to parse json body")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	for _, job := range data {
+		// Push the job onto the queue.
+		core.TransferQueue <- job
+	}
+}
 
 // TFCHandler registers given record in local TFC
 func TFCHandler(w http.ResponseWriter, r *http.Request) {
@@ -399,10 +497,10 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) {
 	for _, r := range *requests {
 
 		// let's create a job with the payload
-		work := core.Job{TransferRequest: r}
+		work := core.Job{TransferRequest: r, Action: "store"}
 
 		// Push the work onto the queue.
-		core.JobQueue <- work
+		core.StorageQueue <- work
 	}
 
 	w.WriteHeader(http.StatusOK)

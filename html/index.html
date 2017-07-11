@@ -1,0 +1,131 @@
+<html>
+<header><title>Transfer portal</title></header>
+<style>
+td {
+    border: 1px solid black;
+}
+button {
+  position: absolute;
+  align: right;
+  left: 80%;
+  top: 50%;
+}
+</style>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+<script>
+  var HttpClient = function() {
+    this.get = function(aUrl, aCallback) {
+        var anHttpRequest = new XMLHttpRequest();
+        anHttpRequest.onreadystatechange = function() {
+            if (anHttpRequest.readyState == 4 && anHttpRequest.status == 200)
+                aCallback(anHttpRequest.responseText);
+        }
+
+        anHttpRequest.open( "GET", aUrl, true );
+        anHttpRequest.send( null );
+    }
+    this.post = function(aUrl, body, aCallback) {
+        var anHttpRequest = new XMLHttpRequest();
+        anHttpRequest.onreadystatechange = function() {
+            if (anHttpRequest.readyState == 4 && anHttpRequest.status == 200)
+                aCallback(anHttpRequest.responseText);
+        }
+
+        anHttpRequest.open( "POST", aUrl, true );
+        anHttpRequest.setRequestHeader("Content-Type", "application/json");
+        anHttpRequest.send( JSON.stringify(body) );
+    }
+  }
+  var client = new HttpClient();
+  client.get('http://localhost:8989/list?type=pending', function(response) {
+    var tRequests = JSON.parse(response);
+    $(document).ready(function(){
+      tRow = $('<tr>');
+      tCell = $('<td>').html("CheckBox");
+      tRow.append(tCell)
+      tCell = $('<td>').html("ID");
+      tRow.append(tCell)
+      tCell = $('<td>').html("Priority");
+      tRow.append(tCell)
+      tCell = $('<td>').html("Block");
+      tRow.append(tCell)
+      tCell = $('<td>').html("Dataset");
+      tRow.append(tCell)
+      tCell = $('<td>').html("File");
+      tRow.append(tCell)
+      tCell = $('<td>').html("DstAlias");
+      tRow.append(tCell)
+      tCell = $('<td>').html("DstUrl");
+      tRow.append(tCell)
+      tCell = $('<td>').html("SrcAlias");
+      tRow.append(tCell)
+      tCell = $('<td>').html("SrcUrl");
+      tRow.append(tCell)
+      tCell = $('<td>').html("Status");
+      tRow.append(tCell)
+      tCell = $('<td>').html("Actions");
+      tRow.append(tCell)
+      $('table').append(tRow);
+      $.each(tRequests, function(index) {
+        tRow = $('<tr>');
+        tCell = $('<td>').html("<input type='checkbox' id="+index+" />");
+        tRow.append(tCell)
+        tCell = $('<td>').html(tRequests[index].id);
+        tRow.append(tCell)
+        tCell = $('<td>').html(tRequests[index].priority);
+        tRow.append(tCell)
+        tCell = $('<td>').html(tRequests[index].block);
+        tRow.append(tCell)
+        tCell = $('<td>').html(tRequests[index].dataset);
+        tRow.append(tCell)
+        tCell = $('<td>').html(tRequests[index].file);
+        tRow.append(tCell)
+        tCell = $('<td>').html(tRequests[index].dstAlias);
+        tRow.append(tCell)
+        tCell = $('<td>').html(tRequests[index].dstUrl);
+        tRow.append(tCell)
+        tCell = $('<td>').html(tRequests[index].srcAlias);
+        tRow.append(tCell)
+        tCell = $('<td>').html(tRequests[index].srcUrl);
+        tRow.append(tCell)
+        tCell = $('<td>').html(tRequests[index].status);
+        tRow.append(tCell)
+        tCell = $('<td>').html("<select> <option value='none'>None</option> <option value='delete'>delete</option> <option value='transfer'>transfer</option> </select>");
+        tRow.append(tCell)
+        $('table').append(tRow);
+      });
+    });
+
+  });
+  function send(){
+    var table = document.getElementsByTagName("TABLE")[0];
+    var actionArr = [];
+    var request;
+    for (var i = 1, row; row = table.rows[i]; i++) {
+      if(row.cells[row.cells.length-1].getElementsByTagName("SELECT")[0].value=="transfer"){
+        actionArr.push({
+          action: "pull" + row.cells[row.cells.length-1].getElementsByTagName("SELECT")[0].value,
+          request: {id: parseInt(row.cells[1].innerHTML)}
+        });
+      }else if(row.cells[row.cells.length-1].getElementsByTagName("SELECT")[0].value=="delete"){
+        actionArr.push({
+          action: row.cells[row.cells.length-1].getElementsByTagName("SELECT")[0].value,
+          request: {id: parseInt(row.cells[1].innerHTML)}
+        });
+      }else{
+        console.log("none")
+      }
+    }
+    if(actionArr.length>0) {
+      client.post('http://localhost:8989/action', actionArr, function(response) {
+        console.log(response)
+      })
+    }
+
+  }
+</script>
+<body>
+  <table />
+  <button type="button" onclick="send()">Click Me!</button>
+</body>
+</html>

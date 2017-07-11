@@ -1,0 +1,1 @@
+SELECT status FROM REQUESTS WHERE id=?

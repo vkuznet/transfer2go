@@ -5,7 +5,9 @@ package core
 
 import (
 	"bytes"
+	"container/heap"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -119,19 +121,133 @@ func httpTransfer(c CatalogEntry, t *TransferRequest) (string, error) {
 	return r.Pfn, nil
 }
 
-// Transfer returns a Decorator that performs request transfers
-func Transfer() Decorator {
+// Store returns a Decorator that stores request
+func Store() Decorator {
+	return func(r Request) Request {
+		return RequestFunc(func(t *TransferRequest) error {
+			t.Id = time.Now().Unix()
+			item := &Item{
+				Value:    *t,
+				priority: t.Priority,
+			}
+			fmt.Println(*t)
+			err := TFC.InsertRequest(*t)
+			if err != nil {
+				return err
+			} else {
+				heap.Push(&RequestQueue, item)
+			}
+			log.WithFields(log.Fields{
+				"Request": t,
+			}).Println("Request Saved")
+			return r.Process(t)
+		})
+	}
+}
+
+// Delete returns a Decorator that deletes request from heap
+func Delete() Decorator {
+	return func(r Request) Request {
+		return RequestFunc(func(t *TransferRequest) error {
+			// Delete request from PriorityQueue. The complexity is O(n) where n = heap.Len()
+			index := -1
+			var err error
+
+			for _, item := range RequestQueue {
+				if item.Value.Id == t.Id {
+					index = item.index
+					break
+				}
+			}
+
+			if index < RequestQueue.Len() && index >= 0 {
+				err = TFC.UpdateRequest(t.Id, "deleted")
+				if err != nil {
+					t.Status = "error"
+					return err
+				} else {
+					// TODO: May be we need to add lock over here.
+					heap.Remove(&RequestQueue, index)
+					t.Status = "deleted"
+					log.WithFields(log.Fields{
+						"Request": t,
+					}).Println("Request Deleted")
+				}
+			} else {
+				t.Status = "error"
+				err = errors.New("Can't find request in heap")
+				return err
+			}
+
+			return r.Process(t)
+		})
+	}
+}
+
+// Transfer returns a Decorator that performs request transfers by pull model
+func PullTransfer() Decorator {
 	return func(r Request) Request {
 		return RequestFunc(func(t *TransferRequest) error {
 			log.WithFields(log.Fields{
 				"Request": t.String(),
-			}).Println("Request Transfer", t.String())
-			records := TFC.Records(*t)
+			}).Println("Request Transfer")
+			// obtain information about source and destination agents
+			url := fmt.Sprintf("%s/status", t.DstUrl)
+			resp := utils.FetchResponse(url, []byte{})
+			if resp.Error != nil {
+				return resp.Error
+			}
+			var dstAgent AgentStatus
+			err := json.Unmarshal(resp.Data, &dstAgent)
+			if err != nil {
+				return err
+			}
+			url = fmt.Sprintf("%s/status", t.SrcUrl)
+			resp = utils.FetchResponse(url, []byte{})
+			if resp.Error != nil {
+				return resp.Error
+			}
+			var srcAgent AgentStatus
+			err = json.Unmarshal(resp.Data, &srcAgent)
+			if err != nil {
+				return err
+			}
+			// if both are up then send acknowledge message to destination on /pullack url.
+			body, err := json.Marshal(t)
+			if err != nil {
+				return err
+			}
+			url = fmt.Sprintf("%s/pull", t.DstUrl)
+			resp = utils.FetchResponse(url, body)
+			// check return status code
+			if resp.StatusCode != 200 {
+				return fmt.Errorf("Response %s, error=%s", resp.Status, string(resp.Data))
+			}
+			return r.Process(t)
+		})
+	}
+}
+
+// Transfer returns a Decorator that performs request transfers
+func PushTransfer() Decorator {
+	return func(r Request) Request {
+		return RequestFunc(func(t *TransferRequest) error {
+			log.WithFields(log.Fields{
+				"Request": t.String(),
+			}).Println("Request Transfer")
+			var records []CatalogEntry
+			// Consider those requests which are failed in previous iteration.
+			// If it is nil then request must be passing through first iteration.
+			if t.FailedRecords != nil {
+				records = t.FailedRecords
+			} else {
+				records = TFC.Records(*t)
+			}
 			if len(records) == 0 {
 				// file does not exists in TFC, nothing to do, return immediately
 				log.WithFields(log.Fields{
 					"TransferRequest": t,
-				}).Warn("Does match anything in TFC of this agent\n", t)
+				}).Warn("Does not match anything in TFC of this agent\n", t)
 				return r.Process(t)
 			}
 			// obtain information about source and destination agents
@@ -159,6 +275,9 @@ func Transfer() Decorator {
 			// TODO: I need to implement bulk transfer for all files in found records
 			// so far I loop over them individually and transfer one by one
 			var trRecords []CatalogEntry // list of successfully transferred records
+			var failedRecords []CatalogEntry
+			// Overwrite the previous error status
+			t.Status = ""
 			for _, rec := range records {
 
 				time0 := time.Now().Unix()
@@ -178,6 +297,8 @@ func Transfer() Decorator {
 							"Record":          rec.String(),
 							"Err":             err,
 						}).Error("Transfer", rec.String(), t.String(), err)
+						t.Status = err.Error()
+						failedRecords = append(failedRecords, rec)
 						continue // if we fail on single record we continue with others
 					}
 				} else {
@@ -202,6 +323,8 @@ func Transfer() Decorator {
 							"Remote PFN":   rpfn,
 							"Err":          err,
 						}).Error("Transfer")
+						t.Status = err.Error()
+						failedRecords = append(failedRecords, rec)
 						continue // if we fail on single record we continue with others
 					}
 				}
@@ -224,7 +347,7 @@ func Transfer() Decorator {
 			if resp.Error != nil {
 				return resp.Error
 			}
-
+			t.FailedRecords = failedRecords
 			return r.Process(t)
 		})
 	}

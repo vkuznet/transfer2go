@@ -5,8 +5,10 @@ package core
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"os/exec"
+	"strconv"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -69,8 +71,9 @@ func LoadSQL(dbtype, owner string) Record {
 	tmplData["Owner"] = owner
 	sdir := fmt.Sprintf("%s/sql/%s", utils.STATICDIR, dbtype)
 	for _, f := range utils.ListFiles(sdir) {
-		k := strings.Split(f, ".")[0]
-		dbsql[k] = utils.ParseTmpl(sdir, f, tmplData)
+		path := strings.Split(f, "/")
+		k := strings.Split(path[len(path)-1], ".")[0]
+		dbsql[k] = utils.ParseTmpl(f, tmplData)
 	}
 	return dbsql
 }
@@ -289,4 +292,120 @@ func (c *Catalog) Transfers(time0, time1 string) []CatalogEntry {
 		out = append(out, rec)
 	}
 	return out
+}
+
+// Insert new request
+func (c *Catalog) InsertRequest(request TransferRequest) error {
+	stm := getSQL("insert_request")
+	_, e := DB.Exec(stm, request.Id, request.File, request.Block, request.Dataset, request.SrcUrl, request.DstUrl, "pending", request.Priority)
+	if e != nil {
+		if !strings.Contains(e.Error(), "UNIQUE") {
+			check("Unable to insert into datasets table", e)
+		}
+	}
+	return e
+}
+
+// Update the status of request
+func (c *Catalog) UpdateRequest(id int64, status string) error {
+	stm := getSQL("update_request")
+	_, err := DB.Exec(stm, status, id)
+	return err
+}
+
+// Get the request details based on request id
+func (c *Catalog) RetriveRequest(request *TransferRequest) error {
+	stm := getSQL("request_by_id")
+	rows, err := DB.Query(stm, request.Id)
+	if err != nil {
+		request.Status = err.Error()
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		if err := rows.Scan(&request.File, &request.Block, &request.Dataset, &request.SrcUrl, &request.DstUrl, &request.Priority); err != nil {
+			request.Status = err.Error()
+			return err
+		}
+	}
+	return nil
+}
+
+// Get the status of request
+func (c *Catalog) GetStatus(id int64) (string, error) {
+	var status string
+	stm := getSQL("get_status")
+	rows, err := DB.Query(stm, id)
+
+	if err != nil {
+		return "", err
+	}
+	for rows.Next() {
+		if err := rows.Scan(&status); err != nil {
+			return "", err
+		}
+	}
+
+	defer rows.Close()
+	return status, err
+}
+
+// Get specific type of transfer requests according to status
+func (c *Catalog) ListRequest(query string) ([]TransferRequest, error) {
+	var (
+		err  error
+		rows *sql.Rows
+	)
+	switch query {
+	case "pending":
+		stm := getSQL("request_by_status") // Request is waiting for the approval
+		rows, err = DB.Query(stm, query)
+	case "finished":
+		stm := getSQL("request_by_status") // Request is successfuly transfered
+		rows, err = DB.Query(stm, query)
+	case "all":
+		stm := getSQL("all_request") // Get all the requests
+		rows, err = DB.Query(stm)
+	case "deleted":
+		stm := getSQL("request_by_status") // Request is deleted without transfer
+		rows, err = DB.Query(stm, query)
+	case "error":
+		stm := getSQL("request_by_status") // Error occured while transfering data
+		rows, err = DB.Query(stm, query)
+	default:
+		return nil, errors.New("Requested request type could not find")
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	cols, err := rows.Columns()
+	defer rows.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	pointers := make([]interface{}, len(cols))
+	container := make([]string, len(cols)) // A pointer to Columns of db
+	var requests []TransferRequest
+
+	for i, _ := range pointers {
+		pointers[i] = &container[i]
+	}
+
+	for rows.Next() {
+		rows.Scan(pointers...)
+		id, err := strconv.ParseInt(container[0], 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		priority, err := strconv.Atoi(container[7])
+		if err != nil {
+			return nil, err
+		}
+		// Sqlite columns => 0:request-id 1:file 2:block 3:dataset 4:srcurl 5:dsturl 6:status 7:Request priority
+		r := TransferRequest{SrcUrl: container[4], DstUrl: container[5], File: container[1], Block: container[2], Dataset: container[3], Id: id, Priority: priority, Status: container[6]}
+		requests = append(requests, r)
+	}
+	return requests, err
 }

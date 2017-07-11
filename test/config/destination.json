@@ -1,0 +1,14 @@
+{
+    "catalog":"test/catalog/destination.json",
+    "protocol":"cp",
+    "backend":"test/",
+    "tool":"/bin/cp",
+    "url":"http://localhost:9000",
+    "port": 9000,
+    "mfile":"metrics2.log",
+    "minterval":60,
+    "verbose":0,
+    "name":"destination",
+    "staticdir":"static",
+    "type": "push"
+}
