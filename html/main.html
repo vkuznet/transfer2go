@@ -1,0 +1,38 @@
+<html>
+<header><title>Transfer portal</title></header>
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.0/css/bootstrap.min.css">
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+<script src="main.js"></script>
+<link rel="stylesheet" type="text/css" href="main.css">
+</html>
+<div class="container">
+	<div class="row">
+		<section class="content">
+			<h1>Requests</h1>
+			<div class="col-md-10 col-md-offset-1">
+				<div class="panel panel-default">
+					<div class="panel-body">
+						<div class="pull-right">
+							<div class="btn-group">
+								<button type="button" class="btn btn-success btn-filter" data-target="pending">Pending</button>
+								<button type="button" class="btn btn-warning btn-filter" data-target="finished">Finished</button>
+								<button type="button" class="btn btn-danger btn-filter" data-target="deleted">Deleted</button>
+								<button type="button" class="btn btn-default btn-filter" data-target="error">Error</button>
+								<button type="button" class="btn btn-info btn-filter" data-target="processing">Processing</button>
+							</div>
+						</div>
+						<div class="table-container">
+							<table class="table table-filter">
+								<tbody>
+								</tbody>
+							</table>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div class="col-md-1">
+				<button type="button" class="btn btn-default rsubmit">Submit</button>
+			</div>
+		</section>
+	</div>
+</div>
