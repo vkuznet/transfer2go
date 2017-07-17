@@ -80,7 +80,7 @@ function renderRequest(type) {
 			html += '</nav>'
 			html += '</div>';
 			html += '<br/><b>Source:</b> '+tRequests[index].srcUrl+'&nbsp;';
-			html += '<b>Dest:</b> '+tRequests[index].dstUrl+'&nbsp;<br/>';
+			html += '<b>Dest:</b> '+tRequests[index].dstUrl+'&nbsp;';
 			html += '<b>Block:</b> '+tRequests[index].block+'&nbsp;';
 			html += '<b>Dataset:</b> '+tRequests[index].dataset+'&nbsp;';
 			html += '<b>File:</b> '+tRequests[index].file;
