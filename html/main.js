@@ -31,9 +31,10 @@ $(document).ready(function () {
 	$('.rsubmit').on('click', function () {
 		var $table = $('table');
 		var actionArr = [];
-		$('table').each(function() {
+		$('table tr').each(function() {
     	var id = $(this).find(".id").html();
 			var action = $(this).find(".action").val();
+			console.log("action" + action)
 			if(action=="transfer"){
 				actionArr.push({
           action: "pull" + action,  // TODO: make it configurable.
@@ -65,6 +66,7 @@ function renderRequest(type) {
 	client.get('http://' + window.location.host + '/list?type=' + type, function(response) {
 		var tRequests = JSON.parse(response);
 		$('.table tr').css('display', 'none');
+		$('.table tr').remove()
 		$.each(tRequests, function(index) {
 			var rid = 'request-'+tRequests[index].id;
 			var html = '<div class="reqdiv" id="div-'+rid+'">';
