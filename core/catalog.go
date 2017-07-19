@@ -372,6 +372,9 @@ func (c *Catalog) ListRequest(query string) ([]TransferRequest, error) {
 	case "error":
 		stm := getSQL("request_by_status") // Error occured while transfering data
 		rows, err = DB.Query(stm, query)
+	case "processing":
+		stm := getSQL("request_by_status") // Error occured while transfering data
+		rows, err = DB.Query(stm, query)
 	default:
 		return nil, errors.New("Requested request type could not find")
 	}

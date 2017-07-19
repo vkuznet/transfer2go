@@ -350,6 +350,7 @@ func ActionHandler(w http.ResponseWriter, r *http.Request) {
 		// Push the job onto the queue.
 		core.TransferQueue <- job
 	}
+	w.WriteHeader(http.StatusOK)
 }
 
 // TFCHandler registers given record in local TFC

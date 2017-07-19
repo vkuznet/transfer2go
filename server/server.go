@@ -207,11 +207,11 @@ func Server(config Config) {
 
 	// define handlers
 	http.HandleFunc(fmt.Sprintf("%s/", base), AuthHandler)
-	http.Handle("/index/", http.StripPrefix("/index/",http.FileServer(http.Dir("html"))))
+	http.Handle("/html/", http.StripPrefix("/html/",http.FileServer(http.Dir("html"))))
 
 	// initialize transfer model
 	core.TransferType = config.Type
-	
+
 	// initialize job queues
 	core.InitQueue(config.QueueSize, config.QueueSize, config.Mfile, config.Minterval)
 
