@@ -31,7 +31,7 @@
 ### In terms of pull requests:
 
 - Implemented Pull model [link](https://github.com/vkuznet/transfer2go/pull/26)
-- Add supervisor to run the process 24 by 7 [link](https://github.com/vkuznet/transfer2go/pull/30)
+- Added supervisor to run the process 24 by 7 [link](https://github.com/vkuznet/transfer2go/pull/30)
 - Designed new web interface [link](https://github.com/vkuznet/transfer2go/pull/32)
 - Resolved deadlock condition [link](https://github.com/vkuznet/transfer2go/pull/33)
 - Added deployment script [link](https://github.com/vkuznet/transfer2go/pull/34)
