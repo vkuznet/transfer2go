@@ -59,6 +59,7 @@ type Dispatcher struct {
 	// A pool of workers channels that are registered with the dispatcher
 	JobPool    chan chan Job
 	MaxWorkers int
+	BufferSize int
 }
 
 // AgentMetrics defines various metrics about the agent work
@@ -207,11 +208,11 @@ func (j *Job) RequestSuccess() {
 }
 
 // NewWorker return a new instance of the Worker type
-func NewWorker(wid int, jobPool chan chan Job) Worker {
+func NewWorker(wid int, bufferSize int, jobPool chan chan Job) Worker {
 	return Worker{
 		Id:         wid,
 		JobPool:    jobPool,
-		JobChannel: make(chan Job),
+		JobChannel: make(chan Job, bufferSize),
 		quit:       make(chan bool)}
 }
 
@@ -219,11 +220,12 @@ func NewWorker(wid int, jobPool chan chan Job) Worker {
 // case we need to stop it
 func (w Worker) Start() {
 	var err error
+
+	// register the current worker into the worker queue.
+	w.JobPool <- w.JobChannel
+
 	go func() {
 		for {
-			// register the current worker into the worker queue.
-			w.JobPool <- w.JobChannel
-
 			select {
 			case job := <-w.JobChannel:
 				// Add info to agents metrics
@@ -253,6 +255,7 @@ func (w Worker) Start() {
 						}).Error("Exceed number of iteration, discard request")
 						job.RequestFails()
 						AgentMetrics.Failed.Inc(1)
+						w.JobPool <- w.JobChannel
 					} else if job.TransferRequest.Delay > 0 {
 						job.TransferRequest.Delay *= 2
 						logs.Println(msg)
@@ -266,6 +269,7 @@ func (w Worker) Start() {
 					job.RequestSuccess()
 					// decrement transfer counter
 					AgentMetrics.In.Dec(1)
+					w.JobPool <- w.JobChannel
 				}
 
 			case <-w.quit:
@@ -284,10 +288,10 @@ func (w Worker) Stop() {
 }
 
 // NewDispatcher returns new instance of Dispatcher type
-func NewDispatcher(maxWorkers int) *Dispatcher {
+func NewDispatcher(maxWorkers int, bufferSize int) *Dispatcher {
 	// define pool of workers
 	pool := make(chan chan Job, maxWorkers)
-	return &Dispatcher{JobPool: pool, MaxWorkers: maxWorkers}
+	return &Dispatcher{JobPool: pool, MaxWorkers: maxWorkers, BufferSize: bufferSize}
 }
 
 // initialize RequestQueue, transferQueue and StorageQueue
@@ -331,7 +335,7 @@ func InitQueue(transferQueueSize int, storageQueueSize int, mfile string, minter
 func (d *Dispatcher) StorageRunner() {
 	// starting n number of workers
 	for i := 0; i < d.MaxWorkers; i++ {
-		worker := NewWorker(i, d.JobPool)
+		worker := NewWorker(i, d.BufferSize, d.JobPool)
 		worker.Start()
 	}
 
@@ -361,7 +365,7 @@ func (d *Dispatcher) dispatchToStorage() {
 func (d *Dispatcher) TransferRunner() {
 	// starting n number of workers
 	for i := 0; i < d.MaxWorkers; i++ {
-		worker := NewWorker(i, d.JobPool)
+		worker := NewWorker(i, d.BufferSize, d.JobPool)
 		worker.Start()
 	}
 
