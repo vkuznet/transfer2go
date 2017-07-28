@@ -13,7 +13,7 @@ service(){
     if [ -z "$pid" ]; then
       local tstamp=`date "+%Y/%m/%d %H:%M:%S"`
       echo "$tstamp goserver is not running, restart"
-      $cmd $args
+      $cmd $args &
       if [ "$args" == "-help" ] || [ "$args" == "--help" ]; then
         echo "Pass -auth and -config arguments"
         echo "[Example]: bash supervisor.sh -auth=false -config=test/config/config1.json"
