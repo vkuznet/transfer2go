@@ -2,9 +2,17 @@
 
 set -e
 
+trap 'kill %1' ERR EXIT
+
 cmd=$1
 args=${@:2}
 echo "Your supervisor is started."
+
+if [ $# -eq 0 ]
+  then
+    echo "No arguments supplied"
+    exit 1
+fi
 
 service(){
   for (( ; ; )); do
