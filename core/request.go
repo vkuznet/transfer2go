@@ -102,6 +102,7 @@ func fileTransferRequest(c CatalogEntry, tr *TransferRequest) (*http.Response, e
 		req.Header.Set("Content-Type", writer.FormDataContentType())
 		client := utils.HttpClient()
 		resp, err = client.Do(req)
+		defer resp.Body.Close()
 		if err != nil {
 			done <- err
 			return
