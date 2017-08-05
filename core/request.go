@@ -73,25 +73,23 @@ func (f RequestFunc) Process(t *TransferRequest) error {
 // https://matt.aimonetti.net/posts/2013/07/01/golang-multipart-file-upload-example/
 func fileTransferRequest(c CatalogEntry, tr *TransferRequest) (*http.Response, error) {
 	file, err := os.Open(c.Pfn)
-	defer file.Close()
 	if err != nil {
 		return nil, err
 	}
-
-	pipeOut, pipeIn := io.Pipe()
-	writer := multipart.NewWriter(pipeIn)
-	// do the request concurrently
+	defer file.Close()
+	// Define go pipe
+	pr, pw := io.Pipe()
+	writer := multipart.NewWriter(pw)
 	var resp *http.Response
+	// we need to wait for everything to be done
 	done := make(chan error)
 	go func() {
-		// prepare request
 		url := fmt.Sprintf("%s/upload", tr.DstUrl)
-		req, err := http.NewRequest("POST", url, pipeOut)
+		req, err := http.NewRequest("POST", url, pr)
 		if err != nil {
 			done <- err
 			return
 		}
-
 		req.Header.Set("Content-Type", writer.FormDataContentType())
 		req.Header.Set("Pfn", c.Pfn)
 		req.Header.Set("Lfn", c.Lfn)
@@ -99,43 +97,36 @@ func fileTransferRequest(c CatalogEntry, tr *TransferRequest) (*http.Response, e
 		req.Header.Set("Hash", c.Hash)
 		req.Header.Set("Src", tr.SrcAlias)
 		req.Header.Set("Dst", tr.DstAlias)
-		req.Header.Set("Content-Type", writer.FormDataContentType())
 		client := utils.HttpClient()
 		resp, err = client.Do(req)
-		defer resp.Body.Close()
-		if err != nil {
+		if err != nil || resp.StatusCode != 200 {
 			done <- err
 			return
 		}
-
 		done <- nil
 	}()
-
 	part, err := writer.CreateFormFile("data", filepath.Base(c.Pfn))
 	if err != nil {
 		return nil, err
 	}
-
-	_, err = io.Copy(part, file)
+	// Use copy of writer to avoid deadlock condition
+	out := io.MultiWriter(part)
+	_, err = io.Copy(out, file)
 	if err != nil {
 		return nil, err
 	}
-
 	err = writer.Close()
 	if err != nil {
 		return nil, err
 	}
-
-	err = pipeIn.Close()
+	err = pw.Close()
 	if err != nil {
 		return nil, err
 	}
-	
 	err = <-done
 	if err != nil {
 		return nil, err
 	}
-
 	return resp, nil
 }
 
@@ -143,10 +134,10 @@ func fileTransferRequest(c CatalogEntry, tr *TransferRequest) (*http.Response, e
 func httpTransfer(c CatalogEntry, t *TransferRequest) (string, error) {
 	// create file transfer request
 	resp, err := fileTransferRequest(c, t)
-	if err != nil {
+	if err != nil && resp.StatusCode != 200 {
 		return "", err
 	}
-
+  defer resp.Body.Close()
 	var r CatalogEntry
 	err = json.NewDecoder(resp.Body).Decode(&r)
 	if err != nil {
