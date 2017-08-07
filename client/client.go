@@ -6,9 +6,13 @@ package client
 //
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"hash/adler32"
+	"io"
 	"io/ioutil"
+	"os"
 	"strings"
 	"time"
 
@@ -240,11 +244,11 @@ func Register(agent, fname string) error {
 			e := fmt.Errorf("Record must have at least the following fields: lfn, pfn, block, dataset, instead received: %v\n", rec)
 			return e
 		}
-		data, err := ioutil.ReadFile(rec.Pfn)
+		hash, bytes, err := readFile(rec.Pfn)
 		if err != nil {
 			return err
 		}
-		hash, bytes := utils.Hash(data)
+		//hash, bytes := utils.Hash(data)
 		r := core.CatalogEntry{Lfn: rec.Lfn, Pfn: rec.Pfn, Block: rec.Block, Dataset: rec.Dataset, Hash: hash, Bytes: bytes}
 		uploadRecords = append(uploadRecords, r)
 	}
@@ -262,4 +266,49 @@ func Register(agent, fname string) error {
 		"Size":  len(uploadRecords),
 	}).Info("Registered records in")
 	return nil
+}
+
+func readFile(path string) (string, int64, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", 0, err
+	}
+	var bytes int64
+	// Create a synchronous in-memory pipe. This pipe will
+	// allow us to use a Writer as a Reader.
+	pipeReader, pipeWriter := io.Pipe()
+	// create a hasher to calculate data hash
+	hasher := adler32.New()
+	// Wait for the reading and writing processes of the io.pipe
+	done := make(chan error)
+	// Create a goroutine to write chunk wise in io.pipe
+	go func() {
+		defer pipeWriter.Close()
+		_, err = io.Copy(pipeWriter, file)
+		if err != nil {
+			done <- err
+			return
+		}
+		done <- nil
+	}()
+	// Create a goroutine to read chunk wise from io.pipe
+	go func() {
+		defer pipeReader.Close()
+		bytes, err = io.Copy(hasher, pipeReader)
+		if err != nil {
+			done <- err
+			return
+		}
+		done <- nil
+	}()
+	err = <-done
+	if err != nil {
+		return "", 0, err
+	}
+	err = <-done
+	if err != nil {
+		return "", 0, err
+	}
+	hash := hex.EncodeToString(hasher.Sum(nil))
+	return hash, bytes, nil
 }

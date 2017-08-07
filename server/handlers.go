@@ -593,7 +593,7 @@ func UploadDataHandler(w http.ResponseWriter, r *http.Request) {
 			"Source Bytes": srcBytes,
 			"Total Bytes":  totBytes,
 			"Error":        e,
-		}).Error("UploadDataHandler bytes mismatch", srcBytes, totBytes, e)
+		}).Error("UploadDataHandler bytes mismatch")
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -604,7 +604,7 @@ func UploadDataHandler(w http.ResponseWriter, r *http.Request) {
 			"Source Hash": srcHash,
 			"Hash":        hash,
 			"Error":       e,
-		}).Error("UploadDataHandler hash mismatch", srcHash, hash, e)
+		}).Error("UploadDataHandler hash mismatch")
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}

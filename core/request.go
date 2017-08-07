@@ -4,7 +4,6 @@ package core
 // Author: Valentin Kuznetsov <vkuznet@gmail.com>
 
 import (
-	"bytes"
 	"container/heap"
 	"encoding/json"
 	"errors"
@@ -72,47 +71,73 @@ func (f RequestFunc) Process(t *TransferRequest) error {
 
 // filleTransferRequest creates HTTP request to transfer a given file name
 // https://matt.aimonetti.net/posts/2013/07/01/golang-multipart-file-upload-example/
-func fileTransferRequest(c CatalogEntry, tr *TransferRequest) (*http.Request, error) {
+func fileTransferRequest(c CatalogEntry, tr *TransferRequest) (*http.Response, error) {
 	file, err := os.Open(c.Pfn)
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close()
-	body := &bytes.Buffer{}
-	writer := multipart.NewWriter(body)
+	// Define go pipe
+	pr, pw := io.Pipe()
+	writer := multipart.NewWriter(pw)
+	var resp *http.Response
+	// we need to wait for everything to be done
+	done := make(chan error)
+	go func() {
+		url := fmt.Sprintf("%s/upload", tr.DstUrl)
+		req, err := http.NewRequest("POST", url, pr)
+		if err != nil {
+			done <- err
+			return
+		}
+		req.Header.Set("Content-Type", writer.FormDataContentType())
+		req.Header.Set("Pfn", c.Pfn)
+		req.Header.Set("Lfn", c.Lfn)
+		req.Header.Set("Bytes", fmt.Sprintf("%d", c.Bytes))
+		req.Header.Set("Hash", c.Hash)
+		req.Header.Set("Src", tr.SrcAlias)
+		req.Header.Set("Dst", tr.DstAlias)
+		client := utils.HttpClient()
+		resp, err = client.Do(req)
+		if err != nil || resp.StatusCode != 200 {
+			done <- err
+			return
+		}
+		done <- nil
+	}()
 	part, err := writer.CreateFormFile("data", filepath.Base(c.Pfn))
 	if err != nil {
 		return nil, err
 	}
-	_, err = io.Copy(part, file)
+	// Use copy of writer to avoid deadlock condition
+	out := io.MultiWriter(part)
+	_, err = io.Copy(out, file)
+	if err != nil {
+		return nil, err
+	}
 	err = writer.Close()
 	if err != nil {
 		return nil, err
 	}
-
-	url := fmt.Sprintf("%s/upload", tr.DstUrl)
-	req, err := http.NewRequest("POST", url, body)
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-	req.Header.Set("Pfn", c.Pfn)
-	req.Header.Set("Lfn", c.Lfn)
-	req.Header.Set("Bytes", fmt.Sprintf("%d", c.Bytes))
-	req.Header.Set("Hash", c.Hash)
-	req.Header.Set("Src", tr.SrcAlias)
-	req.Header.Set("Dst", tr.DstAlias)
-	return req, err
+	err = pw.Close()
+	if err != nil {
+		return nil, err
+	}
+	err = <-done
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
 }
 
 // helper function to perform transfer via HTTP protocol
 func httpTransfer(c CatalogEntry, t *TransferRequest) (string, error) {
 	// create file transfer request
-	request, err := fileTransferRequest(c, t)
-	if err != nil {
+	resp, err := fileTransferRequest(c, t)
+	if err != nil && resp.StatusCode != 200 {
 		return "", err
 	}
-	client := utils.HttpClient()
-	resp, err := client.Do(request)
-	defer resp.Body.Close()
-
+  defer resp.Body.Close()
 	var r CatalogEntry
 	err = json.NewDecoder(resp.Body).Decode(&r)
 	if err != nil {
