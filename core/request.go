@@ -99,8 +99,12 @@ func fileTransferRequest(c CatalogEntry, tr *TransferRequest) (*http.Response, e
 		req.Header.Set("Dst", tr.DstAlias)
 		client := utils.HttpClient()
 		resp, err = client.Do(req)
-		if err != nil || resp.StatusCode != 200 {
+		if err != nil {
 			done <- err
+			return
+		}
+		if resp.StatusCode != 200 {
+			done <- errors.New("Status Code is not 200")
 			return
 		}
 		done <- nil
