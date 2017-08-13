@@ -138,10 +138,10 @@ func fileTransferRequest(c CatalogEntry, tr *TransferRequest) (*http.Response, e
 func httpTransfer(c CatalogEntry, t *TransferRequest) (string, error) {
 	// create file transfer request
 	resp, err := fileTransferRequest(c, t)
-	if err != nil && resp.StatusCode != 200 {
+	if err != nil || resp==nil || resp.StatusCode != 200 {
 		return "", err
 	}
-  defer resp.Body.Close()
+        defer resp.Body.Close()
 	var r CatalogEntry
 	err = json.NewDecoder(resp.Body).Decode(&r)
 	if err != nil {
