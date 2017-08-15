@@ -1,0 +1,84 @@
+<html>
+<header><title>Transfer portal</title></header>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-multiselect/0.9.13/css/bootstrap-multiselect.css">
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+<script src="https://code.jquery.com/jquery-2.2.0.min.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-multiselect/0.9.13/js/bootstrap-multiselect.js"></script>
+<script src="client.js"></script>
+<link rel="stylesheet" type="text/css" href="client.css">
+<div class="container">
+	<div class="row">
+      <div class="col-md-6 col-md-offset-3">
+        <div class="well well-sm">
+          <form class="form-horizontal" id="request-form" action="" method="post">
+          <fieldset>
+            <legend class="text-center">Register Request</legend>
+
+            <div class="form-group">
+              <label class="col-md-3 control-label" for="source">Source</label>
+              <div class="col-md-9">
+                <input id="source" name="source" type="text" placeholder="Source name: source-server.cern.ch:8000" class="form-control">
+              </div>
+            </div>
+
+						<div class="form-group">
+              <div class="col-md-12 text-right">
+                <button class="btn btn-danger" type="button" id="get-data">Get Data</button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="col-md-3 control-label" for="destination">Destination</label>
+              <div class="col-md-9">
+                <input id="destination" name="destination" type="text" placeholder="Destination name" class="form-control">
+              </div>
+            </div>
+
+						<div class="form-group">
+              <label class="col-md-3 control-label" for="main-agent">Main Agent</label>
+              <div class="col-md-9">
+                <input id="main-agent" name="main-agent" type="text" placeholder="Main Agent name" class="form-control">
+              </div>
+            </div>
+
+						<div class="form-group">
+							<label class="col-md-3 control-label" for="dataset">Dataset</label>
+							<div class="col-md-9">
+								<select id="dataset">
+	    						<option value="select">select</option>
+								</select>
+							</div>
+						</div>
+
+						<div class="form-group">
+							<label class="col-md-3 control-label" for="block">Block</label>
+							<div class="col-md-9">
+								<select id="block">
+	    						<option value="select">select</option>
+								</select>
+							</div>
+						</div>
+
+						<div class="form-group">
+							<label class="col-md-3 control-label" for="file">File</label>
+							<div class="col-md-9">
+								<select id="file">
+	    						<option value="select">select</option>
+								</select>
+							</div>
+						</div>
+
+            <!-- Form actions -->
+            <div class="form-group">
+              <div class="col-md-12 text-right">
+                <button type="submit" class="btn btn-primary btn-lg">Submit</button>
+              </div>
+            </div>
+          </fieldset>
+          </form>
+        </div>
+      </div>
+	</div>
+</div>
+</html>
