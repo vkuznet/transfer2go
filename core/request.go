@@ -157,7 +157,7 @@ func httpTransfer(c CatalogEntry, t *TransferRequest) (string, error) {
 func Store() Decorator {
 	return func(r Request) Request {
 		return RequestFunc(func(t *TransferRequest) error {
-			t.Id = time.Now().Unix()
+			t.Id = time.Now().UnixNano()
 			item := &Item{
 				Value:    *t,
 				priority: t.Priority,
