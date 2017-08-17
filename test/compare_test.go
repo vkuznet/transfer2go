@@ -22,7 +22,7 @@ func TestCompareThousand(t *testing.T) {
 	start := time.Now()
 	records := core.CompareRecords(sourceCatalog, destinationCatalog)
 	elapsed := time.Since(start)
-	t.Log("For 1k took %s", elapsed)
+	t.Log("For 1k it took", elapsed)
 	if records != nil {
 		t.Errorf("Incorrect Match for 1k files: %d", len(records))
 	}
@@ -42,7 +42,7 @@ func TestCompareTenThousand(t *testing.T) {
 	start := time.Now()
 	records := core.CompareRecords(sourceCatalog, destinationCatalog)
 	elapsed := time.Since(start)
-	t.Log("For 10k took %s", elapsed)
+	t.Log("For 10k it took", elapsed)
 	if records != nil {
 		t.Errorf("Incorrect Match for 1k files: %d", len(records))
 	}
@@ -61,8 +61,8 @@ func TestCompareTenThousandUncommon(t *testing.T) {
 	start := time.Now()
 	records := core.CompareRecords(sourceCatalog, destinationCatalog)
 	elapsed := time.Since(start)
-	t.Log("For 10k uncommon took %s", elapsed)
+	t.Log("For 10k uncommon it took", elapsed)
 	if records != nil {
-		t.Log("Uncommon files: %d", len(records))
+		t.Log("Need to transfer total files:", len(records))
 	}
 }
