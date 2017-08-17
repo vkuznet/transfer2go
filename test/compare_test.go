@@ -66,3 +66,15 @@ func TestCompareTenThousandUncommon(t *testing.T) {
 		t.Log("Need to transfer total files:", len(records))
 	}
 }
+
+// Test Request function
+func TestGetDestFiles(t *testing.T) {
+  start := time.Now()
+  rec, err := core.GetDestFiles(core.TransferRequest{SrcUrl:"http://localhost:8000", DstUrl:"http://localhost:9000", Dataset: "/a/b/c"})
+  elapsed := time.Since(start)
+	t.Log("Time took to get destination file", elapsed)
+  if err != nil {
+		t.Log("Error in TestGetDestFiles:", err)
+	}
+  t.Log("Files found on destination:", len(rec))
+}
