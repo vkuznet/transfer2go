@@ -139,6 +139,8 @@ func AuthHandler(w http.ResponseWriter, r *http.Request) {
 		ActionHandler(w, r)
 	case "pull":
 		PullHandler(w, r)
+	case "meta":
+		MetaHandler(w, r)
 	default:
 		DefaultHandler(w, r)
 	}
@@ -289,6 +291,42 @@ func ResetHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // POST methods
+
+// MetaHandler gives details about requested dataset/block/files
+func MetaHandler(w http.ResponseWriter, r *http.Request) {
+
+	if !(r.Method == "POST") {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	defer r.Body.Close()
+	var request = core.TransferRequest{}
+	err := json.NewDecoder(r.Body).Decode(&request)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"Error": err,
+		}).Error("MetaHandler unable to marshal", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	lfn := request.File
+	block := request.Block
+	dataset := request.Dataset
+	records := core.TFC.Records(core.TransferRequest{File: lfn, Dataset: dataset, Block: block})
+	data, err := json.Marshal(records)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"Records": records,
+			"Error":   err,
+		}).Error("MetaHandler unable to marshal", records, err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write(data)
+	return
+}
 
 // Handle pull acknowledge message from main agent.
 func PullHandler(w http.ResponseWriter, r *http.Request) {

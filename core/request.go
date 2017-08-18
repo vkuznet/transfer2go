@@ -141,16 +141,53 @@ func httpTransfer(c CatalogEntry, t *TransferRequest) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if resp==nil || resp.StatusCode != 200 {
+	if resp == nil || resp.StatusCode != 200 {
 		return "", errors.New("Empty response from destination")
 	}
-        defer resp.Body.Close()
+	defer resp.Body.Close()
 	var r CatalogEntry
 	err = json.NewDecoder(resp.Body).Decode(&r)
 	if err != nil {
 		return "", err
 	}
 	return r.Pfn, nil
+}
+
+// Check destination catalog
+func GetDestFiles(tr TransferRequest) ([]CatalogEntry, error) {
+	url := fmt.Sprintf("%s/meta", tr.DstUrl)
+	d, err := json.Marshal(tr)
+	if err != nil {
+		return nil, err
+	}
+	resp := utils.FetchResponse(url, d)
+	if resp.Error != nil {
+		return nil, resp.Error
+	}
+	var records []CatalogEntry
+	err = json.Unmarshal(resp.Data, &records)
+	if err != nil {
+		return nil, err
+	}
+	return records, nil
+}
+
+// Compare two CatalogEntry
+func compareRecords(requestedCatalog []CatalogEntry, remoteCatalog []CatalogEntry) []CatalogEntry {
+	var records []CatalogEntry
+	files := make(map[string]string) // Create a hashmap of files to reduce the time complexity of comparison
+	for _, rec := range remoteCatalog {
+		files[rec.Lfn] = rec.Hash
+	}
+	// check for each entry in requestedCatalog if it is present in remoteCatalog or not.
+	for _, rec := range requestedCatalog {
+		if _, ok := files[rec.Lfn]; !ok {
+			records = append(records, rec)
+		} else if rec.Hash != files[rec.Lfn] {
+			records = append(records, rec)
+		}
+	}
+	return records
 }
 
 // Store returns a Decorator that stores request
@@ -273,8 +310,16 @@ func PushTransfer() Decorator {
 			if t.FailedRecords != nil {
 				records = t.FailedRecords
 			} else {
-				records = TFC.Records(*t)
+				requestedRecords := TFC.Records(*t)
+				// Check if the requested data is already presented on destination agent.
+				remoteRecords, err := GetDestFiles(*t)
+				if remoteRecords == nil || err != nil {
+					records = requestedRecords
+				} else {
+					records = compareRecords(requestedRecords, remoteRecords) // Filter the matching records
+				}
 			}
+
 			if len(records) == 0 {
 				// file does not exists in TFC, nothing to do, return immediately
 				log.WithFields(log.Fields{
