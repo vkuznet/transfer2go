@@ -303,7 +303,6 @@ func InitQueue(transferQueueSize int, storageQueueSize int, mfile string, minter
 			"Error": e,
 		}).Error("Error opening file:")
 	}
-	defer f.Close()
 
 	// define agent's metrics
 	r := metrics.DefaultRegistry
@@ -313,8 +312,11 @@ func InitQueue(transferQueueSize int, storageQueueSize int, mfile string, minter
 	totB := metrics.GetOrRegisterCounter("totalBytes", r)
 	bytesT := metrics.GetOrRegisterCounter("bytesInTransfer", r)
 	AgentMetrics = Metrics{In: inT, Failed: failT, Total: totT, TotalBytes: totB, Bytes: bytesT}
-	go metrics.Log(r, time.Duration(minterval)*time.Second, log.New(f, "metrics: ", log.Lmicroseconds))
-
+	go func() {
+		defer f.Close()
+		metrics.Log(r, time.Duration(minterval)*time.Second, log.New(f, "metrics: ", log.Lmicroseconds))
+	}()
+	//metrics.Log(r, time.Duration(minterval)*time.Second, log.New(f, "metrics: ", log.Lmicroseconds))
 	if TransferType == "pull" {
 		StorageQueue = make(chan Job, storageQueueSize)
 		RequestQueue = make(PriorityQueue, 0) // Create a priority queue
