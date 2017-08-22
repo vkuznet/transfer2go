@@ -342,7 +342,7 @@ func InitQueue(transferQueueSize int, storageQueueSize int, mfile string, minter
 		defer f.Close()
 		metrics.Log(r, time.Duration(minterval)*time.Second, log.New(f, "metrics: ", log.Lmicroseconds))
 	}()
-
+	//metrics.Log(r, time.Duration(minterval)*time.Second, log.New(f, "metrics: ", log.Lmicroseconds))
 	if TransferType == "pull" {
 		StorageQueue = make(chan Job, storageQueueSize)
 		RequestQueue = make(PriorityQueue, 0) // Create a priority queue
