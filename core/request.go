@@ -33,6 +33,8 @@ type AgentStatus struct {
 	Agents    map[string]string `json:"agents"`   // list of known agents
 	Addrs     []string          `json:"addrs"`    // list of all IP addresses
 	Metrics   map[string]int64  `json:"metrics"`  // agent metrics
+	CpuUsage  float64           `json:"cpuusage"` // percentage of cpu used
+	MemUsage  float64           `json:"memusage"` // Avg RAM used in MB
 }
 
 // Processor is an object who process' given task
