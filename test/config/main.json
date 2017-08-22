@@ -9,5 +9,6 @@
     "verbose":0,
     "name":"Test",
     "staticdir":"static",
-    "type":"pull"
+    "type":"pull",
+    "MonitorTime":3600
 }

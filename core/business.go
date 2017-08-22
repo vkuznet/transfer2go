@@ -12,15 +12,19 @@ import (
 
 	"github.com/rcrowley/go-metrics"
 	logs "github.com/sirupsen/logrus"
+	"github.com/vkuznet/transfer2go/utils"
 )
 
 // Metrics of the agent
 type Metrics struct {
-	In         metrics.Counter // number of live transfer requests
-	Failed     metrics.Counter // number of failed transfer requests
-	Total      metrics.Counter // total number of transfer requests
-	TotalBytes metrics.Counter // total number of bytes by this agent
-	Bytes      metrics.Counter // number of bytes in progress
+	In         metrics.Counter      // number of live transfer requests
+	Failed     metrics.Counter      // number of failed transfer requests
+	Total      metrics.Counter      // total number of transfer requests
+	TotalBytes metrics.Counter      // total number of bytes by this agent
+	Bytes      metrics.Counter      // number of bytes in progress
+	CpuUsage   metrics.GaugeFloat64 // CPU usage in percentage
+	MemUsage   metrics.GaugeFloat64 // Memory usage in MB
+	Tick       metrics.Counter      // Store cpu ticks
 }
 
 // TransferRequest data type
@@ -295,7 +299,7 @@ func NewDispatcher(maxWorkers int, bufferSize int) *Dispatcher {
 }
 
 // initialize RequestQueue, transferQueue and StorageQueue
-func InitQueue(transferQueueSize int, storageQueueSize int, mfile string, minterval int64) {
+func InitQueue(transferQueueSize int, storageQueueSize int, mfile string, minterval int64, monitorTime int64) {
 	// register metrics
 	f, e := os.OpenFile(mfile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if e != nil {
@@ -303,7 +307,6 @@ func InitQueue(transferQueueSize int, storageQueueSize int, mfile string, minter
 			"Error": e,
 		}).Error("Error opening file:")
 	}
-	defer f.Close()
 
 	// define agent's metrics
 	r := metrics.DefaultRegistry
@@ -312,8 +315,33 @@ func InitQueue(transferQueueSize int, storageQueueSize int, mfile string, minter
 	totT := metrics.GetOrRegisterCounter("totalTransfers", r)
 	totB := metrics.GetOrRegisterCounter("totalBytes", r)
 	bytesT := metrics.GetOrRegisterCounter("bytesInTransfer", r)
-	AgentMetrics = Metrics{In: inT, Failed: failT, Total: totT, TotalBytes: totB, Bytes: bytesT}
-	go metrics.Log(r, time.Duration(minterval)*time.Second, log.New(f, "metrics: ", log.Lmicroseconds))
+	cpuUsage := metrics.GetOrRegisterGaugeFloat64("cpuUsage", r)
+	tick := metrics.GetOrRegisterCounter("tick", r)
+	memUsage := metrics.GetOrRegisterGaugeFloat64("memUsage", r)
+	AgentMetrics = Metrics{In: inT, Failed: failT, Total: totT, TotalBytes: totB, Bytes: bytesT, CpuUsage: cpuUsage, MemUsage: memUsage, Tick: tick}
+
+	go func() {
+		timeTick := monitorTime / minterval
+		for _ = range time.Tick(time.Duration(minterval) * time.Second) {
+			cused, err1 := utils.UsedCPU()
+			mused, err2 := utils.UsedRAM()
+			if err1 == nil && err2 == nil {
+				if AgentMetrics.Tick.Count() > timeTick {
+					AgentMetrics.Tick.Clear()
+					AgentMetrics.CpuUsage.Update(0)
+					AgentMetrics.MemUsage.Update(0)
+				}
+				AgentMetrics.Tick.Inc(1)
+				AgentMetrics.CpuUsage.Update(AgentMetrics.CpuUsage.Value() + cused)
+				AgentMetrics.MemUsage.Update(AgentMetrics.MemUsage.Value() + mused)
+			}
+		}
+	}()
+
+	go func() {
+		defer f.Close()
+		metrics.Log(r, time.Duration(minterval)*time.Second, log.New(f, "metrics: ", log.Lmicroseconds))
+	}()
 
 	if TransferType == "pull" {
 		StorageQueue = make(chan Job, storageQueueSize)
