@@ -10,7 +10,6 @@ import (
 	"hash/adler32"
 	"io"
 	"io/ioutil"
-	"math"
 	"net/http"
 	"net/http/httputil"
 	"os"
@@ -232,13 +231,13 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	addrs := utils.HostIP()
-	cusage := core.AgentMetrics.CpuUsage.Value() / float64(core.AgentMetrics.Tick.Count())
-	musage := core.AgentMetrics.MemUsage.Value() / float64(core.AgentMetrics.Tick.Count())
-	if math.IsNaN(cusage) || math.IsNaN(musage) {
-		log.Error("AgentsHandler: Calculating Metrics values")
+	cusage, musage, err := core.AgentMetrics.GetUsage()
+	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Calculating system metrics try after some time."))
 		return
 	}
+
 	astats := core.AgentStatus{Addrs: addrs, Catalog: core.TFC.Type, Name: _alias, Url: _myself, Protocol: _protocol, Backend: _backend, Tool: _tool, ToolOpts: _toolOpts, Agents: _agents, TimeStamp: time.Now().Unix(), Metrics: core.AgentMetrics.ToDict(), CpuUsage: cusage, MemUsage: musage}
 	data, err := json.Marshal(astats)
 	if err != nil {

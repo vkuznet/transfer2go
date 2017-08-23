@@ -5,8 +5,10 @@ package core
 
 import (
 	"container/heap"
+	"errors"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"time"
 
@@ -78,8 +80,18 @@ var RequestQueue PriorityQueue
 // An instance of dispatcher to handle the transfer process
 var TransferQueue chan Job
 
-//
+// Decide pull or push based model
 var TransferType string
+
+// Method to get cpu and Memory usage
+func (m *Metrics) GetUsage() (float64, float64, error) {
+	cusage := AgentMetrics.CpuUsage.Value() / float64(AgentMetrics.Tick.Count())
+	musage := AgentMetrics.MemUsage.Value() / float64(AgentMetrics.Tick.Count())
+	if math.IsNaN(cusage) || math.IsNaN(musage) {
+		return 0, 0, errors.New("Calculating system metrics")
+	}
+	return cusage, musage, nil
+}
 
 // String representation of Metrics
 func (m *Metrics) String() string {

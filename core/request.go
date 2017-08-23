@@ -199,7 +199,7 @@ func compareRecords(requestedCatalog []CatalogEntry, remoteCatalog []CatalogEntr
 func Store() Decorator {
 	return func(r Request) Request {
 		return RequestFunc(func(t *TransferRequest) error {
-			t.Id = time.Now().UnixNano()
+			t.Id = time.Now().Unix()
 			item := &Item{
 				Value:    *t,
 				priority: t.Priority,
@@ -374,7 +374,6 @@ func PushTransfer() Decorator {
 						"dstAgent": dstAgent.String(),
 					}).Println("Transfer via HTTP protocol to", dstAgent.String())
 					rpfn, err, throughput = httpTransfer(rec, t)
-					log.Println(throughput)
 					if err != nil {
 						log.WithFields(log.Fields{
 							"TransferRequest": t.String(),
@@ -385,8 +384,11 @@ func PushTransfer() Decorator {
 						failedRecords = append(failedRecords, rec)
 						continue // if we fail on single record we continue with others
 					}
-					// store data in table
-
+					cusage, memUsage, err := AgentMetrics.GetUsage()
+					if err == nil {
+						// store data in table
+						TFC.InsertTransfers(time.Now().Unix(), cusage, memUsage, throughput)
+					}
 				} else {
 					// construct remote PFN by using destination agent backend and record LFN
 					rpfn = fmt.Sprintf("%s%s", dstAgent.Backend, rec.Lfn)

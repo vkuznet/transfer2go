@@ -10,5 +10,6 @@
     "verbose":0,
     "name":"destination",
     "staticdir":"static",
-    "type": "push"
+    "type": "push",
+    "MonitorTime":3600
 }

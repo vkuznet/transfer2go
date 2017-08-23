@@ -412,3 +412,9 @@ func (c *Catalog) ListRequest(query string) ([]TransferRequest, error) {
 	}
 	return requests, err
 }
+
+// Insert new row to TRANSFERS table
+func (c *Catalog) InsertTransfers(time int64, cpuUsage float64, memUsage float64, throughput float64) {
+	stm := getSQL("insert_transfers")
+	DB.Exec(stm, time, cpuUsage, memUsage, throughput)
+}
