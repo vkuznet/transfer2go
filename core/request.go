@@ -137,22 +137,25 @@ func fileTransferRequest(c CatalogEntry, tr *TransferRequest) (*http.Response, e
 }
 
 // helper function to perform transfer via HTTP protocol
-func httpTransfer(c CatalogEntry, t *TransferRequest) (string, error) {
-	// create file transfer request
-	resp, err := fileTransferRequest(c, t)
+func httpTransfer(c CatalogEntry, t *TransferRequest) (string, error, float64) {
+	start := time.Now()
+	resp, err := fileTransferRequest(c, t) // create file transfer request
+	elapsed := time.Since(start)
 	if err != nil {
-		return "", err
+		return "", err, 0
 	}
 	if resp == nil || resp.StatusCode != 200 {
-		return "", errors.New("Empty response from destination")
+		return "", errors.New("Empty response from destination"), 0
 	}
 	defer resp.Body.Close()
 	var r CatalogEntry
 	err = json.NewDecoder(resp.Body).Decode(&r)
 	if err != nil {
-		return "", err
+		return "", err, 0
 	}
-	return r.Pfn, nil
+	mbytes := float64(c.Bytes) / 1048576
+	throughput := mbytes / elapsed.Seconds()
+	return r.Pfn, nil, throughput
 }
 
 // Check destination catalog
@@ -365,11 +368,13 @@ func PushTransfer() Decorator {
 
 				// if protocol is not given use default one: HTTP
 				var rpfn string // remote PFN
+				var throughput float64
 				if srcAgent.Protocol == "" || srcAgent.Protocol == "http" {
 					log.WithFields(log.Fields{
 						"dstAgent": dstAgent.String(),
 					}).Println("Transfer via HTTP protocol to", dstAgent.String())
-					rpfn, err = httpTransfer(rec, t)
+					rpfn, err, throughput = httpTransfer(rec, t)
+					log.Println(throughput)
 					if err != nil {
 						log.WithFields(log.Fields{
 							"TransferRequest": t.String(),
@@ -380,6 +385,8 @@ func PushTransfer() Decorator {
 						failedRecords = append(failedRecords, rec)
 						continue // if we fail on single record we continue with others
 					}
+					// store data in table
+
 				} else {
 					// construct remote PFN by using destination agent backend and record LFN
 					rpfn = fmt.Sprintf("%s%s", dstAgent.Backend, rec.Lfn)
