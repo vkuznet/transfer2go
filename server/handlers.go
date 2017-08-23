@@ -141,12 +141,43 @@ func AuthHandler(w http.ResponseWriter, r *http.Request) {
 		PullHandler(w, r)
 	case "meta":
 		MetaHandler(w, r)
+	case "history":
+		HistoricalHandler(w, r)
 	default:
 		DefaultHandler(w, r)
 	}
 }
 
 // GET methods
+
+// Endpoint to get the historical data
+func HistoricalHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	time0 := r.FormValue("time0")
+	time1 := r.FormValue("time1")
+	transfers, err := core.TFC.GetTransfers(time0, time1)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"Error": err,
+		}).Error("AgentsHandler", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	data, err := json.Marshal(transfers)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"Error": err,
+		}).Error("AgentsHandler", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	} else {
+		w.WriteHeader(http.StatusOK)
+	}
+	w.Write(data)
+}
 
 // TransfersHandler provides information about files in catalog
 func TransfersHandler(w http.ResponseWriter, r *http.Request) {

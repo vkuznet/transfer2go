@@ -45,6 +45,14 @@ type CatalogEntry struct {
 	Timestamp    int64  `json:"timestamp"`    // time stamp
 }
 
+// TransferData helps to structure the rows of transfers table
+type TransferData struct {
+	Timestamp  int64   `json:"timestamp"`  // Helps to get data historically
+	CpuUsage   float64 `json:"cpu"`        // percentage of cpu used
+	MemUsage   float64 `json:"ram"`        // ram used in MB
+	Throughput float64 `json:"throughput"` // network throughput during transfer in MB
+}
+
 // Catalog represents Trivial File Catalog (TFC) of the model
 type Catalog struct {
 	Type     string `json:"type"`     // catalog type, e.g. sqlite3, etc.
@@ -292,6 +300,38 @@ func (c *Catalog) Transfers(time0, time1 string) []CatalogEntry {
 		out = append(out, rec)
 	}
 	return out
+}
+
+// Get transfers details
+func (c *Catalog) GetTransfers(time0, time1 string) ([]TransferData, error) {
+	stm := getSQL("get_transfers")
+	var vals []interface{}
+	stm += fmt.Sprintf(" WHERE TIMESTAMP>=%s AND TIMESTAMP<=%s", time0, time1)
+	vals = append(vals, time0)
+	vals = append(vals, time1)
+
+	// fetch data from DB
+	rows, err := DB.Query(stm, vals...)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"Query": stm,
+			"Err":   err,
+		}).Error("DB.Query")
+		return []TransferData{}, err
+	}
+	defer rows.Close()
+	var out []TransferData
+	for rows.Next() {
+		rec := TransferData{}
+		err := rows.Scan(&rec.Timestamp, &rec.CpuUsage, &rec.MemUsage, &rec.Throughput)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"Err": err,
+			}).Error("rows.Scan")
+		}
+		out = append(out, rec)
+	}
+	return out, nil
 }
 
 // Insert new request
