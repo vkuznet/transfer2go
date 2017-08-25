@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -156,9 +157,17 @@ func HistoricalHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	time0 := r.FormValue("time0")
-	time1 := r.FormValue("time1")
-	transfers, err := core.TFC.GetTransfers(time0, time1)
+	duration, err := time.ParseDuration(r.FormValue("duration"))
+	if err != nil {
+		log.WithFields(log.Fields{
+			"Error": err,
+		}).Error("AgentsHandler", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	endTime := time.Now().Unix()
+	startTime := endTime - int64(duration.Seconds())
+	transfers, err := core.TFC.GetTransfers(strconv.FormatInt(startTime, 10), strconv.FormatInt(endTime, 10))
 	if err != nil {
 		log.WithFields(log.Fields{
 			"Error": err,

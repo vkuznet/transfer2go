@@ -305,13 +305,8 @@ func (c *Catalog) Transfers(time0, time1 string) []CatalogEntry {
 // Get transfers details
 func (c *Catalog) GetTransfers(time0, time1 string) ([]TransferData, error) {
 	stm := getSQL("get_transfers")
-	var vals []interface{}
-	stm += fmt.Sprintf(" WHERE TIMESTAMP>=%s AND TIMESTAMP<=%s", time0, time1)
-	vals = append(vals, time0)
-	vals = append(vals, time1)
-
 	// fetch data from DB
-	rows, err := DB.Query(stm, vals...)
+	rows, err := DB.Query(stm, time0, time1)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"Query": stm,

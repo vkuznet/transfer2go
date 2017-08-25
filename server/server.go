@@ -231,7 +231,7 @@ func Server(config Config) {
 
 	// Check if it is main-agent, then initialize router
 	if config.Type == "pull" {
-		cron := core.NewRouter(config.TrainInterval)
+		cron := newRouter(config.TrainInterval)
 		defer cron.Stop() // Stop the cron job with the server crash
 	}
 
