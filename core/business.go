@@ -169,7 +169,7 @@ func (j *Job) RequestFails() {
 		// Also delete that request from heap
 		err := TFC.UpdateRequest(j.TransferRequest.Id, "error")
 		if err == nil {
-			RequestQueue.Delete(j.TransferRequest.Id)  // Remove request from heap.
+			RequestQueue.Delete(j.TransferRequest.Id) // Remove request from heap.
 		} else {
 			// Could not updat status in DB
 		}
@@ -188,7 +188,7 @@ func (j *Job) RequestSuccess() {
 	case "pulltransfer":
 		err := TFC.UpdateRequest(j.TransferRequest.Id, "finished")
 		if err == nil {
-			RequestQueue.Delete(j.TransferRequest.Id)  // Remove request from heap.
+			RequestQueue.Delete(j.TransferRequest.Id) // Remove request from heap.
 		} else {
 			// Could not updat status in DB
 		}
