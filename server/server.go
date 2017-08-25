@@ -42,6 +42,7 @@ type Config struct {
 	Type        string `json:"type"`        // Configure server type push/pull
 	BufferSize  int    `json:"buffersize"`  // Size of buffered channels
 	MonitorTime int64  `json:"monitorTime"` // Large time interval after which we need to reset monitoring calculation
+	TrainInterval string `json:"trinterval"` // Time after which we need to retrain main agent
 }
 
 // String returns string representation of Config data type
@@ -227,6 +228,12 @@ func Server(config Config) {
 	// initialize transfer workers
 	transporter := core.NewDispatcher(config.Workers, config.BufferSize)
 	transporter.TransferRunner()
+
+  // Check if it is main-agent, then initialize router
+	if config.Type == "pull" {
+		cron := core.NewRouter(config.TrainInterval)
+		defer cron.Stop()  // Stop the cron job with the server crash
+	}
 
 	log.WithFields(log.Fields{
 		"Workers":       config.Workers,

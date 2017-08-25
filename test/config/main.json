@@ -10,5 +10,6 @@
     "name":"Test",
     "staticdir":"static",
     "type":"pull",
-    "MonitorTime":3600
+    "MonitorTime":3600,
+    "trinterval": "@every 10s"
 }
