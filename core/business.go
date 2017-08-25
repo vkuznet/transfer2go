@@ -169,20 +169,7 @@ func (j *Job) RequestFails() {
 		// Also delete that request from heap
 		err := TFC.UpdateRequest(j.TransferRequest.Id, "error")
 		if err == nil {
-			// Request Status changed to error
-			index := -1
-			for _, item := range RequestQueue {
-				if item.Value.Id == j.TransferRequest.Id {
-					index = item.index
-					break
-				}
-			}
-			if index < RequestQueue.Len() && index >= 0 {
-				// Remove request from heap
-				heap.Remove(&RequestQueue, index)
-			} else {
-				// Updated status in DB but couldn't find request in heap
-			}
+			RequestQueue.Delete(j.TransferRequest.Id)  // Remove request from heap.
 		} else {
 			// Could not updat status in DB
 		}
@@ -201,22 +188,9 @@ func (j *Job) RequestSuccess() {
 	case "pulltransfer":
 		err := TFC.UpdateRequest(j.TransferRequest.Id, "finished")
 		if err == nil {
-			// If transfer process finish update request status in DB
-			// Also delete that request from heap
-			index := -1
-			for _, item := range RequestQueue {
-				if item.Value.Id == j.TransferRequest.Id {
-					index = item.index
-					break
-				}
-			}
-			if index < RequestQueue.Len() && index >= 0 {
-				heap.Remove(&RequestQueue, index)
-			} else {
-				// Updated status in DB but could not find request in heap
-			}
+			RequestQueue.Delete(j.TransferRequest.Id)  // Remove request from heap.
 		} else {
-			// Could not update status from DB
+			// Could not updat status in DB
 		}
 	case "pushtransfer":
 		// Send success message to destination
