@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/robfig/cron"
-	log "github.com/sirupsen/logrus"
 	"github.com/vkuznet/transfer2go/core"
 	"github.com/vkuznet/transfer2go/utils"
 )
