@@ -9,6 +9,7 @@ import (
 
 	"github.com/robfig/cron"
 	log "github.com/sirupsen/logrus"
+	"github.com/sjwhitworth/golearn/base"
 	learn "github.com/sjwhitworth/golearn/linear_models"
 	"github.com/vkuznet/transfer2go/core"
 	"github.com/vkuznet/transfer2go/utils"
@@ -38,15 +39,41 @@ func train() {
 			dataPoints = append(dataPoints, data...)
 		}
 	}
-	err := writeToCSV(dataPoints)
-	if err != nil {
-		// TODO: retry upto maxTry.
+	if len(dataPoints) == 0 {
+		return
 	}
-	log.Println("Cron fired")
+
+	err := convertToCSV(dataPoints)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"Error": err,
+		}).Println("Error while training router")
+		return
+	}
+
+	trainingData, err := base.ParseCSVToInstances(_config.Cfile, false)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"Error": err,
+		}).Println("Error while training router")
+		return
+	}
+
+	err = AgentRouter.LinearRegression.Fit(trainingData)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"Error": err,
+		}).Println("Error while training router")
+		return
+	}
+	log.WithFields(log.Fields{
+		"TrainInterval": _config.TrainInterval,
+		"Data":          _config.Cfile,
+	}).Println("Router successfully retrained")
 }
 
 // Convert struct to csv format
-func writeToCSV(dataPoints []core.TransferData) error {
+func convertToCSV(dataPoints []core.TransferData) error {
 	file, err := os.Create(_config.Cfile)
 	if err != nil {
 		return err
@@ -78,10 +105,33 @@ func getHistory(source string) ([]core.TransferData, error) {
 	return transferRecords, nil
 }
 
-// TODO: Function to iterate through all the connected agents
-
-// TODO: Function to get the historical data
-
-// TODO: Function to train the model
-
-// TODO: Function to do the cron job
+// function to train router by previous data(After restarting it)
+func (r *Router) InitialTrain() {
+	// Check if router has previous data
+	if _, err := os.Stat(_config.Cfile); !os.IsNotExist(err) {
+		trainingData, err := base.ParseCSVToInstances(_config.Cfile, false)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"Error": err,
+			}).Println("Error while training router")
+			return
+		}
+		err = AgentRouter.LinearRegression.Fit(trainingData)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"Error": err,
+			}).Println("Error while training router")
+			return
+		}
+		log.WithFields(log.Fields{
+			"TrainInterval": _config.TrainInterval,
+			"DataFile":      _config.Cfile,
+		}).Println("Router successfully retrained")
+	} else {
+		log.WithFields(log.Fields{
+			"TrainInterval": _config.TrainInterval,
+			"DataFile":      _config.Cfile,
+			"Error":         err,
+		}).Warn("Error occured while training router for the first time")
+	}
+}

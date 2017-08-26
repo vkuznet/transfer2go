@@ -238,6 +238,7 @@ func Server(config Config) {
 		AgentRouter = newRouter(config.TrainInterval)
 		AgentRouter.CronJob.Start()
 		defer AgentRouter.CronJob.Stop() // Stop the cron job with the server crash
+		AgentRouter.InitialTrain()
 	}
 
 	log.WithFields(log.Fields{
