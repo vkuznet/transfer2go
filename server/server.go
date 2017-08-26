@@ -30,6 +30,7 @@ type Config struct {
 	Tool          string `json:"tool"`        // backend tool, e.g. srmcp
 	ToolOpts      string `json:"toolopts"`    // options for backend tool
 	Mfile         string `json:"mfile"`       // metrics file name
+	Cfile         string `json:"csvfile"`     // historical data file
 	Minterval     int64  `json:"minterval"`   // metrics interval
 	Staticdir     string `json:"staticdir"`   // static dir defines location of static files, e.g. sql,js templates
 	Workers       int    `json:"workers"`     // number of workers
@@ -68,6 +69,9 @@ type AgentProtocol struct {
 var _myself, _alias, _protocol, _backend, _tool, _toolOpts string
 var _agents map[string]string
 var _config Config
+
+// AgentRouter helps to call router's methods
+var AgentRouter *Router
 
 // init
 func init() {
@@ -231,8 +235,9 @@ func Server(config Config) {
 
 	// Check if it is main-agent, then initialize router
 	if config.Type == "pull" {
-		cron := newRouter(config.TrainInterval)
-		defer cron.Stop() // Stop the cron job with the server crash
+		AgentRouter = newRouter(config.TrainInterval)
+		AgentRouter.CronJob.Start()
+		defer AgentRouter.CronJob.Stop() // Stop the cron job with the server crash
 	}
 
 	log.WithFields(log.Fields{

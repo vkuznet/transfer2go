@@ -5,6 +5,7 @@
     "tool":"/bin/cp",
     "url":"http://localhost:8989",
     "mfile":"metrics.log",
+    "csvfile":"history.csv",
     "minterval":60,
     "verbose":0,
     "name":"Test",

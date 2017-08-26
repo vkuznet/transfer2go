@@ -1,29 +1,32 @@
 package server
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"os"
+	"strconv"
 
 	"github.com/robfig/cron"
+	log "github.com/sirupsen/logrus"
+	learn "github.com/sjwhitworth/golearn/linear_models"
 	"github.com/vkuznet/transfer2go/core"
 	"github.com/vkuznet/transfer2go/utils"
 )
 
 type Router struct {
-	CronInterval string `json:"interval"` // Helps to set hourly based cron job
+	CronInterval     string                  // Helps to set hourly based cron job
+	LinearRegression *learn.LinearRegression // machine learning model
+	CronJob          *cron.Cron              // Cron job instance
 }
 
-// AgentRouter helps to call router's methods
-var AgentRouter Router
-
 // newRouter returns new instance of Router type
-func newRouter(interval string) *cron.Cron {
+func newRouter(interval string) *Router {
 	timeConfig := "@every " + interval // It works on this format - http://golang.org/pkg/time/#ParseDuration
-	AgentRouter = Router{CronInterval: interval}
+	lr := learn.NewLinearRegression()
 	c := cron.New()
 	c.AddFunc(timeConfig, train)
-	c.Start()
-	return c
+	return &Router{CronInterval: interval, LinearRegression: lr, CronJob: c}
 }
 
 // Function to train the agent
@@ -35,6 +38,29 @@ func train() {
 			dataPoints = append(dataPoints, data...)
 		}
 	}
+	err := writeToCSV(dataPoints)
+	if err != nil {
+		// TODO: retry upto maxTry.
+	}
+	log.Println("Cron fired")
+}
+
+// Convert struct to csv format
+func writeToCSV(dataPoints []core.TransferData) error {
+	file, err := os.Create(_config.Cfile)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+
+	for _, obj := range dataPoints {
+		str := []string{strconv.FormatFloat(obj.CpuUsage, 'f', -1, 64), strconv.FormatFloat(obj.MemUsage, 'f', -1, 64), strconv.FormatFloat(obj.Throughput, 'f', -1, 64)}
+		writer.Write(str)
+	}
+	return nil
 }
 
 // function to get historical data of agent
