@@ -1,4 +1,4 @@
-package server
+package core
 
 import (
 	"encoding/csv"
@@ -11,29 +11,34 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/sjwhitworth/golearn/base"
 	learn "github.com/sjwhitworth/golearn/linear_models"
-	"github.com/vkuznet/transfer2go/core"
 	"github.com/vkuznet/transfer2go/utils"
 )
 
 type Router struct {
 	CronInterval     string                  // Helps to set hourly based cron job
 	LinearRegression *learn.LinearRegression // machine learning model
-	CronJob          *cron.Cron              // Cron job instance
+	CSVfile          string                  // historical data file
+	Agents           *map[string]string      // list of connected agents
 }
 
+// AgentRouter helps to call router's methods
+var AgentRouter Router
+
 // newRouter returns new instance of Router type
-func newRouter(interval string) *Router {
+func NewRouter(interval string, agent *map[string]string) *cron.Cron {
+	log.Println(agent)
 	timeConfig := "@every " + interval // It works on this format - http://golang.org/pkg/time/#ParseDuration
 	lr := learn.NewLinearRegression()
 	c := cron.New()
 	c.AddFunc(timeConfig, train)
-	return &Router{CronInterval: interval, LinearRegression: lr, CronJob: c}
+	AgentRouter = Router{CronInterval: interval, LinearRegression: lr, Agents: agent}
+	return c
 }
 
 // Function to train the agent
 func train() {
-	var dataPoints []core.TransferData
-	for _, source := range _agents {
+	var dataPoints []TransferData
+	for _, source := range *AgentRouter.Agents {
 		data, err := getHistory(source)
 		if err == nil {
 			dataPoints = append(dataPoints, data...)
@@ -51,7 +56,7 @@ func train() {
 		return
 	}
 
-	trainingData, err := base.ParseCSVToInstances(_config.Cfile, false)
+	trainingData, err := base.ParseCSVToInstances(AgentRouter.CSVfile, false)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"Error": err,
@@ -67,14 +72,14 @@ func train() {
 		return
 	}
 	log.WithFields(log.Fields{
-		"TrainInterval": _config.TrainInterval,
-		"Data":          _config.Cfile,
+		"CronInterval": AgentRouter.CronInterval,
+		"Data":         AgentRouter.CSVfile,
 	}).Println("Router successfully retrained")
 }
 
 // Convert struct to csv format
-func convertToCSV(dataPoints []core.TransferData) error {
-	file, err := os.Create(_config.Cfile)
+func convertToCSV(dataPoints []TransferData) error {
+	file, err := os.Create(AgentRouter.CSVfile)
 	if err != nil {
 		return err
 	}
@@ -91,13 +96,13 @@ func convertToCSV(dataPoints []core.TransferData) error {
 }
 
 // function to get historical data of agent
-func getHistory(source string) ([]core.TransferData, error) {
+func getHistory(source string) ([]TransferData, error) {
 	url := fmt.Sprintf("%s/history?duration=%s", source, AgentRouter.CronInterval)
 	resp := utils.FetchResponse(url, []byte{})
 	if resp.Error != nil {
 		return nil, resp.Error
 	}
-	var transferRecords []core.TransferData
+	var transferRecords []TransferData
 	err := json.Unmarshal(resp.Data, &transferRecords)
 	if err != nil {
 		return nil, err
@@ -107,9 +112,9 @@ func getHistory(source string) ([]core.TransferData, error) {
 
 // function to train router by previous data(After restarting it)
 func (r *Router) InitialTrain() {
-	// Check if router has previous data
-	if _, err := os.Stat(_config.Cfile); !os.IsNotExist(err) {
-		trainingData, err := base.ParseCSVToInstances(_config.Cfile, false)
+	// Check if router has previous data, if not run train method for the first time
+	if _, err := os.Stat(AgentRouter.CSVfile); !os.IsNotExist(err) {
+		trainingData, err := base.ParseCSVToInstances(AgentRouter.CSVfile, false)
 		if err != nil {
 			log.WithFields(log.Fields{
 				"Error": err,
@@ -124,14 +129,19 @@ func (r *Router) InitialTrain() {
 			return
 		}
 		log.WithFields(log.Fields{
-			"TrainInterval": _config.TrainInterval,
-			"DataFile":      _config.Cfile,
+			"TrainInterval": AgentRouter.CronInterval,
+			"DataFile":      AgentRouter.CSVfile,
 		}).Println("Router successfully retrained")
 	} else {
 		log.WithFields(log.Fields{
-			"TrainInterval": _config.TrainInterval,
-			"DataFile":      _config.Cfile,
-			"Error":         err,
-		}).Warn("Error occured while training router for the first time")
+			"TrainInterval": AgentRouter.CronInterval,
+			"DataFile":      AgentRouter.CSVfile,
+			"error":         err,
+		}).Println("Unable to find past data")
 	}
+}
+
+// Function to get the appropriate source agent
+func (r *Router) FindSource(tRequest *TransferRequest) (string, string, error) {
+	return "test.com", "test", nil
 }

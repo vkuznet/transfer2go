@@ -440,6 +440,8 @@ func ActionHandler(w http.ResponseWriter, r *http.Request) {
 
 // TFCHandler registers given record in local TFC
 func TFCHandler(w http.ResponseWriter, r *http.Request) {
+	// allow cross domain AJAX requests
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	if !(r.Method == "POST" || r.Method == "GET") {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -555,6 +557,8 @@ func RegisterProtocolHandler(w http.ResponseWriter, r *http.Request) {
 
 // RequestHandler initiate transfer work for given request
 func RequestHandler(w http.ResponseWriter, r *http.Request) {
+	// allow cross domain AJAX requests
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	if r.Method != "POST" {
 		w.WriteHeader(http.StatusMethodNotAllowed)

@@ -44,6 +44,7 @@ type Config struct {
 	BufferSize    int    `json:"buffersize"`  // Size of buffered channels
 	MonitorTime   int64  `json:"monitorTime"` // Large time interval after which we need to reset monitoring calculation
 	TrainInterval string `json:"trinterval"`  // Time after which we need to retrain main agent
+	RouterModel   bool   `json:"router"`      // Variable to enable the router model
 }
 
 // String returns string representation of Config data type
@@ -69,9 +70,6 @@ type AgentProtocol struct {
 var _myself, _alias, _protocol, _backend, _tool, _toolOpts string
 var _agents map[string]string
 var _config Config
-
-// AgentRouter helps to call router's methods
-var AgentRouter *Router
 
 // init
 func init() {
@@ -219,8 +217,18 @@ func Server(config Config) {
 	// initialize transfer model
 	core.TransferType = config.Type
 
+	// Check if RouterModel is enabled, then initialize router
+	if config.RouterModel == true {
+		log.WithFields(log.Fields{
+			"TrainInterval": _config.TrainInterval,
+		}).Println("Enabling router model")
+		cronJob := core.NewRouter(config.TrainInterval, &_agents)
+		cronJob.Start()
+		defer cronJob.Stop() // Stop the cron job with the server crash
+	}
+
 	// initialize job queues
-	core.InitQueue(config.QueueSize, config.QueueSize, config.Mfile, config.Minterval, config.MonitorTime)
+	core.InitQueue(config.QueueSize, config.QueueSize, config.Mfile, config.Minterval, config.MonitorTime, config.RouterModel)
 
 	if config.BufferSize == 0 {
 		config.BufferSize = 5
@@ -232,14 +240,6 @@ func Server(config Config) {
 	// initialize transfer workers
 	transporter := core.NewDispatcher(config.Workers, config.BufferSize)
 	transporter.TransferRunner()
-
-	// Check if it is main-agent, then initialize router
-	if config.Type == "pull" {
-		AgentRouter = newRouter(config.TrainInterval)
-		AgentRouter.CronJob.Start()
-		defer AgentRouter.CronJob.Stop() // Stop the cron job with the server crash
-		AgentRouter.InitialTrain()
-	}
 
 	log.WithFields(log.Fields{
 		"Workers":       config.Workers,

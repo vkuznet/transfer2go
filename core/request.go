@@ -266,6 +266,15 @@ func PullTransfer() Decorator {
 			if err != nil {
 				return err
 			}
+			// If router is enabled get appropriate source agent
+			if routerModel == true {
+				srcUrl, srcAlias, err := AgentRouter.FindSource(t)
+				log.WithFields(log.Fields{
+					"srcUrl":   srcUrl,
+					"srcAlias": srcAlias,
+					"err":      err,
+				}).Println("Selected Agent")
+			}
 			url = fmt.Sprintf("%s/status", t.SrcUrl)
 			resp = utils.FetchResponse(url, []byte{})
 			if resp.Error != nil {
@@ -319,7 +328,7 @@ func PushTransfer() Decorator {
 				// file does not exists in TFC, nothing to do, return immediately
 				log.WithFields(log.Fields{
 					"TransferRequest": t,
-				}).Warn("Does not match anything in TFC of this agent\n", t)
+				}).Warn("Does not match anything in TFC of this agent or data already exists in destination\n")
 				return r.Process(t)
 			}
 			// obtain information about source and destination agents

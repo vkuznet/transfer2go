@@ -27,6 +27,7 @@ type Metrics struct {
 	CpuUsage   metrics.GaugeFloat64 // CPU usage in percentage
 	MemUsage   metrics.GaugeFloat64 // Memory usage in MB
 	Tick       metrics.Counter      // Store cpu ticks
+	MaxTick    int64                // Max tick after which reset metrics
 }
 
 // TransferRequest data type
@@ -82,6 +83,9 @@ var TransferQueue chan Job
 
 // Decide pull or push based model
 var TransferType string
+
+// Param to enable the router
+var routerModel bool
 
 // Method to get cpu and Memory usage
 func (m *Metrics) GetUsage() (float64, float64, error) {
@@ -285,7 +289,7 @@ func NewDispatcher(maxWorkers int, bufferSize int) *Dispatcher {
 }
 
 // initialize RequestQueue, transferQueue and StorageQueue
-func InitQueue(transferQueueSize int, storageQueueSize int, mfile string, minterval int64, monitorTime int64) {
+func InitQueue(transferQueueSize int, storageQueueSize int, mfile string, minterval int64, monitorTime int64, router bool) {
 	// register metrics
 	f, e := os.OpenFile(mfile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if e != nil {
@@ -304,23 +308,16 @@ func InitQueue(transferQueueSize int, storageQueueSize int, mfile string, minter
 	cpuUsage := metrics.GetOrRegisterGaugeFloat64("cpuUsage", r)
 	tick := metrics.GetOrRegisterCounter("tick", r)
 	memUsage := metrics.GetOrRegisterGaugeFloat64("memUsage", r)
-	AgentMetrics = Metrics{In: inT, Failed: failT, Total: totT, TotalBytes: totB, Bytes: bytesT, CpuUsage: cpuUsage, MemUsage: memUsage, Tick: tick}
+	timeTick := monitorTime / minterval
+	AgentMetrics = Metrics{In: inT, Failed: failT, Total: totT, TotalBytes: totB, Bytes: bytesT, CpuUsage: cpuUsage, MemUsage: memUsage, Tick: tick, MaxTick: timeTick}
 
+	// Calculate the machine usage for the first time
+	AgentMetrics.GetCurrentStats()
+
+	// Run background process to calculate machine usage
 	go func() {
-		timeTick := monitorTime / minterval
 		for _ = range time.Tick(time.Duration(minterval) * time.Second) {
-			cused, err1 := utils.UsedCPU()
-			mused, err2 := utils.UsedRAM()
-			if err1 == nil && err2 == nil {
-				if AgentMetrics.Tick.Count() > timeTick {
-					AgentMetrics.Tick.Clear()
-					AgentMetrics.CpuUsage.Update(0)
-					AgentMetrics.MemUsage.Update(0)
-				}
-				AgentMetrics.Tick.Inc(1)
-				AgentMetrics.CpuUsage.Update(AgentMetrics.CpuUsage.Value() + cused)
-				AgentMetrics.MemUsage.Update(AgentMetrics.MemUsage.Value() + mused)
-			}
+			AgentMetrics.GetCurrentStats()
 		}
 	}()
 
@@ -339,9 +336,12 @@ func InitQueue(transferQueueSize int, storageQueueSize int, mfile string, minter
 		for i := 0; i < len(requests); i++ {
 			heap.Push(&RequestQueue, &Item{Value: requests[i], priority: requests[i].Priority})
 		}
+		if router == true {
+			routerModel = router
+			AgentRouter.InitialTrain()
+		}
 		logs.Println("Requests restored from db")
 	}
-
 	TransferQueue = make(chan Job, transferQueueSize)
 }
 
@@ -436,5 +436,21 @@ func (d *Dispatcher) dispatchToTransfer() {
 		default:
 			time.Sleep(time.Duration(10) * time.Millisecond) // wait for a job
 		}
+	}
+}
+
+// Function to get current system usage
+func (m *Metrics) GetCurrentStats() {
+	cused, err1 := utils.UsedCPU()
+	mused, err2 := utils.UsedRAM()
+	if err1 == nil && err2 == nil {
+		if AgentMetrics.Tick.Count() > m.MaxTick {
+			AgentMetrics.Tick.Clear()
+			AgentMetrics.CpuUsage.Update(0)
+			AgentMetrics.MemUsage.Update(0)
+		}
+		AgentMetrics.Tick.Inc(1)
+		AgentMetrics.CpuUsage.Update(AgentMetrics.CpuUsage.Value() + cused)
+		AgentMetrics.MemUsage.Update(AgentMetrics.MemUsage.Value() + mused)
 	}
 }
