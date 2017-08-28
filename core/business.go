@@ -5,22 +5,29 @@ package core
 
 import (
 	"container/heap"
+	"errors"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"time"
 
 	"github.com/rcrowley/go-metrics"
 	logs "github.com/sirupsen/logrus"
+	"github.com/vkuznet/transfer2go/utils"
 )
 
 // Metrics of the agent
 type Metrics struct {
-	In         metrics.Counter // number of live transfer requests
-	Failed     metrics.Counter // number of failed transfer requests
-	Total      metrics.Counter // total number of transfer requests
-	TotalBytes metrics.Counter // total number of bytes by this agent
-	Bytes      metrics.Counter // number of bytes in progress
+	In         metrics.Counter      // number of live transfer requests
+	Failed     metrics.Counter      // number of failed transfer requests
+	Total      metrics.Counter      // total number of transfer requests
+	TotalBytes metrics.Counter      // total number of bytes by this agent
+	Bytes      metrics.Counter      // number of bytes in progress
+	CpuUsage   metrics.GaugeFloat64 // CPU usage in percentage
+	MemUsage   metrics.GaugeFloat64 // Memory usage in MB
+	Tick       metrics.Counter      // Store cpu ticks
+	MaxTick    int64                // Max tick after which reset metrics
 }
 
 // TransferRequest data type
@@ -74,8 +81,21 @@ var RequestQueue PriorityQueue
 // An instance of dispatcher to handle the transfer process
 var TransferQueue chan Job
 
-//
+// Decide pull or push based model
 var TransferType string
+
+// Param to enable the router
+var routerModel bool
+
+// Method to get cpu and Memory usage
+func (m *Metrics) GetUsage() (float64, float64, error) {
+	cusage := AgentMetrics.CpuUsage.Value() / float64(AgentMetrics.Tick.Count())
+	musage := AgentMetrics.MemUsage.Value() / float64(AgentMetrics.Tick.Count())
+	if math.IsNaN(cusage) || math.IsNaN(musage) {
+		return 0, 0, errors.New("Calculating system metrics")
+	}
+	return cusage, musage, nil
+}
 
 // String representation of Metrics
 func (m *Metrics) String() string {
@@ -153,20 +173,7 @@ func (j *Job) RequestFails() {
 		// Also delete that request from heap
 		err := TFC.UpdateRequest(j.TransferRequest.Id, "error")
 		if err == nil {
-			// Request Status changed to error
-			index := -1
-			for _, item := range RequestQueue {
-				if item.Value.Id == j.TransferRequest.Id {
-					index = item.index
-					break
-				}
-			}
-			if index < RequestQueue.Len() && index >= 0 {
-				// Remove request from heap
-				heap.Remove(&RequestQueue, index)
-			} else {
-				// Updated status in DB but couldn't find request in heap
-			}
+			RequestQueue.Delete(j.TransferRequest.Id) // Remove request from heap.
 		} else {
 			// Could not updat status in DB
 		}
@@ -185,22 +192,9 @@ func (j *Job) RequestSuccess() {
 	case "pulltransfer":
 		err := TFC.UpdateRequest(j.TransferRequest.Id, "finished")
 		if err == nil {
-			// If transfer process finish update request status in DB
-			// Also delete that request from heap
-			index := -1
-			for _, item := range RequestQueue {
-				if item.Value.Id == j.TransferRequest.Id {
-					index = item.index
-					break
-				}
-			}
-			if index < RequestQueue.Len() && index >= 0 {
-				heap.Remove(&RequestQueue, index)
-			} else {
-				// Updated status in DB but could not find request in heap
-			}
+			RequestQueue.Delete(j.TransferRequest.Id) // Remove request from heap.
 		} else {
-			// Could not update status from DB
+			// Could not updat status in DB
 		}
 	case "pushtransfer":
 		// Send success message to destination
@@ -295,7 +289,7 @@ func NewDispatcher(maxWorkers int, bufferSize int) *Dispatcher {
 }
 
 // initialize RequestQueue, transferQueue and StorageQueue
-func InitQueue(transferQueueSize int, storageQueueSize int, mfile string, minterval int64) {
+func InitQueue(transferQueueSize int, storageQueueSize int, mfile string, minterval int64, monitorTime int64, router bool) {
 	// register metrics
 	f, e := os.OpenFile(mfile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if e != nil {
@@ -311,7 +305,22 @@ func InitQueue(transferQueueSize int, storageQueueSize int, mfile string, minter
 	totT := metrics.GetOrRegisterCounter("totalTransfers", r)
 	totB := metrics.GetOrRegisterCounter("totalBytes", r)
 	bytesT := metrics.GetOrRegisterCounter("bytesInTransfer", r)
-	AgentMetrics = Metrics{In: inT, Failed: failT, Total: totT, TotalBytes: totB, Bytes: bytesT}
+	cpuUsage := metrics.GetOrRegisterGaugeFloat64("cpuUsage", r)
+	tick := metrics.GetOrRegisterCounter("tick", r)
+	memUsage := metrics.GetOrRegisterGaugeFloat64("memUsage", r)
+	timeTick := monitorTime / minterval
+	AgentMetrics = Metrics{In: inT, Failed: failT, Total: totT, TotalBytes: totB, Bytes: bytesT, CpuUsage: cpuUsage, MemUsage: memUsage, Tick: tick, MaxTick: timeTick}
+
+	// Calculate the machine usage for the first time
+	AgentMetrics.GetCurrentStats()
+
+	// Run background process to calculate machine usage
+	go func() {
+		for _ = range time.Tick(time.Duration(minterval) * time.Second) {
+			AgentMetrics.GetCurrentStats()
+		}
+	}()
+
 	go func() {
 		defer f.Close()
 		metrics.Log(r, time.Duration(minterval)*time.Second, log.New(f, "metrics: ", log.Lmicroseconds))
@@ -327,9 +336,12 @@ func InitQueue(transferQueueSize int, storageQueueSize int, mfile string, minter
 		for i := 0; i < len(requests); i++ {
 			heap.Push(&RequestQueue, &Item{Value: requests[i], priority: requests[i].Priority})
 		}
+		if router == true {
+			routerModel = router
+			AgentRouter.InitialTrain()
+		}
 		logs.Println("Requests restored from db")
 	}
-
 	TransferQueue = make(chan Job, transferQueueSize)
 }
 
@@ -424,5 +436,21 @@ func (d *Dispatcher) dispatchToTransfer() {
 		default:
 			time.Sleep(time.Duration(10) * time.Millisecond) // wait for a job
 		}
+	}
+}
+
+// Function to get current system usage
+func (m *Metrics) GetCurrentStats() {
+	cused, err1 := utils.UsedCPU()
+	mused, err2 := utils.UsedRAM()
+	if err1 == nil && err2 == nil {
+		if AgentMetrics.Tick.Count() > m.MaxTick {
+			AgentMetrics.Tick.Clear()
+			AgentMetrics.CpuUsage.Update(0)
+			AgentMetrics.MemUsage.Update(0)
+		}
+		AgentMetrics.Tick.Inc(1)
+		AgentMetrics.CpuUsage.Update(AgentMetrics.CpuUsage.Value() + cused)
+		AgentMetrics.MemUsage.Update(AgentMetrics.MemUsage.Value() + mused)
 	}
 }

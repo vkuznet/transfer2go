@@ -1,14 +1,15 @@
 {
     "catalog":"test/catalog/source.json",
-    "protocol":"cp",
+    "protocol":"http",
     "backend":"test/",
-    "tool":"/bin/cp",
+    "tool":"",
     "url":"http://localhost:8000",
     "port": 8000,
-    "mfile":"metrics2.log",
+    "mfile":"metrics1.log",
     "minterval":60,
     "verbose":0,
     "name":"source",
     "staticdir":"static",
-    "type": "push"
+    "type": "push",
+    "MonitorTime":3600
 }

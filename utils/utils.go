@@ -17,6 +17,8 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/shirou/gopsutil/cpu"
+	"github.com/shirou/gopsutil/mem"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -28,13 +30,13 @@ func ListFiles(dir string) []string {
 	var out []string
 	err := filepath.Walk(dir, func(path string, f os.FileInfo, err error) error {
 		if err != nil {
-      return err
-    }
-    if !f.IsDir() {
+			return err
+		}
+		if !f.IsDir() {
 			out = append(out, path)
-    }
-    return nil
-  })
+		}
+		return nil
+	})
 	if err != nil {
 		log.WithFields(log.Fields{
 			"Directory": dir,
@@ -235,4 +237,31 @@ func SourceLine() string {
 		}
 	}
 	return strings.Join(out, " -> ")
+}
+
+// Calculate CPU usage
+func UsedCPU() (float64, error) {
+	cpuUsage, err := cpu.Percent(0, true)
+	if err != nil {
+		return 100, err
+	}
+	totalCPU, err := cpu.Counts(true)
+	if err != nil {
+		return 100, err
+	}
+	var avgUsage float64
+	for _, val := range cpuUsage {
+		avgUsage += val
+	}
+	return avgUsage / float64(totalCPU), nil
+}
+
+// Get used ram
+func UsedRAM() (float64, error) {
+	ram, err := mem.VirtualMemory()
+	if err != nil {
+		return 0, err
+	}
+	usedRam := float64(ram.Used) / 1048576 // Convert bytes to MB
+	return usedRam, nil
 }

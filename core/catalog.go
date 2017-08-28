@@ -45,6 +45,14 @@ type CatalogEntry struct {
 	Timestamp    int64  `json:"timestamp"`    // time stamp
 }
 
+// TransferData helps to structure the rows of transfers table
+type TransferData struct {
+	Timestamp  int64   `json:"timestamp"`  // Helps to get data historically
+	CpuUsage   float64 `json:"cpu"`        // percentage of cpu used
+	MemUsage   float64 `json:"ram"`        // ram used in MB
+	Throughput float64 `json:"throughput"` // network throughput during transfer in MB
+}
+
 // Catalog represents Trivial File Catalog (TFC) of the model
 type Catalog struct {
 	Type     string `json:"type"`     // catalog type, e.g. sqlite3, etc.
@@ -294,6 +302,33 @@ func (c *Catalog) Transfers(time0, time1 string) []CatalogEntry {
 	return out
 }
 
+// Get transfers details
+func (c *Catalog) GetTransfers(time0, time1 string) ([]TransferData, error) {
+	stm := getSQL("get_transfers")
+	// fetch data from DB
+	rows, err := DB.Query(stm, time0, time1)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"Query": stm,
+			"Err":   err,
+		}).Error("DB.Query")
+		return []TransferData{}, err
+	}
+	defer rows.Close()
+	var out []TransferData
+	for rows.Next() {
+		rec := TransferData{}
+		err := rows.Scan(&rec.Timestamp, &rec.CpuUsage, &rec.MemUsage, &rec.Throughput)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"Err": err,
+			}).Error("rows.Scan")
+		}
+		out = append(out, rec)
+	}
+	return out, nil
+}
+
 // Insert new request
 func (c *Catalog) InsertRequest(request TransferRequest) error {
 	stm := getSQL("insert_request")
@@ -411,4 +446,10 @@ func (c *Catalog) ListRequest(query string) ([]TransferRequest, error) {
 		requests = append(requests, r)
 	}
 	return requests, err
+}
+
+// Insert new row to TRANSFERS table
+func (c *Catalog) InsertTransfers(time int64, cpuUsage float64, memUsage float64, throughput float64) {
+	stm := getSQL("insert_transfers")
+	DB.Exec(stm, time, cpuUsage, memUsage, throughput)
 }

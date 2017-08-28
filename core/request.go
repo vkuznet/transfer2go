@@ -33,6 +33,8 @@ type AgentStatus struct {
 	Agents    map[string]string `json:"agents"`   // list of known agents
 	Addrs     []string          `json:"addrs"`    // list of all IP addresses
 	Metrics   map[string]int64  `json:"metrics"`  // agent metrics
+	CpuUsage  float64           `json:"cpuusage"` // percentage of cpu used
+	MemUsage  float64           `json:"memusage"` // Avg RAM used in MB
 }
 
 // Processor is an object who process' given task
@@ -135,27 +137,30 @@ func fileTransferRequest(c CatalogEntry, tr *TransferRequest) (*http.Response, e
 }
 
 // helper function to perform transfer via HTTP protocol
-func httpTransfer(c CatalogEntry, t *TransferRequest) (string, error) {
-	// create file transfer request
-	resp, err := fileTransferRequest(c, t)
+func httpTransfer(c CatalogEntry, t *TransferRequest) (string, error, float64) {
+	start := time.Now()
+	resp, err := fileTransferRequest(c, t) // create file transfer request
+	elapsed := time.Since(start)
 	if err != nil {
-		return "", err
+		return "", err, 0
 	}
 	if resp == nil || resp.StatusCode != 200 {
-		return "", errors.New("Empty response from destination")
+		return "", errors.New("Empty response from destination"), 0
 	}
 	defer resp.Body.Close()
 	var r CatalogEntry
 	err = json.NewDecoder(resp.Body).Decode(&r)
 	if err != nil {
-		return "", err
+		return "", err, 0
 	}
-	return r.Pfn, nil
+	mbytes := float64(c.Bytes) / 1048576
+	throughput := mbytes / elapsed.Seconds()
+	return r.Pfn, nil, throughput
 }
 
 // Check destination catalog
-func GetDestFiles(tr TransferRequest) ([]CatalogEntry, error) {
-	url := fmt.Sprintf("%s/meta", tr.DstUrl)
+func GetRemoteFiles(tr TransferRequest, remote string) ([]CatalogEntry, error) {
+	url := fmt.Sprintf("%s/meta", remote)
 	d, err := json.Marshal(tr)
 	if err != nil {
 		return nil, err
@@ -194,7 +199,7 @@ func compareRecords(requestedCatalog []CatalogEntry, remoteCatalog []CatalogEntr
 func Store() Decorator {
 	return func(r Request) Request {
 		return RequestFunc(func(t *TransferRequest) error {
-			t.Id = time.Now().UnixNano()
+			t.Id = time.Now().Unix()
 			item := &Item{
 				Value:    *t,
 				priority: t.Priority,
@@ -218,33 +223,23 @@ func Store() Decorator {
 func Delete() Decorator {
 	return func(r Request) Request {
 		return RequestFunc(func(t *TransferRequest) error {
-			// Delete request from PriorityQueue. The complexity is O(n) where n = heap.Len()
-			index := -1
-			var err error
 
-			for _, item := range RequestQueue {
-				if item.Value.Id == t.Id {
-					index = item.index
-					break
-				}
-			}
+			err := TFC.UpdateRequest(t.Id, "deleted")
 
-			if index < RequestQueue.Len() && index >= 0 {
-				err = TFC.UpdateRequest(t.Id, "deleted")
-				if err != nil {
-					t.Status = "error"
-					return err
-				} else {
-					// TODO: May be we need to add lock over here.
-					heap.Remove(&RequestQueue, index)
-					t.Status = "deleted"
+			if err == nil {
+				deleted := RequestQueue.Delete(t.Id)
+				if deleted {
 					log.WithFields(log.Fields{
 						"Request": t,
 					}).Println("Request Deleted")
+				} else {
+					t.Status = "error"
+					err = errors.New("Can't find request in Heap")
+					return err
 				}
 			} else {
 				t.Status = "error"
-				err = errors.New("Can't find request in heap")
+				err = errors.New("Can't find request in Database")
 				return err
 			}
 
@@ -270,6 +265,23 @@ func PullTransfer() Decorator {
 			err := json.Unmarshal(resp.Data, &dstAgent)
 			if err != nil {
 				return err
+			}
+			// If router is enabled to get appropriate source agent
+			if routerModel == true {
+				srcAlias, srcUrl, err := AgentRouter.FindSource(t)
+				if err == nil {
+					t.SrcUrl = srcUrl
+					t.SrcAlias = srcAlias
+					log.WithFields(log.Fields{
+						"srcUrl":   srcUrl,
+						"srcAlias": srcAlias,
+						"err":      err,
+					}).Println("Selected Agent")
+				} else {
+					log.WithFields(log.Fields{
+						"err": err,
+					}).Println("Error while selecting agent")
+				}
 			}
 			url = fmt.Sprintf("%s/status", t.SrcUrl)
 			resp = utils.FetchResponse(url, []byte{})
@@ -312,7 +324,7 @@ func PushTransfer() Decorator {
 			} else {
 				requestedRecords := TFC.Records(*t)
 				// Check if the requested data is already presented on destination agent.
-				remoteRecords, err := GetDestFiles(*t)
+				remoteRecords, err := GetRemoteFiles(*t, t.DstUrl)
 				if remoteRecords == nil || err != nil {
 					records = requestedRecords
 				} else {
@@ -324,7 +336,7 @@ func PushTransfer() Decorator {
 				// file does not exists in TFC, nothing to do, return immediately
 				log.WithFields(log.Fields{
 					"TransferRequest": t,
-				}).Warn("Does not match anything in TFC of this agent\n", t)
+				}).Warn("Does not match anything in TFC of this agent or data already exists in destination\n")
 				return r.Process(t)
 			}
 			// obtain information about source and destination agents
@@ -363,11 +375,12 @@ func PushTransfer() Decorator {
 
 				// if protocol is not given use default one: HTTP
 				var rpfn string // remote PFN
+				var throughput float64
 				if srcAgent.Protocol == "" || srcAgent.Protocol == "http" {
 					log.WithFields(log.Fields{
 						"dstAgent": dstAgent.String(),
 					}).Println("Transfer via HTTP protocol to", dstAgent.String())
-					rpfn, err = httpTransfer(rec, t)
+					rpfn, err, throughput = httpTransfer(rec, t)
 					if err != nil {
 						log.WithFields(log.Fields{
 							"TransferRequest": t.String(),
@@ -377,6 +390,11 @@ func PushTransfer() Decorator {
 						t.Status = err.Error()
 						failedRecords = append(failedRecords, rec)
 						continue // if we fail on single record we continue with others
+					}
+					cusage, memUsage, err := AgentMetrics.GetUsage()
+					if err == nil {
+						// store data in table
+						TFC.InsertTransfers(time.Now().Unix(), cusage, memUsage, throughput)
 					}
 				} else {
 					// construct remote PFN by using destination agent backend and record LFN

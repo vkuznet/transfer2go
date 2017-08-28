@@ -47,6 +47,23 @@ func (pq *PriorityQueue) Pop() interface{} {
 	return item
 }
 
+// Delete request from PriorityQueue. The complexity is O(n) where n = heap.Len()
+func (pq *PriorityQueue) Delete(id int64) bool {
+	index := -1
+	for _, item := range *pq {
+		if item.Value.Id == id {
+			index = item.index
+			break
+		}
+	}
+	// Varify request id exists in heap and then delete it
+	if index < RequestQueue.Len() && index >= 0 {
+		heap.Remove(&RequestQueue, index)
+		return true
+	}
+	return false
+}
+
 // update modifies the priority and value of an Item in the queue.
 func (pq *PriorityQueue) update(item *Item, value TransferRequest, priority int) {
 	item.Value = value

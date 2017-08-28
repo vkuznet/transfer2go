@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -141,12 +142,51 @@ func AuthHandler(w http.ResponseWriter, r *http.Request) {
 		PullHandler(w, r)
 	case "meta":
 		MetaHandler(w, r)
+	case "history":
+		HistoricalHandler(w, r)
 	default:
 		DefaultHandler(w, r)
 	}
 }
 
 // GET methods
+
+// Endpoint to get the historical data
+func HistoricalHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	duration, err := time.ParseDuration(r.FormValue("duration"))
+	if err != nil {
+		log.WithFields(log.Fields{
+			"Error": err,
+		}).Error("AgentsHandler", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	endTime := time.Now().Unix()
+	startTime := endTime - int64(duration.Seconds())
+	transfers, err := core.TFC.GetTransfers(strconv.FormatInt(startTime, 10), strconv.FormatInt(endTime, 10))
+	if err != nil {
+		log.WithFields(log.Fields{
+			"Error": err,
+		}).Error("AgentsHandler", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	data, err := json.Marshal(transfers)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"Error": err,
+		}).Error("AgentsHandler", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	} else {
+		w.WriteHeader(http.StatusOK)
+	}
+	w.Write(data)
+}
 
 // TransfersHandler provides information about files in catalog
 func TransfersHandler(w http.ResponseWriter, r *http.Request) {
@@ -231,7 +271,14 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	addrs := utils.HostIP()
-	astats := core.AgentStatus{Addrs: addrs, Catalog: core.TFC.Type, Name: _alias, Url: _myself, Protocol: _protocol, Backend: _backend, Tool: _tool, ToolOpts: _toolOpts, Agents: _agents, TimeStamp: time.Now().Unix(), Metrics: core.AgentMetrics.ToDict()}
+	cusage, musage, err := core.AgentMetrics.GetUsage()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Calculating system metrics try after some time."))
+		return
+	}
+
+	astats := core.AgentStatus{Addrs: addrs, Catalog: core.TFC.Type, Name: _alias, Url: _myself, Protocol: _protocol, Backend: _backend, Tool: _tool, ToolOpts: _toolOpts, Agents: _agents, TimeStamp: time.Now().Unix(), Metrics: core.AgentMetrics.ToDict(), CpuUsage: cusage, MemUsage: musage}
 	data, err := json.Marshal(astats)
 	if err != nil {
 		log.WithFields(log.Fields{
@@ -393,6 +440,8 @@ func ActionHandler(w http.ResponseWriter, r *http.Request) {
 
 // TFCHandler registers given record in local TFC
 func TFCHandler(w http.ResponseWriter, r *http.Request) {
+	// allow cross domain AJAX requests
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	if !(r.Method == "POST" || r.Method == "GET") {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -508,6 +557,8 @@ func RegisterProtocolHandler(w http.ResponseWriter, r *http.Request) {
 
 // RequestHandler initiate transfer work for given request
 func RequestHandler(w http.ResponseWriter, r *http.Request) {
+	// allow cross domain AJAX requests
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	if r.Method != "POST" {
 		w.WriteHeader(http.StatusMethodNotAllowed)
