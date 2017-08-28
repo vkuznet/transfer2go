@@ -159,8 +159,8 @@ func httpTransfer(c CatalogEntry, t *TransferRequest) (string, error, float64) {
 }
 
 // Check destination catalog
-func GetDestFiles(tr TransferRequest) ([]CatalogEntry, error) {
-	url := fmt.Sprintf("%s/meta", tr.DstUrl)
+func GetRemoteFiles(tr TransferRequest, remote string) ([]CatalogEntry, error) {
+	url := fmt.Sprintf("%s/meta", remote)
 	d, err := json.Marshal(tr)
 	if err != nil {
 		return nil, err
@@ -266,14 +266,22 @@ func PullTransfer() Decorator {
 			if err != nil {
 				return err
 			}
-			// If router is enabled get appropriate source agent
+			// If router is enabled to get appropriate source agent
 			if routerModel == true {
-				srcUrl, srcAlias, err := AgentRouter.FindSource(t)
-				log.WithFields(log.Fields{
-					"srcUrl":   srcUrl,
-					"srcAlias": srcAlias,
-					"err":      err,
-				}).Println("Selected Agent")
+				srcAlias, srcUrl, err := AgentRouter.FindSource(t)
+				if err == nil {
+					t.SrcUrl = srcUrl
+					t.SrcAlias = srcAlias
+					log.WithFields(log.Fields{
+						"srcUrl":   srcUrl,
+						"srcAlias": srcAlias,
+						"err":      err,
+					}).Println("Selected Agent")
+				} else {
+					log.WithFields(log.Fields{
+						"err": err,
+					}).Println("Error while selecting agent")
+				}
 			}
 			url = fmt.Sprintf("%s/status", t.SrcUrl)
 			resp = utils.FetchResponse(url, []byte{})
@@ -316,7 +324,7 @@ func PushTransfer() Decorator {
 			} else {
 				requestedRecords := TFC.Records(*t)
 				// Check if the requested data is already presented on destination agent.
-				remoteRecords, err := GetDestFiles(*t)
+				remoteRecords, err := GetRemoteFiles(*t, t.DstUrl)
 				if remoteRecords == nil || err != nil {
 					records = requestedRecords
 				} else {

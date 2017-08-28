@@ -222,7 +222,7 @@ func Server(config Config) {
 		log.WithFields(log.Fields{
 			"TrainInterval": _config.TrainInterval,
 		}).Println("Enabling router model")
-		cronJob := core.NewRouter(config.TrainInterval, &_agents)
+		cronJob := core.NewRouter(config.TrainInterval, &_agents, config.Cfile)
 		cronJob.Start()
 		defer cronJob.Stop() // Stop the cron job with the server crash
 	}
