@@ -97,7 +97,7 @@ func convertToCSV(dataPoints []TransferData) error {
 
 // function to get historical data of agent
 func getHistory(source string) ([]TransferData, error) {
-	url := fmt.Sprintf("%s/history?duration=%s", source, "24h")
+	url := fmt.Sprintf("%s/history?duration=%s", source, AgentRouter.CronInterval)
 	resp := utils.FetchResponse(url, []byte{})
 	if resp.Error != nil {
 		return nil, resp.Error
