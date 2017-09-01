@@ -170,7 +170,7 @@ func (r *Router) FindSource(tRequest *TransferRequest) (string, string, error) {
 	var selectedSource string
 	for name, source := range *r.Agents { // TODO: can parallelize this code
 		records, err := GetRemoteFiles(*tRequest, source)
-		if err != nil && len(records) < 0 {
+		if err != nil || len(records) <= 0 {
 			continue
 		}
 		url := fmt.Sprintf("%s/status", source)
