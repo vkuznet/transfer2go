@@ -12,6 +12,6 @@
     "staticdir":"static",
     "type":"pull",
     "MonitorTime":3600,
-    "trinterval": "10s",
+    "trinterval": "24h",
     "router":true
 }
