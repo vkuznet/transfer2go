@@ -17,7 +17,7 @@ fi
 service(){
   for (( ; ; )); do
     local pid=`ps auxwww | egrep "$cmd" | grep -v -e bash -e grep | awk 'BEGIN{ORS=" "} {print $2}'`
-    echo "PID=$pid"
+#    echo "PID=$pid"
     if [ -z "$pid" ]; then
       local tstamp=`date "+%Y/%m/%d %H:%M:%S"`
       echo "$tstamp goserver is not running, restart"
