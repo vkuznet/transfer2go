@@ -312,3 +312,49 @@ func readFile(path string) (string, int64, error) {
 	hash := hex.EncodeToString(hasher.Sum(nil))
 	return hash, bytes, nil
 }
+
+
+func RegisterRequest(agent string, src string, dst string) {
+	var source string
+	// resolve source agent name/alias and identify file to transfer
+	if strings.Contains(src, ":") {
+		arr := strings.Split(src, ":")
+		source = arr[len(arr)-1]
+	}
+	// parse the input
+	var lfn, block, dataset string
+	if strings.Contains(src, "#") { // it is a block name, e.g. /a/b/c#123
+		block = src
+	} else if strings.Count(src, "/") == 3 { // it is a dataset
+		dataset = src
+	} else { // it is lfn
+		lfn = src
+	}
+	var requests []core.TransferRequest
+	req := core.TransferRequest{SrcUrl: source, File: lfn, Block: block, Dataset: dataset, DstUrl: dst}
+	furl := agent + "/request"
+  requests = append(requests, req)
+  d, err := json.Marshal(requests)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"Agent": agent,
+			"Src":  src,
+			"Error": err,
+		}).Info("Unable to marshal request")
+		return
+	}
+	resp := utils.FetchResponse(furl, d)
+	if resp.Error != nil || resp.StatusCode != 200 {
+		log.WithFields(log.Fields{
+			"Agent": agent,
+			"Src": src,
+			"Error": resp.Error,
+		}).Info("Error while registering request to main agent")
+		return
+	}
+	log.WithFields(log.Fields{
+		"Agent": agent,
+		"Src": src,
+		"Dst": dst,
+	}).Info("successfully registered request")
+}

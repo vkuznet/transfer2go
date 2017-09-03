@@ -38,6 +38,8 @@ func main() {
 	flag.StringVar(&dst, "dst", "", "Destination end-point, either AgentName or AgentName:LFN")
 	var register string
 	flag.StringVar(&register, "register", "", "File with meta-data of records in JSON data format to register at remote agent")
+	var request string
+	flag.StringVar(&request, "request", "", "To register new transfer request with the main agent")
 
 	var authVar bool
 	flag.BoolVar(&authVar, "auth", true, "To disable the auth layer")
@@ -102,6 +104,8 @@ func main() {
 			err = client.Register(agent, register)
 		} else if src == "" { // no transfer request
 			client.Agent(agent)
+		} else if request != "" {
+			client.RegisterRequest(request, src, dst)
 		} else {
 			err = client.Transfer(agent, src, dst)
 		}
