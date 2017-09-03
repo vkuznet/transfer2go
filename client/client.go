@@ -324,9 +324,7 @@ func RegisterRequest(agent string, src string, dst string) {
 	// parse the input
 	var lfn, block, dataset string
 	if strings.Contains(src, "#") { // it is a block name, e.g. /a/b/c#123
-		arr := strings.Split(src, "#")
-		dataset = arr[0]
-		block = arr[1]
+		block = src
 	} else if strings.Count(src, "/") == 3 { // it is a dataset
 		dataset = src
 	} else { // it is lfn
