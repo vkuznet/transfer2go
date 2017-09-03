@@ -116,105 +116,132 @@ func findFiles(agents map[string]string, src string) ([]AgentFiles, error) {
 	return reArrange(agentFiles), nil
 }
 
-// helper function to parse source and destination parameters
-func parse(agent, src, dst string) ([][]core.TransferRequest, error) {
-	var tr [][]core.TransferRequest
-	var dstUrl string
+// helper function to find remote agents
+func findAgents(agent string) map[string]string {
 
 	// find out list of all agents
 	url := fmt.Sprintf("%s/agents", agent)
 	resp := utils.FetchResponse(url, []byte{})
 	if resp.Error != nil {
-		return tr, resp.Error
+		log.WithFields(log.Fields{
+			"Agent": agent,
+		}).Error("Unable to get list of agents")
 	}
 	var remoteAgents map[string]string
 	e := json.Unmarshal(resp.Data, &remoteAgents)
 	if e != nil {
-		return tr, e
-	}
-
-	// resolve source agent name/alias and identify file to transfer
-	if strings.Contains(src, ":") {
-		arr := strings.Split(src, ":")
-		src = arr[1]
-	}
-
-	// check if destination is ok
-	dstUrl, ok := remoteAgents[dst]
-	if !ok {
 		log.WithFields(log.Fields{
-			"Destination":  dst,
-			"known agents": remoteAgents,
-		}).Error("Unable to resolve destination")
-		return tr, fmt.Errorf("Unknown destination")
+			"Agent": agent,
+		}).Error("Unable to unmarshal response from agent")
 	}
-
-	// get list of records which provide info about agent and a file
-	// and construct transfer collection
-	records, err := findFiles(remoteAgents, src) // src here can be either lfn/block/dataset
-	if err != nil {
-		return tr, err
-	}
-	for _, rec := range records {
-		var requests []core.TransferRequest
-		for _, file := range rec.Files {
-			req := core.TransferRequest{SrcUrl: rec.Url, SrcAlias: rec.Alias, File: file, DstUrl: dstUrl, DstAlias: dst}
-			log.Println(req.String())
-			requests = append(requests, req)
-		}
-		tr = append(tr, requests)
-	}
-	return tr, nil
+	return remoteAgents
 }
 
-// Transfer client function is responsible to initiate transfer request from
-// source to destination.
-func Transfer(agent, src, dst string) error {
+// helper function to parse source and destination parameters
+func parseRequest(agent, src, dst string) (core.TransferRequest, error) {
+	var req core.TransferRequest
+	var dstUrl, srcUrl string
 
-	// parse src/dst parameters and construct list of transfer requests
-	collection, err := parse(agent, src, dst)
+	// resolve source agent name/alias and identify file to transfer
+	var data string
+	if strings.Contains(src, ":") {
+		arr := strings.Split(src, ":")
+		src = arr[0]
+		data = arr[1]
+	}
+	if len(data) == 0 {
+		log.WithFields(log.Fields{
+			"Source":      src,
+			"Destination": dst,
+		}).Error("Unable to resolve destination")
+		return req, fmt.Errorf("No data is specified to transfer")
+	}
+	remoteAgents := findAgents(agent)
+	dstUrl, dok := remoteAgents[dst]
+	if !dok {
+		log.WithFields(log.Fields{
+			"Source":      src,
+			"Destination": dst,
+		}).Error("Unable to resolve destination")
+		return req, fmt.Errorf("Unknown destination")
+	}
+	srcUrl, sok := remoteAgents[src]
+	if !sok {
+		log.WithFields(log.Fields{
+			"Source":      src,
+			"Destination": dst,
+		}).Error("Unable to resolve source url")
+		return req, fmt.Errorf("Unknown source url")
+	}
+	// TODO: resolve src and dst aliases properly, don't assume that src/dst are alias names
+	if strings.Contains(data, "#") { // it is a block name, e.g. /a/b/c#123
+		req = core.TransferRequest{SrcUrl: srcUrl, SrcAlias: src, DstUrl: dstUrl, DstAlias: dst, Block: data}
+	} else if strings.Count(data, "/") == 3 { // it is a dataset
+		req = core.TransferRequest{SrcUrl: srcUrl, SrcAlias: src, DstUrl: dstUrl, DstAlias: dst, Dataset: data}
+	} else { // it is lfn
+		req = core.TransferRequest{SrcUrl: srcUrl, SrcAlias: src, DstUrl: dstUrl, DstAlias: dst, File: data}
+	}
+	log.Info(req.String())
+	return req, nil
+}
+
+// helper function to submit tranfer requests to given url
+func submitRequest(furl string, requests []core.TransferRequest) {
+	d, err := json.Marshal(requests)
 	if err != nil {
-		return err
+		log.WithFields(log.Fields{
+			"Url":   furl,
+			"Error": err,
+		}).Info("Unable to marshal request")
+		return
 	}
-
-	// send tranfer requests to agents concurrently via go-routine
-	out := make(chan utils.ResponseType)
-	defer close(out)
-	umap := map[string]int{}
-	for _, transferRequests := range collection {
-		furl := fmt.Sprintf("%s/request", transferRequests[0].SrcUrl)
-		d, e := json.Marshal(transferRequests)
-		if e != nil {
-			return e
-		}
-		umap[furl] = 1 // keep track of processed urls below
-		go utils.Fetch(furl, d, out)
+	resp := utils.FetchResponse(furl, d)
+	if resp.Error != nil || resp.StatusCode != 200 {
+		log.WithFields(log.Fields{
+			"Url":   furl,
+			"Error": resp.Error,
+		}).Info("Error while registering request to main agent")
+		return
 	}
+	log.WithFields(log.Fields{
+		"Url": furl,
+	}).Info("successfully registered request")
+}
 
-	// collect request responses
-	exit := false
-	for {
-		select {
-		case r := <-out:
-			if r.Error != nil {
-				log.WithFields(log.Fields{
-					"Url": r.Url,
-				}).Error("ERROR fail with transfer request to", r.Url)
-				return r.Error
-			}
-			delete(umap, r.Url) // remove Url from map
-		default:
-			if len(umap) == 0 { // no more requests, merge data records
-				exit = true
-			}
-			time.Sleep(time.Duration(10) * time.Millisecond) // wait for response
-		}
-		if exit {
-			break
-		}
+// Transfer performs transfer data from source to destination (PUSH model)
+func Transfer(agent, src, dst string) {
+	req, err := parseRequest(agent, src, dst)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"Agent":       agent,
+			"Source":      src,
+			"Destination": dst,
+			"Error":       err,
+		}).Info("Unable to parse request")
 	}
-	return nil
+	var requests []core.TransferRequest
+	requests = append(requests, req)
+	// make request to source url to transfer data
+	furl := fmt.Sprintf("%s/request", req.SrcUrl)
+	submitRequest(furl, requests)
+}
 
+// RegisterRequest performs registration of transfer request in given agent (PULL mode)
+func RegisterRequest(agent string, src string, dst string) {
+	var requests []core.TransferRequest
+	furl := agent + "/request"
+	req, err := parseRequest(agent, src, dst)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"Agent":       agent,
+			"Source":      src,
+			"Destination": dst,
+			"Error":       err,
+		}).Info("Unable to parse request")
+		return
+	}
+	requests = append(requests, req)
+	submitRequest(furl, requests)
 }
 
 // Agent function call agent url
@@ -248,7 +275,6 @@ func Register(agent, fname string) error {
 		if err != nil {
 			return err
 		}
-		//hash, bytes := utils.Hash(data)
 		r := core.CatalogEntry{Lfn: rec.Lfn, Pfn: rec.Pfn, Block: rec.Block, Dataset: rec.Dataset, Hash: hash, Bytes: bytes}
 		uploadRecords = append(uploadRecords, r)
 	}
@@ -311,50 +337,4 @@ func readFile(path string) (string, int64, error) {
 	}
 	hash := hex.EncodeToString(hasher.Sum(nil))
 	return hash, bytes, nil
-}
-
-
-func RegisterRequest(agent string, src string, dst string) {
-	var source string
-	// resolve source agent name/alias and identify file to transfer
-	if strings.Contains(src, ":") {
-		arr := strings.Split(src, ":")
-		source = arr[len(arr)-1]
-	}
-	// parse the input
-	var lfn, block, dataset string
-	if strings.Contains(src, "#") { // it is a block name, e.g. /a/b/c#123
-		block = src
-	} else if strings.Count(src, "/") == 3 { // it is a dataset
-		dataset = src
-	} else { // it is lfn
-		lfn = src
-	}
-	var requests []core.TransferRequest
-	req := core.TransferRequest{SrcUrl: source, File: lfn, Block: block, Dataset: dataset, DstUrl: dst}
-	furl := agent + "/request"
-  requests = append(requests, req)
-  d, err := json.Marshal(requests)
-	if err != nil {
-		log.WithFields(log.Fields{
-			"Agent": agent,
-			"Src":  src,
-			"Error": err,
-		}).Info("Unable to marshal request")
-		return
-	}
-	resp := utils.FetchResponse(furl, d)
-	if resp.Error != nil || resp.StatusCode != 200 {
-		log.WithFields(log.Fields{
-			"Agent": agent,
-			"Src": src,
-			"Error": resp.Error,
-		}).Info("Error while registering request to main agent")
-		return
-	}
-	log.WithFields(log.Fields{
-		"Agent": agent,
-		"Src": src,
-		"Dst": dst,
-	}).Info("successfully registered request")
 }
