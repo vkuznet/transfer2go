@@ -1,6 +1,11 @@
 GOPATH:=$(PWD):${GOPATH}
 export GOPATH
+OS := $(shell uname)
+ifeq ($(OS),Darwin)
 flags=-ldflags="-s -w"
+else
+flags=-ldflags="-s -w -extldflags -static"
+endif
 TAG := $(shell git tag | sort -r | head -n 1)
 
 all: build
