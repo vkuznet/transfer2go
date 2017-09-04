@@ -5,10 +5,10 @@
     "tool":"/bin/cp",
     "url":"http://localhost:9000",
     "port": 9000,
-    "mfile":"metrics2.log",
+    "mfile":"DestinationAgentMetrics.log",
     "minterval":60,
     "verbose":0,
-    "name":"destination",
+    "name":"DestinationAgent",
     "staticdir":"static",
     "type": "push",
     "MonitorTime":3600

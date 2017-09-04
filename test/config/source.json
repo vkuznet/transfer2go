@@ -5,10 +5,10 @@
     "tool":"",
     "url":"http://localhost:8000",
     "port": 8000,
-    "mfile":"metrics1.log",
+    "mfile":"SourceAgentmetrics.log",
     "minterval":60,
     "verbose":0,
-    "name":"source",
+    "name":"SourceAgent",
     "staticdir":"static",
     "type": "push",
     "MonitorTime":3600
