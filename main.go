@@ -99,22 +99,20 @@ func main() {
 		server.Init(authVar)
 		server.Server(config)
 	} else {
-		var err error
 		if register != "" {
-			err = client.Register(agent, register)
+			client.Register(agent, register)
 		} else if src == "" { // no transfer request
 			client.Agent(agent)
 		} else {
 			if model == "pull" {
 				client.RegisterRequest(agent, src, dst)
+				//                 core.AuthzDecorator(client.RegisterRequest, "admin")(agent, src, dst)
 			} else if model == "push" {
 				client.Transfer(agent, src, dst)
+				//                 core.AuthzDecorator(client.Transfer, "cms")(agent, src, dst)
 			} else {
 				log.Fatal("Unknown transfer model")
 			}
-		}
-		if err != nil {
-			log.Fatal(err)
 		}
 	}
 }

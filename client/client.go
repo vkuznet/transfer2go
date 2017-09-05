@@ -137,6 +137,13 @@ func findAgents(agent string) map[string]string {
 	return remoteAgents
 }
 
+// Agent function call agent url
+func Agent(agent string) error {
+	resp := utils.FetchResponse(agent, []byte{})
+	log.Println(string(resp.Data))
+	return resp.Error
+}
+
 // helper function to parse source and destination parameters
 func parseRequest(agent, src, dst string) (core.TransferRequest, error) {
 	var req core.TransferRequest
@@ -183,6 +190,52 @@ func parseRequest(agent, src, dst string) (core.TransferRequest, error) {
 	}
 	log.Info(req.String())
 	return req, nil
+}
+
+// helper function to read a file from given path, it calculates file hash during this process
+func readFile(path string) (string, int64, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", 0, err
+	}
+	var bytes int64
+	// Create a synchronous in-memory pipe. This pipe will
+	// allow us to use a Writer as a Reader.
+	pipeReader, pipeWriter := io.Pipe()
+	// create a hasher to calculate data hash
+	hasher := adler32.New()
+	// Wait for the reading and writing processes of the io.pipe
+	done := make(chan error)
+	// Create a goroutine to write chunk wise in io.pipe
+	go func() {
+		defer pipeWriter.Close()
+		_, err = io.Copy(pipeWriter, file)
+		if err != nil {
+			done <- err
+			return
+		}
+		done <- nil
+	}()
+	// Create a goroutine to read chunk wise from io.pipe
+	go func() {
+		defer pipeReader.Close()
+		bytes, err = io.Copy(hasher, pipeReader)
+		if err != nil {
+			done <- err
+			return
+		}
+		done <- nil
+	}()
+	err = <-done
+	if err != nil {
+		return "", 0, err
+	}
+	err = <-done
+	if err != nil {
+		return "", 0, err
+	}
+	hash := hex.EncodeToString(hasher.Sum(nil))
+	return hash, bytes, nil
 }
 
 // helper function to submit tranfer requests to given url
@@ -244,24 +297,27 @@ func RegisterRequest(agent string, src string, dst string) {
 	submitRequest(furl, requests)
 }
 
-// Agent function call agent url
-func Agent(agent string) error {
-	resp := utils.FetchResponse(agent, []byte{})
-	log.Println(string(resp.Data))
-	return resp.Error
-}
-
 // Register function upload given meta-data to the agent and register them in its TFC
-func Register(agent, fname string) error {
+func Register(agent, fname string) {
 	// read inpuf file name which contains records meta-data (catalog entries)
 	c, e := ioutil.ReadFile(fname)
 	if e != nil {
-		return fmt.Errorf("Unable to read %s, error=%v\n", fname, e)
+		log.WithFields(log.Fields{
+			"Agent": agent,
+			"File":  fname,
+			"Error": e,
+		}).Error("Unable to read the file")
+		return
 	}
 	var uploadRecords, records []core.CatalogEntry
 	err := json.Unmarshal([]byte(c), &records)
 	if err != nil {
-		return fmt.Errorf("Unable to parse catalog JSON file, %v\n", err)
+		log.WithFields(log.Fields{
+			"Agent": agent,
+			"File":  fname,
+			"Error": err,
+		}).Error("Unable to parse catalog JSON file")
+		return
 	}
 	// TODO: so far we scan every record and read a file to get its hash
 	// this work only for local filesystem, but I don't know how it will work
@@ -269,72 +325,47 @@ func Register(agent, fname string) error {
 	for _, rec := range records {
 		if rec.Lfn == "" || rec.Pfn == "" || rec.Block == "" || rec.Dataset == "" {
 			e := fmt.Errorf("Record must have at least the following fields: lfn, pfn, block, dataset, instead received: %v\n", rec)
-			return e
+			log.WithFields(log.Fields{
+				"Agent": agent,
+				"File":  fname,
+				"Error": e,
+			}).Error("No input data provided with record")
+			return
 		}
 		hash, bytes, err := readFile(rec.Pfn)
 		if err != nil {
-			return err
+			log.WithFields(log.Fields{
+				"Agent": agent,
+				"File":  fname,
+				"Error": err,
+			}).Error("Unable to read rec.Pfn")
+			return
 		}
 		r := core.CatalogEntry{Lfn: rec.Lfn, Pfn: rec.Pfn, Block: rec.Block, Dataset: rec.Dataset, Hash: hash, Bytes: bytes}
 		uploadRecords = append(uploadRecords, r)
 	}
 	d, e := json.Marshal(uploadRecords)
 	if e != nil {
-		return e
+		log.WithFields(log.Fields{
+			"Agent": agent,
+			"File":  fname,
+			"Error": e,
+		}).Error("Unable to Marshal upload records")
+		return
 	}
 	url := fmt.Sprintf("%s/tfc", agent)
 	resp := utils.FetchResponse(url, d)
 	if resp.Error != nil {
-		return fmt.Errorf("Unable to upload, url=%s, data=%s, err=%v\n", url, string(resp.Data), resp.Error)
+		e := fmt.Errorf("Unable to upload, url=%s, data=%s, err=%v\n", url, string(resp.Data), resp.Error)
+		log.WithFields(log.Fields{
+			"Agent": agent,
+			"File":  fname,
+			"Error": e,
+		}).Error("Unable to fetch response")
+		return
 	}
 	log.WithFields(log.Fields{
 		"Agent": agent,
 		"Size":  len(uploadRecords),
 	}).Info("Registered records in")
-	return nil
-}
-
-func readFile(path string) (string, int64, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return "", 0, err
-	}
-	var bytes int64
-	// Create a synchronous in-memory pipe. This pipe will
-	// allow us to use a Writer as a Reader.
-	pipeReader, pipeWriter := io.Pipe()
-	// create a hasher to calculate data hash
-	hasher := adler32.New()
-	// Wait for the reading and writing processes of the io.pipe
-	done := make(chan error)
-	// Create a goroutine to write chunk wise in io.pipe
-	go func() {
-		defer pipeWriter.Close()
-		_, err = io.Copy(pipeWriter, file)
-		if err != nil {
-			done <- err
-			return
-		}
-		done <- nil
-	}()
-	// Create a goroutine to read chunk wise from io.pipe
-	go func() {
-		defer pipeReader.Close()
-		bytes, err = io.Copy(hasher, pipeReader)
-		if err != nil {
-			done <- err
-			return
-		}
-		done <- nil
-	}()
-	err = <-done
-	if err != nil {
-		return "", 0, err
-	}
-	err = <-done
-	if err != nil {
-		return "", 0, err
-	}
-	hash := hex.EncodeToString(hasher.Sum(nil))
-	return hash, bytes, nil
 }
