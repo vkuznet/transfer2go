@@ -245,18 +245,30 @@ func ListHandler(w http.ResponseWriter, r *http.Request) {
 	parameter := strings.Split(query, "=")
 
 	if parameter[0] == "type" {
-		requests, err := core.TFC.ListRequest(parameter[1])
+		var requests []core.TransferRequest
+		if parameter[1] == "pending" {
+			requests = core.RequestQueue.GetAllRequest()
+		} else {
+			var err error
+			requests, err = core.TFC.ListRequest(parameter[1])
+			if err != nil {
+				log.WithFields(log.Fields{
+					"Error": err,
+				}).Error("ListRequest handler")
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+		}
 		data, err := json.Marshal(requests)
-
 		if err != nil {
 			log.WithFields(log.Fields{
 				"Error": err,
 			}).Error("ListRequest handler")
 			w.WriteHeader(http.StatusInternalServerError)
-		} else {
-			w.WriteHeader(http.StatusOK)
-			w.Write(data)
+			return
 		}
+		w.WriteHeader(http.StatusOK)
+		w.Write(data)
 	} else {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Could not find type url parameter"))
