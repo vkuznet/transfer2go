@@ -394,7 +394,7 @@ func PullHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer r.Body.Close()
-	var data = core.TransferRequest{}
+	var data []core.TransferRequest
 	err := json.NewDecoder(r.Body).Decode(&data)
 	if err != nil {
 		log.WithFields(log.Fields{
@@ -403,9 +403,11 @@ func PullHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	var requests []core.Job
-	requests = append(requests, core.Job{TransferRequest: data, Action: "pushtransfer"})
-	body, err := json.Marshal(requests)
+	var jobs []core.Job
+	for _, req := range data {
+		jobs = append(jobs, core.Job{TransferRequest: req, Action: "pushtransfer"})
+	}
+	body, err := json.Marshal(jobs)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"Error": err,
@@ -413,16 +415,20 @@ func PullHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	url := fmt.Sprintf("%s/action", data.SrcUrl)
-	resp := utils.FetchResponse(url, body)
-	// check return status code
-	if resp.StatusCode != 200 {
-		log.WithFields(log.Fields{
-			"Error": err,
-		}).Error("PullHandler unable to send transfer request to Source")
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+	if len(data) > 0 {
+		url := fmt.Sprintf("%s/action", data[0].SrcUrl)
+		resp := utils.FetchResponse(url, body)
+		// Check return status code
+		if resp.StatusCode != 200 {
+			log.WithFields(log.Fields{
+				"Error": err,
+			}).Error("PullHandler unable to send transfer request to Source")
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 	}
+	w.WriteHeader(http.StatusInternalServerError)
+	return
 }
 
 // This handler handles operations on requests
