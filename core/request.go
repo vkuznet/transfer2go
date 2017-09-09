@@ -209,23 +209,23 @@ func SubmitRequest(t []TransferRequest, dstUrl string) error {
 
 // Function to send the request to source
 func RedirectRequest(t *TransferRequest, dstUrl string) error {
-	selectedAgents, err := AgentRouter.FindSource(t)
+	selectedAgents, index, err := AgentRouter.FindSource(t)
 	if err != nil {
 		return err
 	}
-	var transferCount int
-	for _, agent := range selectedAgents {
-		err := checkAgent(agent.SrcUrl)
+	transferCount := 0
+	for i := len(selectedAgents) - 1; i > index; i-- {
+		err := checkAgent(selectedAgents[i].SrcUrl)
 		if err != nil {
 			log.WithFields(log.Fields{
 				"Error":  err,
-				"Source": agent.SrcUrl,
+				"Source": selectedAgents[i].SrcUrl,
 			}).Println("Unable to connect to source")
 			continue
 		}
-		err = SubmitRequest(agent.Requests, dstUrl)
+		err = SubmitRequest(selectedAgents[i].Requests, dstUrl)
 		if err == nil {
-			transferCount++
+			transferCount += 1
 		}
 	}
 	if transferCount == 0 {

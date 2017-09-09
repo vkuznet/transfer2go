@@ -427,7 +427,7 @@ func PullHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	w.WriteHeader(http.StatusInternalServerError)
+	w.WriteHeader(http.StatusOK)
 	return
 }
 

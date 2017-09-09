@@ -179,11 +179,11 @@ func readCSVfile(path string) ([][]float64, error) {
 }
 
 // Function to get the appropriate source agent
-func (r *Router) FindSource(tr *TransferRequest) ([]SourceStats, error) {
+func (r *Router) FindSource(tr *TransferRequest) ([]SourceStats, int, error) {
 	// Find the union of files and files stored per agent
 	unionSet, filteredAgent := GetUnionCatalog(tr)
 	if len(filteredAgent) <= 0 {
-		return nil, errors.New("Couldn't find appropriate agent")
+		return nil, 0, errors.New("Couldn't find appropriate agent")
 	}
 	// Get the prediction values
 	for _, agent := range filteredAgent {
@@ -211,16 +211,17 @@ func (r *Router) FindSource(tr *TransferRequest) ([]SourceStats, error) {
 	sort.Slice(filteredAgent, func(i, j int) bool {
 		return filteredAgent[i].prediction < filteredAgent[j].prediction
 	})
-	for i := len(filteredAgent) - 1; i >= 0 && unionSet.Size() > 0; i-- {
-		commonFiles := set.Intersection(unionSet, filteredAgent[i].catalogSet)
+	index := len(filteredAgent) - 1
+	for ; index >= 0 && unionSet.Size() > 0; index-- {
+		commonFiles := set.Intersection(filteredAgent[index].catalogSet, unionSet)
 		requests := make([]TransferRequest, 0)
 		for _, file := range commonFiles.List() {
-			requests = append(requests, TransferRequest{File: file.(string), SrcUrl: tr.SrcUrl, SrcAlias: tr.SrcAlias, DstUrl: tr.DstUrl, DstAlias: tr.DstAlias})
+			requests = append(requests, TransferRequest{File: file.(string), SrcUrl: filteredAgent[index].SrcUrl, SrcAlias: filteredAgent[index].SrcAlias, DstUrl: tr.DstUrl, DstAlias: tr.DstAlias})
 		}
-		filteredAgent[i].Requests = requests
-		unionSet.Remove(commonFiles)
+		filteredAgent[index].Requests = requests
+		unionSet.Separate(commonFiles)
 	}
-	return filteredAgent, nil
+	return filteredAgent, index, nil
 }
 
 // Function to get the union of files
@@ -236,7 +237,7 @@ func GetUnionCatalog(tRequest *TransferRequest) (*set.SetNonTS, []SourceStats) {
 		for _, catalog := range records {
 			agentSet.Add(catalog.Lfn)
 		}
-		unionSet = set.NewNonTS(set.Union(unionSet, agentSet))
+		unionSet.Merge(agentSet)
 		agentStat := SourceStats{SrcUrl: srcUrl, SrcAlias: srcAlias, catalogSet: agentSet}
 		filteredAgent = append(filteredAgent, agentStat)
 	}
