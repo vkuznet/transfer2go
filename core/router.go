@@ -8,19 +8,33 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strconv"
 
 	"github.com/robfig/cron"
 	"github.com/sajari/regression"
 	log "github.com/sirupsen/logrus"
 	"github.com/vkuznet/transfer2go/utils"
+	"gopkg.in/fatih/set.v0"
 )
+
+// If error occures while getting predictions set default value to MinFloat
+const MIN_FLOAT = -1000000
 
 type Router struct {
 	CronInterval     string                 // Helps to set hourly based cron job
 	LinearRegression *regression.Regression // machine learning model
 	CSVfile          string                 // historical data file
 	Agents           *map[string]string     // list of connected agents
+}
+
+// struct to store source informations
+type SourceStats struct {
+	SrcUrl     string
+	SrcAlias   string
+	catalogSet *set.SetNonTS
+	prediction float64
+	Requests   []TransferRequest
 }
 
 // AgentRouter helps to call router's methods
@@ -165,37 +179,67 @@ func readCSVfile(path string) ([][]float64, error) {
 }
 
 // Function to get the appropriate source agent
-func (r *Router) FindSource(tRequest *TransferRequest) (string, string, error) {
-	var maxPrediction = 0.0
-	var selectedSource string
-	for name, source := range *r.Agents { // TODO: can parallelize this code
-		records, err := GetRemoteFiles(*tRequest, source)
-		if err != nil || len(records) <= 0 {
-			continue
-		}
-		url := fmt.Sprintf("%s/status", source)
+func (r *Router) FindSource(tr *TransferRequest) ([]SourceStats, int, error) {
+	// Find the union of files and files stored per agent
+	unionSet, filteredAgent := GetUnionCatalog(tr)
+	if len(filteredAgent) <= 0 {
+		return nil, 0, errors.New("Couldn't find appropriate agent")
+	}
+	// Get the prediction values
+	for _, agent := range filteredAgent {
+		url := fmt.Sprintf("%s/status", agent.SrcUrl)
 		resp := utils.FetchResponse(url, []byte{})
 		var status AgentStatus
 		if resp.Error != nil {
+			agent.prediction = MIN_FLOAT
 			continue
 		}
-		err = json.Unmarshal(resp.Data, &status)
+		err := json.Unmarshal(resp.Data, &status)
 		if err != nil {
+			agent.prediction = MIN_FLOAT
 			continue
 		}
-		// Predict output
+		// Predict output through LinearRegression
 		result, err := r.LinearRegression.Predict([]float64{status.CpuUsage, status.MemUsage})
 		if err != nil {
-			result = 0
-		}
-		if result > maxPrediction {
-			selectedSource = name
+			agent.prediction = MIN_FLOAT
+			continue
+		} else {
+			agent.prediction = result
 		}
 	}
-
-	if selectedSource == "" {
-		return "", "", errors.New("Couldn't find appropriate agent")
+	sort.Slice(filteredAgent, func(i, j int) bool {
+		return filteredAgent[i].prediction < filteredAgent[j].prediction
+	})
+	index := len(filteredAgent) - 1
+	for ; index >= 0 && unionSet.Size() > 0; index-- {
+		commonFiles := set.Intersection(filteredAgent[index].catalogSet, unionSet)
+		requests := make([]TransferRequest, 0)
+		for _, file := range commonFiles.List() {
+			requests = append(requests, TransferRequest{File: file.(string), SrcUrl: filteredAgent[index].SrcUrl, SrcAlias: filteredAgent[index].SrcAlias, DstUrl: tr.DstUrl, DstAlias: tr.DstAlias})
+		}
+		filteredAgent[index].Requests = requests
+		unionSet.Separate(commonFiles)
 	}
+	return filteredAgent, index, nil
+}
 
-	return selectedSource, (*r.Agents)[selectedSource], nil
+// Function to get the union of files
+func GetUnionCatalog(tRequest *TransferRequest) (*set.SetNonTS, []SourceStats) {
+	unionSet := set.NewNonTS()
+	filteredAgent := make([]SourceStats, 0)
+	for srcAlias, srcUrl := range *AgentRouter.Agents {
+		records, err := GetRemoteFiles(*tRequest, srcUrl)
+		if err != nil || len(records) <= 0 {
+			continue
+		}
+		agentSet := set.NewNonTS()
+		for _, catalog := range records {
+			agentSet.Add(catalog.Lfn)
+		}
+		unionSet.Merge(agentSet)
+		agentStat := SourceStats{SrcUrl: srcUrl, SrcAlias: srcAlias, catalogSet: agentSet}
+		filteredAgent = append(filteredAgent, agentStat)
+	}
+	return unionSet, filteredAgent
 }
