@@ -396,7 +396,7 @@ func (c *Catalog) ListRequest(query string) ([]TransferRequest, error) {
 		stm := getSQL("request_by_status") // Request is waiting for the approval
 		rows, err = DB.Query(stm, query)
 	case "finished":
-		stm := getSQL("request_by_status") // Request is successfuly transfered
+		stm := getSQL("request_by_status") // Request is successfully transferred
 		rows, err = DB.Query(stm, query)
 	case "all":
 		stm := getSQL("all_request") // Get all the requests
@@ -405,10 +405,10 @@ func (c *Catalog) ListRequest(query string) ([]TransferRequest, error) {
 		stm := getSQL("request_by_status") // Request is deleted without transfer
 		rows, err = DB.Query(stm, query)
 	case "error":
-		stm := getSQL("request_by_status") // Error occured while transfering data
+		stm := getSQL("request_by_status") // Error occurred while transferring data
 		rows, err = DB.Query(stm, query)
 	case "processing":
-		stm := getSQL("request_by_status") // Error occured while transfering data
+		stm := getSQL("request_by_status") // Error occurred while transferring data
 		rows, err = DB.Query(stm, query)
 	default:
 		return nil, errors.New("Requested request type could not find")
