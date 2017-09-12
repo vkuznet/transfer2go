@@ -15,6 +15,7 @@ import (
 	"github.com/sajari/regression"
 	log "github.com/sirupsen/logrus"
 	"github.com/vkuznet/transfer2go/utils"
+	set "gopkg.in/fatih/set.v0"
 )
 
 // MIN_FLOAT defin min float value if error occures while getting predictions set default value to MinFloat
