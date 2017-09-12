@@ -69,6 +69,15 @@ func (pq *PriorityQueue) Delete(id int64) bool {
 	return false
 }
 
+// Get the entire list of requests
+func (pq *PriorityQueue) GetAllRequest() []TransferRequest {
+	var requests []TransferRequest
+	for _, item := range *pq {
+		requests = append(requests, item.Value)
+	}
+	return requests
+}
+
 // update modifies the priority and value of an Item in the queue.
 func (pq *PriorityQueue) update(item *Item, value TransferRequest, priority int) {
 	item.Value = value

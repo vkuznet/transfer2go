@@ -177,6 +177,63 @@ func GetRemoteFiles(tr TransferRequest, remote string) ([]CatalogEntry, error) {
 	return records, nil
 }
 
+// Get the status of agent
+func checkAgent(agentUrl string) error {
+	url := fmt.Sprintf("%s/status", agentUrl)
+	resp := utils.FetchResponse(url, []byte{})
+	if resp.Error != nil {
+		return resp.Error
+	}
+	var srcAgent AgentStatus
+	err := json.Unmarshal(resp.Data, &srcAgent)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Submit request to destination
+func SubmitRequest(t []TransferRequest, dstUrl string) error {
+	body, err := json.Marshal(t)
+	if err != nil {
+		return err
+	}
+	url := fmt.Sprintf("%s/pull", dstUrl)
+	resp := utils.FetchResponse(url, body)
+	// check return status code
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("Response %s, error=%s", resp.Status, string(resp.Data))
+	}
+	return nil
+}
+
+// Function to send the request to source
+func RedirectRequest(t *TransferRequest, dstUrl string) error {
+	selectedAgents, index, err := AgentRouter.FindSource(t)
+	if err != nil {
+		return err
+	}
+	transferCount := 0
+	for i := len(selectedAgents) - 1; i > index; i-- {
+		err := checkAgent(selectedAgents[i].SrcUrl)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"Error":  err,
+				"Source": selectedAgents[i].SrcUrl,
+			}).Println("Unable to connect to source")
+			continue
+		}
+		err = SubmitRequest(selectedAgents[i].Requests, dstUrl)
+		if err == nil {
+			transferCount += 1
+		}
+	}
+	if transferCount == 0 {
+		return errors.New("[Pull Model] Could not submit requests to destination")
+	}
+	return nil
+}
+
 // Compare two CatalogEntry
 func compareRecords(requestedCatalog []CatalogEntry, remoteCatalog []CatalogEntry) []CatalogEntry {
 	var records []CatalogEntry
@@ -255,54 +312,20 @@ func PullTransfer() Decorator {
 			log.WithFields(log.Fields{
 				"Request": t.String(),
 			}).Println("Request Transfer")
-			// obtain information about source and destination agents
-			url := fmt.Sprintf("%s/status", t.DstUrl)
-			resp := utils.FetchResponse(url, []byte{})
-			if resp.Error != nil {
-				return resp.Error
-			}
-			var dstAgent AgentStatus
-			err := json.Unmarshal(resp.Data, &dstAgent)
+			// obtain information about destination agents
+			var err error
+			err = checkAgent(t.DstUrl)
 			if err != nil {
 				return err
 			}
 			// If router is enabled to get appropriate source agent
 			if routerModel == true {
-				srcAlias, srcUrl, err := AgentRouter.FindSource(t)
-				if err == nil {
-					t.SrcUrl = srcUrl
-					t.SrcAlias = srcAlias
-					log.WithFields(log.Fields{
-						"srcUrl":   srcUrl,
-						"srcAlias": srcAlias,
-						"err":      err,
-					}).Println("Selected Agent")
-				} else {
-					log.WithFields(log.Fields{
-						"err": err,
-					}).Println("Error while selecting agent")
-				}
+				err = RedirectRequest(t, t.DstUrl)
+			} else {
+				err = SubmitRequest([]TransferRequest{*t}, t.DstUrl)
 			}
-			url = fmt.Sprintf("%s/status", t.SrcUrl)
-			resp = utils.FetchResponse(url, []byte{})
-			if resp.Error != nil {
-				return resp.Error
-			}
-			var srcAgent AgentStatus
-			err = json.Unmarshal(resp.Data, &srcAgent)
 			if err != nil {
 				return err
-			}
-			// if both are up then send acknowledge message to destination on /pullack url.
-			body, err := json.Marshal(t)
-			if err != nil {
-				return err
-			}
-			url = fmt.Sprintf("%s/pull", t.DstUrl)
-			resp = utils.FetchResponse(url, body)
-			// check return status code
-			if resp.StatusCode != 200 {
-				return fmt.Errorf("Response %s, error=%s", resp.Status, string(resp.Data))
 			}
 			return r.Process(t)
 		})
