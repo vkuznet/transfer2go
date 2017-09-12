@@ -17,9 +17,10 @@ import (
 	"github.com/vkuznet/transfer2go/utils"
 )
 
-// If error occures while getting predictions set default value to MinFloat
+// MIN_FLOAT defin min float value if error occures while getting predictions set default value to MinFloat
 const MIN_FLOAT = -1000000
 
+// Router structure defines attributes of the router
 type Router struct {
 	CronInterval     string                 // Helps to set hourly based cron job
 	LinearRegression *regression.Regression // machine learning model
@@ -27,7 +28,7 @@ type Router struct {
 	Agents           *map[string]string     // list of connected agents
 }
 
-// struct to store source informations
+// SourceStats structure to store source informations
 type SourceStats struct {
 	SrcUrl     string
 	SrcAlias   string
@@ -223,7 +224,7 @@ func (r *Router) FindSource(tr *TransferRequest) ([]SourceStats, int, error) {
 	return filteredAgent, index, nil
 }
 
-// Function to get the union of files
+// GetUnionCatalog function to get the union of files
 func GetUnionCatalog(tRequest *TransferRequest) (*set.SetNonTS, []SourceStats) {
 	unionSet := set.NewNonTS()
 	filteredAgent := make([]SourceStats, 0)

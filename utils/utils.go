@@ -256,7 +256,7 @@ func UsedCPU() (float64, error) {
 	return avgUsage / float64(totalCPU), nil
 }
 
-// UserRAM gets used ram
+// UsedRAM gets used ram
 func UsedRAM() (float64, error) {
 	ram, err := mem.VirtualMemory()
 	if err != nil {

@@ -137,25 +137,25 @@ func fileTransferRequest(c CatalogEntry, tr *TransferRequest) (*http.Response, e
 }
 
 // helper function to perform transfer via HTTP protocol
-func httpTransfer(c CatalogEntry, t *TransferRequest) (string, error, float64) {
+func httpTransfer(c CatalogEntry, t *TransferRequest) (string, float64, error) {
 	start := time.Now()
 	resp, err := fileTransferRequest(c, t) // create file transfer request
 	elapsed := time.Since(start)
 	if err != nil {
-		return "", err, 0
+		return "", 0, err
 	}
 	if resp == nil || resp.StatusCode != 200 {
-		return "", errors.New("Empty response from destination"), 0
+		return "", 0, errors.New("Empty response from destination")
 	}
 	defer resp.Body.Close()
 	var r CatalogEntry
 	err = json.NewDecoder(resp.Body).Decode(&r)
 	if err != nil {
-		return "", err, 0
+		return "", 0, err
 	}
 	mbytes := float64(c.Bytes) / 1048576
 	throughput := mbytes / elapsed.Seconds()
-	return r.Pfn, nil, throughput
+	return r.Pfn, throughput, nil
 }
 
 // GetRemoteFiles checks destination catalog
@@ -192,7 +192,7 @@ func checkAgent(agentUrl string) error {
 	return nil
 }
 
-// Submit request to destination
+// SubmitRequest submits request to destination
 func SubmitRequest(t []TransferRequest, dstUrl string) error {
 	body, err := json.Marshal(t)
 	if err != nil {
@@ -207,7 +207,7 @@ func SubmitRequest(t []TransferRequest, dstUrl string) error {
 	return nil
 }
 
-// Function to send the request to source
+// RedirectRequest function to send the request to source
 func RedirectRequest(t *TransferRequest, dstUrl string) error {
 	selectedAgents, index, err := AgentRouter.FindSource(t)
 	if err != nil {
@@ -265,9 +265,8 @@ func Store() Decorator {
 			err := TFC.InsertRequest(*t)
 			if err != nil {
 				return err
-			} else {
-				heap.Push(&RequestQueue, item)
 			}
+			heap.Push(&RequestQueue, item)
 			log.WithFields(log.Fields{
 				"Request": t,
 			}).Println("Request Saved")
@@ -403,7 +402,7 @@ func PushTransfer() Decorator {
 					log.WithFields(log.Fields{
 						"dstAgent": dstAgent.String(),
 					}).Println("Transfer via HTTP protocol to", dstAgent.String())
-					rpfn, err, throughput = httpTransfer(rec, t)
+					rpfn, throughput, err = httpTransfer(rec, t)
 					if err != nil {
 						log.WithFields(log.Fields{
 							"TransferRequest": t.String(),

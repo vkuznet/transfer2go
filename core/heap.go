@@ -69,7 +69,7 @@ func (pq *PriorityQueue) Delete(id int64) bool {
 	return false
 }
 
-// Get the entire list of requests
+// GetAllRequest gets the entire list of requests
 func (pq *PriorityQueue) GetAllRequest() []TransferRequest {
 	var requests []TransferRequest
 	for _, item := range *pq {

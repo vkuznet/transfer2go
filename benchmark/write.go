@@ -51,12 +51,12 @@ func main() {
 
 }
 
-// Get max length of random string
+// String gets max length of random string
 func String(length int) string {
 	return StringWithCharset(length, charset)
 }
 
-// Function to generate random string
+// StringWithCharset function to generate random string
 func StringWithCharset(length int, charset string) string {
 	b := make([]byte, length)
 	for i := range b {

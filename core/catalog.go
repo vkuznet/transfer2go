@@ -427,7 +427,7 @@ func (c *Catalog) ListRequest(query string) ([]TransferRequest, error) {
 	container := make([]string, len(cols)) // A pointer to Columns of db
 	var requests []TransferRequest
 
-	for i, _ := range pointers {
+	for i := range pointers {
 		pointers[i] = &container[i]
 	}
 

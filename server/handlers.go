@@ -182,9 +182,8 @@ func HistoricalHandler(w http.ResponseWriter, r *http.Request) {
 		}).Error("AgentsHandler", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
-	} else {
-		w.WriteHeader(http.StatusOK)
 	}
+	w.WriteHeader(http.StatusOK)
 	w.Write(data)
 }
 
@@ -233,7 +232,7 @@ func FilesHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
-// ListHandlers lists all transfer Requests
+// ListHandler lists all transfer Requests
 func ListHandler(w http.ResponseWriter, r *http.Request) {
 
 	query := r.URL.RawQuery
@@ -387,7 +386,7 @@ func MetaHandler(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-// PullHandlers handles pull acknowledge message from main agent.
+// PullHandler handles pull acknowledge message from main agent.
 func PullHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -431,7 +430,7 @@ func PullHandler(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-// ActionHandlers handles operations on requests
+// ActionHandler handles operations on requests
 func ActionHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		w.WriteHeader(http.StatusMethodNotAllowed)

@@ -81,7 +81,7 @@ var RequestQueue PriorityQueue
 // TransferQueue is an instance of dispatcher to handle the transfer process
 var TransferQueue chan Job
 
-// TranserType decides which pull or push based model is used
+// TransferType decides which pull or push based model is used
 var TransferType string
 
 // Param to enable the router

@@ -5,7 +5,7 @@ package core
 
 import logs "github.com/sirupsen/logrus"
 
-// type CallerFunc func(string, string, string)
+// CallerFunc type func(string, string, string)
 type CallerFunc func(agent, src, dst string)
 
 // AuthzDecorator provides skeleton for performing authorization check with given function
