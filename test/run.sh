@@ -1,20 +1,6 @@
 #!/bin/bash
 # Author: Valentin Kuznetsov < vkuznet [] gmail () com>
 
-if [ "$1" == "-h" ] || [ "$1" == "-help" ] || [ "$1" == "--help" ]; then
-    echo "Usage: run.sh"
-    echo "Perform transfer2go test among 3 agents: main|source|destination"
-    echo "Test creates dummy file; register it in source agent; place request to main agent"
-    echo "approve request in main agent and transfer the file from source to destination"
-    exit
-fi
-exe=./transfer2go
-tdir=$PWD/test
-schema=$PWD/static/sql/sqlite3/schema.sql
-
-export X509_USER_KEY=~/.globus/userkey.pem
-export X509_USER_CERT=~/.globus/usercert.pem
-
 # helper function to kill certain process
 pskill ()
 {
@@ -31,6 +17,25 @@ psgrep ()
 {
     ps axu | grep -v grep | grep "$@" -i --color=auto
 }
+
+if [ "$1" == "-h" ] || [ "$1" == "-help" ] || [ "$1" == "--help" ]; then
+    echo "Usage: run.sh"
+    echo "Perform transfer2go test among 3 agents: main|source|destination"
+    echo "Test creates dummy file; register it in source agent; place request to main agent"
+    echo "approve request in main agent and transfer the file from source to destination"
+    exit
+fi
+
+echo "Kill previous transfer2go processes (if any)"
+pskill transfer2go
+sleep 1
+
+exe=./transfer2go
+tdir=$PWD/test
+schema=$PWD/static/sql/sqlite3/schema.sql
+
+export X509_USER_KEY=~/.globus/userkey.pem
+export X509_USER_CERT=~/.globus/usercert.pem
 
 wdir=/tmp/transfer2go
 if [ -d $wdir ]; then
@@ -55,6 +60,7 @@ cat > $wdir/config/main.json << EOF
     "backend":"$wdir/main",
     "tool":"/bin/cp",
     "url":"http://localhost:8989",
+    "port": 8989,
     "mfile":"mainAgentMetrics.log",
     "csvfile":"$wdir/model/history.csv",
     "minterval":60,
@@ -73,6 +79,7 @@ cat > $wdir/catalog/main.json << EOF
     "uri":"$wdir/catalog/main.db"
 }
 EOF
+cp test/data/history.csv $wdir/model/
 cat $wdir/config/main.json | \
     sed -e "s,main,source,g" -e "s,8989,8000,g" -e "s,pull,push,g" -e "s,true,false,g" \
     > $wdir/config/source.json 
@@ -85,9 +92,9 @@ sqlite3 $wdir/catalog/main.db < $schema
 sqlite3 $wdir/catalog/source.db < $schema
 sqlite3 $wdir/catalog/destination.db < $schema
 
-mainlog=main.log
-srclog=src.log
-dstlog=dst.log
+mainlog=$wdir/main.log
+srclog=$wdir/src.log
+dstlog=$wdir/dst.log
 
 mainconfig=$wdir/config/main.json
 srcconfig=$wdir/config/source.json
@@ -115,9 +122,6 @@ dd if=/dev/zero of=$wdir/source/file.root bs=1024 count=0 seek=1024
 set -e
 
 trap 'kill %1; kill %2; kill %3' ERR EXIT
-
-echo "Kill previous transfer2go processes (if any)"
-pskill transfer2go
 
 echo "Start $mainAgentName at $mainAgentUrl"
 $exe -config $mainconfig -auth=false > $mainlog 2>&1 &
