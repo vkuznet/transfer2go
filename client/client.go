@@ -369,3 +369,35 @@ func Register(agent, fname string) {
 		"Size":  len(uploadRecords),
 	}).Info("Registered records in")
 }
+
+// ApproveRequest performs request approval in given agent (PULL mode)
+func ApproveRequest(agent string, rid int64) {
+	var job []core.Job
+	req := core.TransferRequest{Id: rid}
+	action := core.Job{TransferRequest: req, Action: "pulltransfer"}
+	furl := agent + "/action"
+	job = append(job, action)
+	d, e := json.Marshal(job)
+	if e != nil {
+		log.WithFields(log.Fields{
+			"Url":   furl,
+			"Id":    rid,
+			"Job":   job,
+			"Error": e,
+		}).Error("Error while marshal job transfer request")
+		return
+	}
+	resp := utils.FetchResponse(furl, d)
+	if resp.Error != nil || resp.StatusCode != 200 {
+		log.WithFields(log.Fields{
+			"Url":   furl,
+			"Id":    rid,
+			"Error": resp.Error,
+		}).Error("Error while approving request in main agent")
+		return
+	}
+	log.WithFields(log.Fields{
+		"Url": furl,
+		"Id":  rid,
+	}).Info("successfully approved request")
+}

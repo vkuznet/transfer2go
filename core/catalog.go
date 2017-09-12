@@ -302,7 +302,7 @@ func (c *Catalog) Transfers(time0, time1 string) []CatalogEntry {
 	return out
 }
 
-// Get transfers details
+// GetTransfers provide details about transfers in given time interval
 func (c *Catalog) GetTransfers(time0, time1 string) ([]TransferData, error) {
 	stm := getSQL("get_transfers")
 	// fetch data from DB
@@ -329,7 +329,7 @@ func (c *Catalog) GetTransfers(time0, time1 string) ([]TransferData, error) {
 	return out, nil
 }
 
-// Insert new request
+// InsertRequest inserts new request
 func (c *Catalog) InsertRequest(request TransferRequest) error {
 	stm := getSQL("insert_request")
 	_, e := DB.Exec(stm, request.Id, request.File, request.Block, request.Dataset, request.SrcUrl, request.DstUrl, "pending", request.Priority)
@@ -341,15 +341,15 @@ func (c *Catalog) InsertRequest(request TransferRequest) error {
 	return e
 }
 
-// Update the status of request
+// UpdateRequest updates the status of request
 func (c *Catalog) UpdateRequest(id int64, status string) error {
 	stm := getSQL("update_request")
 	_, err := DB.Exec(stm, status, id)
 	return err
 }
 
-// Get the request details based on request id
-func (c *Catalog) RetriveRequest(request *TransferRequest) error {
+// RetrieveRequest gets the request details based on request id
+func (c *Catalog) RetrieveRequest(request *TransferRequest) error {
 	stm := getSQL("request_by_id")
 	rows, err := DB.Query(stm, request.Id)
 	if err != nil {
@@ -366,7 +366,7 @@ func (c *Catalog) RetriveRequest(request *TransferRequest) error {
 	return nil
 }
 
-// Get the status of request
+// GetStatus gets the status of request
 func (c *Catalog) GetStatus(id int64) (string, error) {
 	var status string
 	stm := getSQL("get_status")
@@ -385,7 +385,7 @@ func (c *Catalog) GetStatus(id int64) (string, error) {
 	return status, err
 }
 
-// Get specific type of transfer requests according to status
+// ListRequest gets specific type of transfer requests according to status
 func (c *Catalog) ListRequest(query string) ([]TransferRequest, error) {
 	var (
 		err  error
@@ -448,7 +448,7 @@ func (c *Catalog) ListRequest(query string) ([]TransferRequest, error) {
 	return requests, err
 }
 
-// Insert new row to TRANSFERS table
+// InsertTransfers inserts new row to TRANSFERS table
 func (c *Catalog) InsertTransfers(time int64, cpuUsage float64, memUsage float64, throughput float64) {
 	stm := getSQL("insert_transfers")
 	DB.Exec(stm, time, cpuUsage, memUsage, throughput)

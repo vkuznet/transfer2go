@@ -26,7 +26,7 @@ type Router struct {
 // AgentRouter helps to call router's methods
 var AgentRouter Router
 
-// newRouter returns new instance of Router type
+// NewRouter returns new instance of Router type
 func NewRouter(interval string, agent *map[string]string, csvFile string) *cron.Cron {
 	lr := new(regression.Regression)
 	lr.SetObserved("Get throughput")
@@ -110,7 +110,7 @@ func getHistory(source string) ([]TransferData, error) {
 	return transferRecords, nil
 }
 
-// function to train router by previous data(After restarting it)
+// InitialTrain function to train router by previous data(After restarting it)
 func (r *Router) InitialTrain() {
 	// Check if router has previous data, if not run train method for the first time
 	if _, err := os.Stat(r.CSVfile); !os.IsNotExist(err) {
@@ -164,7 +164,7 @@ func readCSVfile(path string) ([][]float64, error) {
 	return nil, errors.New("The length of past data is 0")
 }
 
-// Function to get the appropriate source agent
+// FindSource function to get the appropriate source agent
 func (r *Router) FindSource(tRequest *TransferRequest) (string, string, error) {
 	var maxPrediction = 0.0
 	var selectedSource string

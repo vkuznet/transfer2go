@@ -75,19 +75,19 @@ var AgentMetrics Metrics
 // StorageQueue is a buffered channel that we can send work requests on.
 var StorageQueue chan Job
 
-// A queue to sort the requests according to priority.
+// RequestQueue is a queue to sort the requests according to priority.
 var RequestQueue PriorityQueue
 
-// An instance of dispatcher to handle the transfer process
+// TransferQueue is an instance of dispatcher to handle the transfer process
 var TransferQueue chan Job
 
-// Decide pull or push based model
+// TranserType decides which pull or push based model is used
 var TransferType string
 
 // Param to enable the router
 var routerModel bool
 
-// Method to get cpu and Memory usage
+// GetUsage method to get cpu and Memory usage
 func (m *Metrics) GetUsage() (float64, float64, error) {
 	cusage := AgentMetrics.CpuUsage.Value() / float64(AgentMetrics.Tick.Count())
 	musage := AgentMetrics.MemUsage.Value() / float64(AgentMetrics.Tick.Count())
@@ -138,6 +138,7 @@ func (t *TransferRequest) RunPull() error {
 	return request.Process(t)
 }
 
+// Delete performs deletion of transfer request
 func (t *TransferRequest) Delete() error {
 	interval := time.Duration(t.Delay) * time.Second
 	request := Decorate(DefaultProcessor,
@@ -157,7 +158,12 @@ func (t *TransferRequest) Store() error {
 	return request.Process(t)
 }
 
-// Function to handle failed jobs
+// String method return string representation of transfer request
+func (j *Job) String() string {
+	return fmt.Sprintf("<Job TransferRequest=%s action=%s>", j.TransferRequest.String(), j.Action)
+}
+
+// RequestFails function to handle failed jobs
 func (j *Job) RequestFails() {
 	switch j.Action {
 	case "store":
@@ -182,7 +188,7 @@ func (j *Job) RequestFails() {
 	}
 }
 
-// Function to handle success jobs
+// RequestSuccess function to handle success jobs
 func (j *Job) RequestSuccess() {
 	switch j.Action {
 	case "store":
@@ -288,7 +294,7 @@ func NewDispatcher(maxWorkers int, bufferSize int) *Dispatcher {
 	return &Dispatcher{JobPool: pool, MaxWorkers: maxWorkers, BufferSize: bufferSize}
 }
 
-// initialize RequestQueue, transferQueue and StorageQueue
+// InitQueue initializes RequestQueue, transferQueue and StorageQueue
 func InitQueue(transferQueueSize int, storageQueueSize int, mfile string, minterval int64, monitorTime int64, router bool) {
 	// register metrics
 	f, e := os.OpenFile(mfile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
@@ -345,7 +351,7 @@ func InitQueue(transferQueueSize int, storageQueueSize int, mfile string, minter
 	TransferQueue = make(chan Job, transferQueueSize)
 }
 
-// Run function starts the worker and dispatch it as go-routine
+// StorageRunner function starts the worker and dispatch it as go-routine
 func (d *Dispatcher) StorageRunner() {
 	// starting n number of workers
 	for i := 0; i < d.MaxWorkers; i++ {
@@ -375,7 +381,7 @@ func (d *Dispatcher) dispatchToStorage() {
 	}
 }
 
-// Run function starts the worker and dispatch it as go-routine
+// TransferRunner function starts the worker and dispatch it as go-routine
 func (d *Dispatcher) TransferRunner() {
 	// starting n number of workers
 	for i := 0; i < d.MaxWorkers; i++ {
@@ -415,7 +421,7 @@ func (d *Dispatcher) dispatchToTransfer() {
 					} else {
 						return
 					}
-					err = TFC.RetriveRequest(&job.TransferRequest)
+					err = TFC.RetrieveRequest(&job.TransferRequest)
 					if err != nil {
 						logs.WithFields(logs.Fields{
 							"Error": err,
@@ -439,7 +445,7 @@ func (d *Dispatcher) dispatchToTransfer() {
 	}
 }
 
-// Function to get current system usage
+// GetCurrentStats function to get current system usage
 func (m *Metrics) GetCurrentStats() {
 	cused, err1 := utils.UsedCPU()
 	mused, err2 := utils.UsedRAM()

@@ -151,7 +151,7 @@ func AuthHandler(w http.ResponseWriter, r *http.Request) {
 
 // GET methods
 
-// Endpoint to get the historical data
+// HistoricalHandler is endpoint to get the historical data
 func HistoricalHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -233,7 +233,7 @@ func FilesHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
-// List all transfer Requests
+// ListHandlers lists all transfer Requests
 func ListHandler(w http.ResponseWriter, r *http.Request) {
 
 	query := r.URL.RawQuery
@@ -375,7 +375,7 @@ func MetaHandler(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-// Handle pull acknowledge message from main agent.
+// PullHandlers handles pull acknowledge message from main agent.
 func PullHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -413,7 +413,7 @@ func PullHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// This handler handles operations on requests
+// ActionHandlers handles operations on requests
 func ActionHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		w.WriteHeader(http.StatusMethodNotAllowed)

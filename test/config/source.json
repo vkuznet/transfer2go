@@ -1,7 +1,7 @@
 {
     "catalog":"test/catalog/source.json",
     "protocol":"http",
-    "backend":"test/",
+    "backend":"/tmp/transfer2go/source",
     "tool":"",
     "url":"http://localhost:8000",
     "port": 8000,

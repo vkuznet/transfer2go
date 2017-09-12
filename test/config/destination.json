@@ -1,7 +1,7 @@
 {
     "catalog":"test/catalog/destination.json",
-    "protocol":"cp",
-    "backend":"test/",
+    "protocol":"http",
+    "backend":"/tmp/transfer2go/destination",
     "tool":"/bin/cp",
     "url":"http://localhost:9000",
     "port": 9000,

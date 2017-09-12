@@ -18,19 +18,23 @@ type Item struct {
 // A PriorityQueue implements heap.Interface and holds Items.
 type PriorityQueue []*Item
 
+// Len provides length of PriorityQueue
 func (pq PriorityQueue) Len() int { return len(pq) }
 
+// Less provides less function for PriorityQueue
 func (pq PriorityQueue) Less(i, j int) bool {
 	// We want Pop to give us the highest, not lowest, priority so we use greater than here.
 	return pq[i].priority > pq[j].priority
 }
 
+// Swap provides swap function for PriorityQueue
 func (pq PriorityQueue) Swap(i, j int) {
 	pq[i], pq[j] = pq[j], pq[i]
 	pq[i].index = i
 	pq[j].index = j
 }
 
+// Push provides push function for PriorityQueue
 func (pq *PriorityQueue) Push(x interface{}) {
 	n := len(*pq)
 	item := x.(*Item)
@@ -38,6 +42,7 @@ func (pq *PriorityQueue) Push(x interface{}) {
 	*pq = append(*pq, item)
 }
 
+// Pop provides pop function for PriorityQueue
 func (pq *PriorityQueue) Pop() interface{} {
 	old := *pq
 	n := len(old)

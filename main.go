@@ -23,26 +23,35 @@ func main() {
 
 	// server options
 	var agent string
-	flag.StringVar(&agent, "agent", "", "Remote agent (registration) end-point")
+	flag.StringVar(&agent, "agent", "", "Remote agent (registration) end-point [SERVER|CLIENT]")
 	var configFile string
-	flag.StringVar(&configFile, "config", "", "Agent configuration file")
+	flag.StringVar(&configFile, "config", "", "Agent configuration file [SERVER]")
 	var verbose int
-	flag.IntVar(&verbose, "verbose", 0, "Verbosity level")
+	flag.IntVar(&verbose, "verbose", 0, "Verbosity level [SERVER|CLENT]")
 	var version bool
-	flag.BoolVar(&version, "version", false, "Show version")
+	flag.BoolVar(&version, "version", false, "Show version [SERVER|CLIENT]")
 
 	// client options
 	var src string
-	flag.StringVar(&src, "src", "", "Source end-point, either local file or AgentName:LFN")
+	flag.StringVar(&src, "src", "", "Source end-point, either local file or AgentName:LFN [CLIENT]")
 	var dst string
-	flag.StringVar(&dst, "dst", "", "Destination end-point, either AgentName or AgentName:LFN")
+	flag.StringVar(&dst, "dst", "", "Destination end-point, either AgentName or AgentName:LFN [CLIENT]")
 	var register string
-	flag.StringVar(&register, "register", "", "File with meta-data of records in JSON data format to register at remote agent")
+	flag.StringVar(&register, "register", "", "File with meta-data of records in JSON data format to register at remote agent [CLIENT]")
+	var approve int64
+	flag.Int64Var(&approve, "approve", 0, "Approve given request id to initiate the transfer [CLIENT]")
 	var model string
-	flag.StringVar(&model, "model", "pull", "Transfer model: pull (data transfer through main agent), push (data transfer from src to dst directly)")
+	flag.StringVar(&model, "model", "pull", "Transfer model: pull (data transfer through main agent), push (data transfer from src to dst directly) [CLIENT]")
 
 	var authVar bool
-	flag.BoolVar(&authVar, "auth", true, "To disable the auth layer")
+	flag.BoolVar(&authVar, "auth", true, "To disable the auth layer [SERVER|CLIENT]")
+
+	flag.Usage = func() {
+		fmt.Println(fmt.Sprintf("Usage of %s", os.Args[0]))
+		fmt.Println("[SERVER] refers to server options")
+		fmt.Println("[CLIENT] refers to client options")
+		flag.PrintDefaults()
+	}
 
 	flag.Parse()
 
@@ -99,8 +108,11 @@ func main() {
 		server.Init(authVar)
 		server.Server(config)
 	} else {
-		if register != "" {
+		if register != "" { // register data in agent
 			client.Register(agent, register)
+		} else if approve != 0 { // approve transfer request
+			client.ApproveRequest(agent, approve)
+			//             core.AuthzDecorator(client.ApproveRequest, "admin")(agent, approve)
 		} else if src == "" { // no transfer request
 			client.Agent(agent)
 		} else {

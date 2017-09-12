@@ -1,7 +1,7 @@
 {
     "catalog":"test/catalog/main.json",
-    "protocol":"cp",
-    "backend":"/tmp",
+    "protocol":"http",
+    "backend":"/tmp/transfer2go/main",
     "tool":"/bin/cp",
     "url":"http://localhost:8989",
     "mfile":"MainAgentMetrics.log",

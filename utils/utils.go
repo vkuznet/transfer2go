@@ -239,7 +239,7 @@ func SourceLine() string {
 	return strings.Join(out, " -> ")
 }
 
-// Calculate CPU usage
+// UsedCPU calculates CPU usage
 func UsedCPU() (float64, error) {
 	cpuUsage, err := cpu.Percent(0, true)
 	if err != nil {
@@ -256,7 +256,7 @@ func UsedCPU() (float64, error) {
 	return avgUsage / float64(totalCPU), nil
 }
 
-// Get used ram
+// UserRAM gets used ram
 func UsedRAM() (float64, error) {
 	ram, err := mem.VirtualMemory()
 	if err != nil {

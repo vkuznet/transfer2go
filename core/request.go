@@ -158,7 +158,7 @@ func httpTransfer(c CatalogEntry, t *TransferRequest) (string, error, float64) {
 	return r.Pfn, nil, throughput
 }
 
-// Check destination catalog
+// GetRemoteFiles checks destination catalog
 func GetRemoteFiles(tr TransferRequest, remote string) ([]CatalogEntry, error) {
 	url := fmt.Sprintf("%s/meta", remote)
 	d, err := json.Marshal(tr)
@@ -248,7 +248,7 @@ func Delete() Decorator {
 	}
 }
 
-// Transfer returns a Decorator that performs request transfers by pull model
+// PullTransfer returns a Decorator that performs request transfers by pull model
 func PullTransfer() Decorator {
 	return func(r Request) Request {
 		return RequestFunc(func(t *TransferRequest) error {
@@ -309,7 +309,7 @@ func PullTransfer() Decorator {
 	}
 }
 
-// Transfer returns a Decorator that performs request transfers
+// PushTransfer returns a Decorator that performs request transfers
 func PushTransfer() Decorator {
 	return func(r Request) Request {
 		return RequestFunc(func(t *TransferRequest) error {

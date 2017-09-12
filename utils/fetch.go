@@ -129,6 +129,7 @@ func HttpClient() *http.Client {
 	return &http.Client{Transport: tr}
 }
 
+// String provides string representation for ResponseType
 func (r *ResponseType) String() string {
 	return fmt.Sprintf("<Response: url=%s data=%s error=%v>", r.Url, string(r.Data), r.Error)
 }
