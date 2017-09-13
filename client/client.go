@@ -21,6 +21,14 @@ import (
 	"github.com/vkuznet/transfer2go/utils"
 )
 
+// ActionRequest provides structure submitted by clients to perform certain action on main agent
+type ActionRequest struct {
+	Delay    int    `json:"delay"`    // transfer delay time, i.e. post-pone transfer
+	Id       int64  `json:"id"`       // unique id of each request
+	Priority int    `json:"priority"` // priority of request
+	Action   string `json:"action"`   // which action to apply
+}
+
 // AgentFiles holds agent alias/url and list of files to transfer
 type AgentFiles struct {
 	Alias string
@@ -368,6 +376,42 @@ func Register(agent, fname string) {
 		"Agent": agent,
 		"Size":  len(uploadRecords),
 	}).Info("Registered records in")
+}
+
+// ProcessAction performs request approval in given agent (PULL mode)
+func ProcessAction(agent string, jsonString string) {
+	var req ActionRequest
+	err := json.Unmarshal([]byte(jsonString), &req)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"JSON":  jsonString,
+			"Error": err,
+		}).Error("Error unable to unmarshal input json string")
+		return
+	}
+	rid := req.Id
+	if rid == 0 {
+		log.WithFields(log.Fields{
+			"JSON":  jsonString,
+			"Error": err,
+		}).Error("Error unknown request Id")
+		return
+	}
+	if req.Action == "approve" {
+		ApproveRequest(agent, rid)
+	} else if req.Action == "delete" {
+		log.WithFields(log.Fields{
+			"JSON":  jsonString,
+			"Error": err,
+		}).Warn("Not yet implemented")
+		return
+	} else {
+		log.WithFields(log.Fields{
+			"JSON":  jsonString,
+			"Error": err,
+		}).Error("Error unknown action")
+		return
+	}
 }
 
 // ApproveRequest performs request approval in given agent (PULL mode)

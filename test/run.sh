@@ -177,8 +177,11 @@ echo "list know requests on $mainAgentName via requests API"
 $exe -agent=$mainAgentUrl -requests=pending
 echo "You may visit $mainAgentUrl/html/main.html to view and/or approve requests"
 echo
-echo "approve request id:$rid"
-$exe -agent=$mainAgentUrl -approve=$rid
+#echo "approve request id:$rid"
+#$exe -agent=$mainAgentUrl -approve=$rid
+echo "approve request via action"
+action="{\"id\":$rid,\"action\":\"approve\"}"
+$exe -agent=$mainAgentUrl -action=$action
 sleep 2
 echo
 if cmp -s "$wdir/source/file.root" "$wdir/destination/file.root"

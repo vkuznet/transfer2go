@@ -36,6 +36,8 @@ func main() {
 	flag.StringVar(&src, "src", "", "Source end-point, either local file or AgentName:LFN [CLIENT]")
 	var dst string
 	flag.StringVar(&dst, "dst", "", "Destination end-point, either AgentName or AgentName:LFN [CLIENT]")
+	var action string
+	flag.StringVar(&action, "action", "", "Specify action JSON to process [CLIENT]")
 	var register string
 	flag.StringVar(&register, "register", "", "File with meta-data of records in JSON data format to register at remote agent [CLIENT]")
 	var approve int64
@@ -112,6 +114,9 @@ func main() {
 	} else {
 		if register != "" { // register data in agent
 			client.Register(agent, register)
+		} else if action != "" { // perform action on main agent
+			client.ProcessAction(agent, action)
+			//             core.AuthzDecorator(client.ProcessAction, "admin")(agent, action)
 		} else if approve != 0 { // approve transfer request
 			client.ApproveRequest(agent, approve)
 			//             core.AuthzDecorator(client.ApproveRequest, "admin")(agent, approve)
