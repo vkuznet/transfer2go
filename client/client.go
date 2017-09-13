@@ -401,3 +401,31 @@ func ApproveRequest(agent string, rid int64) {
 		"Id":  rid,
 	}).Info("successfully approved request")
 }
+
+// ShowRequests list request of a given type from an agent
+func ShowRequests(agent, rtype string) {
+	furl := fmt.Sprintf("%s/list?type=%s", agent, rtype)
+	var args []byte
+	resp := utils.FetchResponse(furl, args)
+	if resp.Error != nil || resp.StatusCode != 200 {
+		log.WithFields(log.Fields{
+			"Url":   furl,
+			"Type":  rtype,
+			"Error": resp.Error,
+		}).Error("Error while fetching list of request from the agent")
+		return
+	}
+	var requests []core.TransferRequest
+	err := json.Unmarshal(resp.Data, &requests)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"Url":   furl,
+			"Type":  rtype,
+			"Error": resp.Error,
+		}).Error("Error during unmarshalling HTTP response")
+		return
+	}
+	for _, r := range requests {
+		log.Info(r.String())
+	}
+}

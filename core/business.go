@@ -115,7 +115,7 @@ func (m *Metrics) ToDict() map[string]int64 {
 
 // String method return string representation of transfer request
 func (t *TransferRequest) String() string {
-	return fmt.Sprintf("<TransferRequest ts=%d file=%s block=%s dataset=%s srcUrl=%s srcAlias=%s dstUrl=%s dstAlias=%s delay=%d>", t.TimeStamp, t.File, t.Block, t.Dataset, t.SrcUrl, t.SrcAlias, t.DstUrl, t.DstAlias, t.Delay)
+	return fmt.Sprintf("<TransferRequest id=%d priority=%d status=%s ts=%d file=%s block=%s dataset=%s srcUrl=%s srcAlias=%s dstUrl=%s dstAlias=%s delay=%d>", t.Id, t.Priority, t.Status, t.TimeStamp, t.File, t.Block, t.Dataset, t.SrcUrl, t.SrcAlias, t.DstUrl, t.DstAlias, t.Delay)
 }
 
 // RunPush method perform a job on transfer request. It will use push model

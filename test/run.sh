@@ -173,6 +173,8 @@ requests=`curl -s "$mainAgentUrl/list?type=pending"`
 echo $requests
 rid=`echo $requests | python -c "import sys, json; print(json.load(sys.stdin)[0]['id'])"`
 echo
+echo "list know requests on $mainAgentName via requests API"
+$exe -agent=$mainAgentUrl -requests=pending
 echo "You may visit $mainAgentUrl/html/main.html to view and/or approve requests"
 echo
 echo "approve request id:$rid"

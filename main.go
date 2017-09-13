@@ -42,6 +42,8 @@ func main() {
 	flag.Int64Var(&approve, "approve", 0, "Approve given request id to initiate the transfer [CLIENT]")
 	var model string
 	flag.StringVar(&model, "model", "pull", "Transfer model: pull (data transfer through main agent), push (data transfer from src to dst directly) [CLIENT]")
+	var requests string
+	flag.StringVar(&requests, "requests", "", "Show given type of requests (pending, transfer) [CLIENT]")
 
 	var authVar bool
 	flag.BoolVar(&authVar, "auth", true, "To disable the auth layer [SERVER|CLIENT]")
@@ -113,6 +115,8 @@ func main() {
 		} else if approve != 0 { // approve transfer request
 			client.ApproveRequest(agent, approve)
 			//             core.AuthzDecorator(client.ApproveRequest, "admin")(agent, approve)
+		} else if requests != "" { // show requests from the agent
+			client.ShowRequests(agent, requests)
 		} else if src == "" { // no transfer request
 			client.Agent(agent)
 		} else {
