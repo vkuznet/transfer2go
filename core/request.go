@@ -310,7 +310,7 @@ func PullTransfer() Decorator {
 		return RequestFunc(func(t *TransferRequest) error {
 			log.WithFields(log.Fields{
 				"Request": t.String(),
-			}).Println("Request Transfer")
+			}).Println("Request Transfer (pull model)")
 			// obtain information about destination agents
 			var err error
 			err = checkAgent(t.DstUrl)
@@ -337,7 +337,7 @@ func PushTransfer() Decorator {
 		return RequestFunc(func(t *TransferRequest) error {
 			log.WithFields(log.Fields{
 				"Request": t.String(),
-			}).Println("Request Transfer")
+			}).Println("Request Transfer (push model)")
 			var records []CatalogEntry
 			// Consider those requests which are failed in previous iteration.
 			// If it is nil then request must be passing through first iteration.
