@@ -760,23 +760,16 @@ func DownloadHandler(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				log.WithFields(log.Fields{
 					"Error": err,
-				}).Error("unable to open pfn in stager")
+					"File":  fname,
+				}).Error("unable to open file in stager")
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
-			// TODO: I need to write data in chunks to avoid memory issue.
-			_, err = io.Copy(w, fin)
-			if err != nil {
-				log.WithFields(log.Fields{
-					"Error": err,
-				}).Error("unable to copy file")
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
+			http.ServeContent(w, r, fname, time.Now(), fin)
 			w.WriteHeader(http.StatusOK)
 			return
 		} else {
-			_stager.Stage(pfn[0])
+			_stager.Stage(files[0])
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
