@@ -211,6 +211,16 @@ func (c *Catalog) Files(dataset, block, lfn string) []string {
 	return files
 }
 
+// PfnFiles returns list of files for specified conditions
+func (c *Catalog) PfnFiles(dataset, block, lfn string) []string {
+	var files []string
+	req := TransferRequest{Dataset: dataset, Block: block, File: lfn}
+	for _, rec := range c.Records(req) {
+		files = append(files, rec.Pfn)
+	}
+	return files
+}
+
 // Records returns catalog records for a given transfer request
 func (c *Catalog) Records(req TransferRequest) []CatalogEntry {
 	stm := getSQL("files_blocks_datasets")

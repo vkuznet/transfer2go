@@ -294,6 +294,14 @@ func NewDispatcher(maxWorkers int, bufferSize int) *Dispatcher {
 	return &Dispatcher{JobPool: pool, MaxWorkers: maxWorkers, BufferSize: bufferSize}
 }
 
+// NewStager returns new instance of Dispatcher type
+func NewStager(pool string, catalog Catalog) *FileSystemStager {
+	if pool == "" {
+		pool = "/tmp/transfer2go" // default pool area resides in /tmp
+	}
+	return &FileSystemStager{Pool: pool, Catalog: catalog}
+}
+
 // InitQueue initializes RequestQueue, transferQueue and StorageQueue
 func InitQueue(transferQueueSize int, storageQueueSize int, mfile string, minterval int64, monitorTime int64, router bool) {
 	// register metrics
