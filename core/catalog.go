@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/vkuznet/transfer2go/utils"
@@ -358,6 +359,7 @@ func (c *Catalog) Exec(stm string, status string, id int64) error {
 	for err != nil && count < 3 {
 		_, err = DB.Exec(stm, status, id)
 		count += 1
+		time.Sleep(time.Second * 1)
 	}
 	return err
 }
