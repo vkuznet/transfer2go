@@ -270,7 +270,7 @@ func (w Worker) Start() {
 						}).Warn("put on hold")
 						w.JobChannel <- job
 					}
-				} else if job.TransferRequest.Status != "" || job.TransferRequest.Status != "ok" {
+				} else if job.TransferRequest.Status != "" {
 					// we got record which still in progress, e.g. agent stager is staging data
 					// let's delay its processing and put it back to the job queue
 					msg := fmt.Sprintf("WARNING %s put on hold", job.TransferRequest.String())
@@ -342,7 +342,7 @@ func InitQueue(transferQueueSize int, storageQueueSize int, mfile string, minter
 
 	// Run background process to calculate machine usage
 	go func() {
-		for _ = range time.Tick(time.Duration(minterval) * time.Second) {
+		for range time.Tick(time.Duration(minterval) * time.Second) {
 			AgentMetrics.GetCurrentStats()
 		}
 	}()
