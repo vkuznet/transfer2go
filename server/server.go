@@ -71,7 +71,6 @@ type AgentProtocol struct {
 var _myself, _alias, _protocol, _backend, _tool, _toolOpts string
 var _agents map[string]string
 var _config Config
-var _stager *core.FileSystemStager
 
 // init
 func init() {
@@ -245,13 +244,13 @@ func Server(config Config) {
 	transporter.TransferRunner()
 
 	// initialize stager
-	_stager = core.NewStager(config.Pool, core.TFC)
+	core.AgentStager = core.NewStager(config.Pool, core.TFC)
 
 	log.WithFields(log.Fields{
 		"Workers":       config.Workers,
 		"QueueSize":     config.QueueSize,
 		"Transfer Type": config.Type,
-	}).Println("Start dispatcher with workers of queue size")
+	}).Println("Start dispatcher")
 
 	if authVar {
 		//start HTTPS server which require user certificates
