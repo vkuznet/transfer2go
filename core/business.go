@@ -246,31 +246,36 @@ func (w Worker) Start() {
 				}
 
 				if err != nil || job.TransferRequest.Status == "error" {
-					msg := fmt.Sprintf("WARNING %v error %v, put on hold", job.TransferRequest, err.Error())
 					// decide if we'll drop the request or put it on hold by increasing its delay
 					// and put back to job channel
 					if job.TransferRequest.Delay > 300 {
 						logs.WithFields(logs.Fields{
-							"Transfer Request": job.TransferRequest,
+							"Request": job.TransferRequest.String(),
 						}).Error("Exceed number of iteration, discard request")
 						job.RequestFails()
 						AgentMetrics.Failed.Inc(1)
 						w.JobPool <- w.JobChannel
 					} else if job.TransferRequest.Delay > 0 {
 						job.TransferRequest.Delay *= 2
-						logs.Println(msg)
+						logs.WithFields(logs.Fields{
+							"Error":   err.Error(),
+							"Request": job.TransferRequest.String(),
+						}).Warn("put on hold")
 						w.JobChannel <- job
 					} else {
 						job.TransferRequest.Delay = 60
-						logs.Println(msg)
+						logs.WithFields(logs.Fields{
+							"Error":   err.Error(),
+							"Request": job.TransferRequest.String(),
+						}).Warn("put on hold")
 						w.JobChannel <- job
 					}
-				} else if job.TransferRequest.Status == "processing" {
+				} else if job.TransferRequest.Status != "" || job.TransferRequest.Status != "ok" {
 					// we got record which still in progress, e.g. agent stager is staging data
 					// let's delay its processing and put it back to the job queue
-					msg := fmt.Sprintf("WARNING %v put on hold", job.TransferRequest)
+					msg := fmt.Sprintf("WARNING %s put on hold", job.TransferRequest.String())
 					job.TransferRequest.Delay = 60
-					logs.Println(msg)
+					logs.Warn(msg)
 					w.JobChannel <- job
 				} else {
 					job.RequestSuccess()
