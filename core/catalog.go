@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/vkuznet/transfer2go/utils"
@@ -351,10 +352,22 @@ func (c *Catalog) InsertRequest(request TransferRequest) error {
 	return e
 }
 
+// Try to update db upto three times
+func (c *Catalog) Exec(stm string, status string, id int64) error {
+	count := 0
+	_, err := DB.Exec(stm, status, id)
+	for err != nil && count < 3 {
+		_, err = DB.Exec(stm, status, id)
+		count += 1
+		time.Sleep(time.Second * 1)
+	}
+	return err
+}
+
 // UpdateRequest updates the status of request
 func (c *Catalog) UpdateRequest(id int64, status string) error {
 	stm := getSQL("update_request")
-	_, err := DB.Exec(stm, status, id)
+	err := c.Exec(stm, status, id)
 	return err
 }
 
