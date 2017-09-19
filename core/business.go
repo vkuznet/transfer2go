@@ -32,19 +32,18 @@ type Metrics struct {
 
 // TransferRequest data type
 type TransferRequest struct {
-	TimeStamp     int64          `json:"ts"`       // timestamp of the request
-	File          string         `json:"file"`     // LFN name to be transferred
-	Block         string         `json:"block"`    // block name to be transferred
-	Dataset       string         `json:"dataset"`  // dataset name to be transferred
-	SrcUrl        string         `json:"srcUrl"`   // source agent URL which initiate the transfer
-	SrcAlias      string         `json:"srcAlias"` // source agent name
-	DstUrl        string         `json:"dstUrl"`   // destination agent URL which will consume the transfer
-	DstAlias      string         `json:"dstAlias"` // destination agent name
-	Delay         int            `json:"delay"`    // transfer delay time, i.e. post-pone transfer
-	Id            int64          `json:"id"`       // unique id of each request
-	Priority      int            `json:"priority"` // priority of request
-	Status        string         `json:"status"`   // Identify the category of request
-	FailedRecords []CatalogEntry // Store records which are failed
+	TimeStamp int64  `json:"ts"`       // timestamp of the request
+	File      string `json:"file"`     // LFN name to be transferred
+	Block     string `json:"block"`    // block name to be transferred
+	Dataset   string `json:"dataset"`  // dataset name to be transferred
+	SrcUrl    string `json:"srcUrl"`   // source agent URL which initiate the transfer
+	SrcAlias  string `json:"srcAlias"` // source agent name
+	DstUrl    string `json:"dstUrl"`   // destination agent URL which will consume the transfer
+	DstAlias  string `json:"dstAlias"` // destination agent name
+	Delay     int    `json:"delay"`    // transfer delay time, i.e. post-pone transfer
+	Id        int64  `json:"id"`       // unique id of each request
+	Priority  int    `json:"priority"` // priority of request
+	Status    string `json:"status"`   // Identify the category of request
 }
 
 // Job represents the job to be run
@@ -247,8 +246,9 @@ func (w Worker) Start() {
 				}
 
 				if err != nil || job.TransferRequest.Status == "error" {
-					msg := fmt.Sprintf("WARNING %v experienced an error %v, %v, put on hold", job.TransferRequest, err.Error(), job.TransferRequest.Status)
-					// decide if we'll drop the request or put it on hold by increasing its delay and put back to job channel
+					msg := fmt.Sprintf("WARNING %v error %v, put on hold", job.TransferRequest, err.Error())
+					// decide if we'll drop the request or put it on hold by increasing its delay
+					// and put back to job channel
 					if job.TransferRequest.Delay > 300 {
 						logs.WithFields(logs.Fields{
 							"Transfer Request": job.TransferRequest,
@@ -265,6 +265,13 @@ func (w Worker) Start() {
 						logs.Println(msg)
 						w.JobChannel <- job
 					}
+				} else if job.TransferRequest.Status == "processing" {
+					// we got record which still in progress, e.g. agent stager is staging data
+					// let's delay its processing and put it back to the job queue
+					msg := fmt.Sprintf("WARNING %v put on hold", job.TransferRequest)
+					job.TransferRequest.Delay = 60
+					logs.Println(msg)
+					w.JobChannel <- job
 				} else {
 					job.RequestSuccess()
 					// decrement transfer counter
