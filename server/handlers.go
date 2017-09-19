@@ -142,6 +142,8 @@ func AuthHandler(w http.ResponseWriter, r *http.Request) {
 		ActionHandler(w, r)
 	case "pull":
 		PullHandler(w, r)
+	case "push":
+		PushHandler(w, r)
 	case "meta":
 		MetaHandler(w, r)
 	case "history":
@@ -417,13 +419,60 @@ func PullHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	var jobs []core.Job
 	for _, req := range data {
+		jobs = append(jobs, core.Job{TransferRequest: req, Action: "pulltransfer"})
+	}
+	body, err := json.Marshal(jobs)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"Error": err,
+			"jobs":  jobs,
+		}).Error("PullHandler unable to marshall jobs")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if len(data) > 0 {
+		url := fmt.Sprintf("%s/action", data[0].DstUrl)
+		resp := utils.FetchResponse(url, body)
+		// Check return status code
+		if resp.StatusCode != 200 {
+			log.WithFields(log.Fields{
+				"Error":       err,
+				"Destination": data[0].DstUrl,
+			}).Error("PullHandler unable to send transfer request to destination agent")
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	}
+	w.WriteHeader(http.StatusOK)
+	return
+}
+
+// PushHandler performs pushing data from a source to destination agent
+func PushHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	defer r.Body.Close()
+	var data []core.TransferRequest
+	err := json.NewDecoder(r.Body).Decode(&data)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"Error": err,
+		}).Error("PushHandler unable to parse json body")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	var jobs []core.Job
+	for _, req := range data {
 		jobs = append(jobs, core.Job{TransferRequest: req, Action: "pushtransfer"})
 	}
 	body, err := json.Marshal(jobs)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"Error": err,
-		}).Error("PullHandler unable to send json body to Source")
+			"jobs":  jobs,
+		}).Error("PushHandler unable to marshal jobs")
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -433,8 +482,9 @@ func PullHandler(w http.ResponseWriter, r *http.Request) {
 		// Check return status code
 		if resp.StatusCode != 200 {
 			log.WithFields(log.Fields{
-				"Error": err,
-			}).Error("PullHandler unable to send transfer request to Source")
+				"Error":  err,
+				"Source": data[0].SrcUrl,
+			}).Error("PushHandler unable to send transfer request to source agent")
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
