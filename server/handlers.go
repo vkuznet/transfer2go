@@ -391,17 +391,6 @@ func MetaHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // PullHandler handles pull acknowledge message from main agent.
-// TODO: I need to implement new logic for pull data model (pull handler is at destination)
-//
-// It will received list of TransferRequest where each one contains either full
-// or part of the dataset/block/files we need to pull from source agent(s)
-// Loop over all requests and spawn new goroutine with the following logic
-// - resolve input TransferRequest into dataset/block/files
-// - for every file
-//   - send request to src agent /download?lfn=file.root
-//     - if 204 No Content, sleep and retry
-//   - received data and check its hash
-//   - register newly received file into local Catalog
 func PullHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -803,9 +792,9 @@ func DownloadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	args := r.URL.Query()
 	if files, ok := args["lfn"]; ok {
-		if _stager.Exist(files[0]) {
+		if core.AgentStager.Exist(files[0]) {
 			var fin *os.File
-			fname := _stager.Access(files[0])
+			fname := core.AgentStager.Access(files[0])
 			fin, err := os.Open(fname)
 			if err != nil {
 				log.WithFields(log.Fields{
@@ -819,7 +808,7 @@ func DownloadHandler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			return
 		} else {
-			_stager.Stage(files[0])
+			core.AgentStager.Stage(files[0])
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
