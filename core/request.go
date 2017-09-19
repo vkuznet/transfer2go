@@ -317,14 +317,44 @@ func PullTransfer() Decorator {
 			if err != nil {
 				return err
 			}
-			// If router is enabled to get appropriate source agent
-			if routerModel == true {
-				err = RedirectRequest(t, t.DstUrl)
-			} else {
-				err = SubmitRequest([]TransferRequest{*t}, t.DstUrl)
+			// Here we implement the following logic:
+			// - send request to src agent /download?lfn=file.root
+			//   - if 204 No Content, change transfer request status to processing
+			// - received data and check its hash
+			// - register newly received file into local Catalog
+
+			// check if record exists in TFC
+			existingRecords := TFC.Records(*t)
+			if len(existingRecords) > 0 {
+				return nil // nothing to do since we have this record in TFC
 			}
-			if err != nil {
-				return err
+
+			// try to download a file from remote agent
+			time0 := time.Now().Unix()
+			url := fmt.Sprintf("%s/download?lfn=%s", t.SrcUrl, t.File)
+			resp := utils.FetchResponse(url, []byte{})
+			if resp.Error != nil {
+				return resp.Error
+			}
+			if resp.StatusCode == 204 {
+				// transfer was put into stager but not yet finished
+				t.Status = "processing"
+			}
+			if resp.StatusCode == 200 {
+				// we got data add record into local catalog
+				data := resp.Data
+				// call local stager to put data into local pool and/or tape system
+				pfn, bytes, hash, err := AgentStager.Write(data, t.File)
+				if err != nil {
+					return err
+				}
+				// create catalog entry for this data
+				entry := CatalogEntry{Lfn: t.File, Pfn: pfn, Dataset: t.Dataset, Block: t.Block, Bytes: bytes, Hash: hash, TransferTime: (time.Now().Unix() - time0), Timestamp: time.Now().Unix()}
+				// update local TFC with new catalog entry
+				TFC.Add(entry)
+				// record how much we transferred
+				AgentMetrics.TotalBytes.Inc(bytes) // keep growing
+				AgentMetrics.Total.Inc(1)          // keep growing
 			}
 			return r.Process(t)
 		})
@@ -339,19 +369,13 @@ func PushTransfer() Decorator {
 				"Request": t.String(),
 			}).Println("Request Transfer (push model)")
 			var records []CatalogEntry
-			// Consider those requests which are failed in previous iteration.
-			// If it is nil then request must be passing through first iteration.
-			if t.FailedRecords != nil {
-				records = t.FailedRecords
+			requestedRecords := TFC.Records(*t)
+			// Check if the requested data is already presented on destination agent.
+			remoteRecords, err := GetRemoteFiles(*t, t.DstUrl)
+			if remoteRecords == nil || err != nil {
+				records = requestedRecords
 			} else {
-				requestedRecords := TFC.Records(*t)
-				// Check if the requested data is already presented on destination agent.
-				remoteRecords, err := GetRemoteFiles(*t, t.DstUrl)
-				if remoteRecords == nil || err != nil {
-					records = requestedRecords
-				} else {
-					records = compareRecords(requestedRecords, remoteRecords) // Filter the matching records
-				}
+				records = compareRecords(requestedRecords, remoteRecords) // Filter the matching records
 			}
 
 			if len(records) == 0 {
@@ -368,7 +392,7 @@ func PushTransfer() Decorator {
 				return resp.Error
 			}
 			var dstAgent AgentStatus
-			err := json.Unmarshal(resp.Data, &dstAgent)
+			err = json.Unmarshal(resp.Data, &dstAgent)
 			if err != nil {
 				return err
 			}
@@ -386,7 +410,6 @@ func PushTransfer() Decorator {
 			// TODO: I need to implement bulk transfer for all files in found records
 			// so far I loop over them individually and transfer one by one
 			var trRecords []CatalogEntry // list of successfully transferred records
-			var failedRecords []CatalogEntry
 			// Overwrite the previous error status
 			t.Status = ""
 			for _, rec := range records {
@@ -410,7 +433,6 @@ func PushTransfer() Decorator {
 							"Err":             err,
 						}).Error("Transfer", rec.String(), t.String(), err)
 						t.Status = err.Error()
-						failedRecords = append(failedRecords, rec)
 						continue // if we fail on single record we continue with others
 					}
 					cusage, memUsage, err := AgentMetrics.GetUsage()
@@ -441,7 +463,6 @@ func PushTransfer() Decorator {
 							"Err":          err,
 						}).Error("Transfer")
 						t.Status = err.Error()
-						failedRecords = append(failedRecords, rec)
 						continue // if we fail on single record we continue with others
 					}
 				}
@@ -464,7 +485,6 @@ func PushTransfer() Decorator {
 			if resp.Error != nil {
 				return resp.Error
 			}
-			t.FailedRecords = failedRecords
 			return r.Process(t)
 		})
 	}
