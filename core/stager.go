@@ -15,7 +15,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// Stager represent instance of agent's stager
+// AgentStager represent instance of agent's stager
 var AgentStager *FileSystemStager
 
 // Stager interface defines abstract functionality of the file stage system

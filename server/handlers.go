@@ -807,11 +807,10 @@ func DownloadHandler(w http.ResponseWriter, r *http.Request) {
 			http.ServeContent(w, r, fname, time.Now(), fin)
 			w.WriteHeader(http.StatusOK)
 			return
-		} else {
-			core.AgentStager.Stage(files[0])
-			w.WriteHeader(http.StatusNoContent)
-			return
 		}
+		core.AgentStager.Stage(files[0])
+		w.WriteHeader(http.StatusNoContent)
+		return
 	}
 	w.WriteHeader(http.StatusBadRequest)
 }

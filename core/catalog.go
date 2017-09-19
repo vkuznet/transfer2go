@@ -333,7 +333,7 @@ func (c *Catalog) GetTransfers(time0, time1 string) ([]TransferData, error) {
 		if err != nil {
 			log.WithFields(log.Fields{
 				"Err": err,
-			}).Error("rows.Scan")
+			}).Error("Exec: rows.Scan")
 		}
 		out = append(out, rec)
 	}
@@ -352,7 +352,7 @@ func (c *Catalog) InsertRequest(request TransferRequest) error {
 	return e
 }
 
-// Try to update db upto three times
+// Exec method update db upto three times
 func (c *Catalog) Exec(stm string, status string, id int64) error {
 	count := 0
 	_, err := DB.Exec(stm, status, id)
