@@ -1,20 +1,28 @@
 package core
 
+// transfer2go stager data transfer module
+// Author - Valentin Kuznetsov <vkuznet@gmail.com>
+
 import (
+	"bufio"
+	"encoding/hex"
 	"fmt"
+	"hash/adler32"
+	"io"
 	"os"
 	"path/filepath"
 
 	log "github.com/sirupsen/logrus"
 )
 
-// transfer2go stager data transfer module
-// Author - Valentin Kuznetsov <vkuznet@gmail.com>
+// Stager represent instance of agent's stager
+var AgentStager *FileSystemStager
 
 // Stager interface defines abstract functionality of the file stage system
 type Stager interface {
 	Stage(lfn string) error
 	Read(lfn string, chunk int64) ([]byte, error)
+	Write([]byte) (string, int64, string)
 	Exist(lfn string) bool
 	Access(lfn string) string
 }
@@ -80,4 +88,34 @@ func (s *FileSystemStager) Exist(lfn string) bool {
 		return true
 	}
 	return false
+}
+
+// Put implements put functionality of the Stager interface
+func (s *FileSystemStager) Write(data []byte, lfn string) (string, int64, string, error) {
+	// create a file (pfn) in local pool
+	pfn := fmt.Sprintf("%s/%s", s.Pool, filepath.Base(lfn))
+	fin, err := os.Create(pfn)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"Error": err,
+			"Pfn":   pfn,
+		}).Error("Unable to create file in local pool", err)
+		return "", 0, "", err
+	}
+	// create a hasher to calculate data hash
+	hasher := adler32.New()
+	// create our writer with give file descriptor
+	w := bufio.NewWriter(fin)
+	// create multi-writer (data->hasher->writer)
+	mw := io.MultiWriter(hasher, w)
+	// write data through multi-writer (hasher->writer)
+	bytes, err := mw.Write(data)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"Error": err,
+		}).Error("Unable to write data through hasher->writer", err)
+		return "", 0, "", err
+	}
+	hash := hex.EncodeToString(hasher.Sum(nil))
+	return pfn, int64(bytes), hash, nil
 }
