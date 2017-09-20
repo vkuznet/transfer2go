@@ -195,7 +195,7 @@ func (j *Job) UpdateRequest(status string) {
 func (j *Job) RequestFails() {
 	switch j.Action {
 	case "store":
-		// TODO: notify client about error
+		// we stored request in a system, so do nothing here
 	case "delete":
 		// update main agent
 		j.UpdateRequest("deleted")
@@ -438,49 +438,6 @@ func (d *Dispatcher) dispatchToTransfer() {
 		case job := <-TransferQueue:
 			// a job request has been received
 			go func(job Job) {
-				/*
-					//                 if TransferType == "pull" {
-					status, err := TFC.GetStatus(job.TransferRequest.Id)
-					if err != nil {
-						logs.WithFields(logs.Fields{
-							"Error": err,
-						}).Error("Error getting request status")
-						// TODO: push in error queue.
-						return
-					}
-					if status == "pending" {
-						// Update the status of request in DB
-						err = TFC.UpdateRequest(job.TransferRequest.Id, "processing")
-						job.TransferRequest.Status = "processing"
-						if err != nil {
-							logs.WithFields(logs.Fields{
-								"Error": err,
-							}).Error("Error updating request status")
-							// TODO: push in error queue.
-							return
-						}
-					} else {
-						return
-					}
-					err = TFC.RetrieveRequest(&job.TransferRequest)
-					if err != nil {
-						logs.WithFields(logs.Fields{
-							"Error": err,
-						}).Error("Error retriving request data")
-						job.RequestFails()
-						// TODO: push in error queue.
-						return
-					}
-					job.TransferRequest.Status = "processing"
-					//                 }
-					// try to obtain a worker job channel that is available.
-					// this will block until a worker is idle
-					jobChannel := <-d.JobPool
-
-					// dispatch the job to the worker job channel
-					jobChannel <- job
-				*/
-
 				// try to obtain a worker job channel that is available.
 				// this will block until a worker is idle
 				jobChannel := <-d.JobPool

@@ -311,16 +311,10 @@ func PullTransfer() Decorator {
 			log.WithFields(log.Fields{
 				"Request": t.String(),
 			}).Info("Request Transfer (pull model)")
-			// obtain information about destination agents
-			var err error
-			err = checkAgent(t.DstUrl)
-			if err != nil {
-				return err
-			}
 			// Here we implement the following logic:
 			// - send request to src agent /download?lfn=file.root
 			//   - if 204 No Content, change transfer request status to processing
-			// - received data and check its hash
+			// - received data and call AgentStager to write data to local storage
 			// - register newly received file into local Catalog
 
 			// check if record exists in TFC
@@ -336,12 +330,6 @@ func PullTransfer() Decorator {
 			time0 := time.Now().Unix()
 			url := fmt.Sprintf("%s/download?lfn=%s", t.SrcUrl, t.File)
 			resp := utils.FetchResponse(url, []byte{})
-			log.WithFields(log.Fields{
-				"Request":             t.String(),
-				"Response.Error":      resp.Error,
-				"Response.Status":     resp.Status,
-				"Response.StatusCode": resp.StatusCode,
-			}).Info("Request Transfer (pull model), no existing records in local TFC")
 			if resp.Error != nil {
 				log.WithFields(log.Fields{
 					"Request":             t.String(),
@@ -376,7 +364,7 @@ func PullTransfer() Decorator {
 				TFC.Add(entry)
 				log.WithFields(log.Fields{
 					"Request": t.String(),
-					"Entry":   entry,
+					"Entry":   entry.String(),
 				}).Info("Request Transfer (pull model), successfully added to this agent")
 				// change status of the processed request
 				t.Status = ""

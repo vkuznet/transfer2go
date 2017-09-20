@@ -526,11 +526,11 @@ func ActionHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	log.WithFields(log.Fields{
-		"Data": data,
-	}).Info("ActionHandler, receive new request")
-
+	// loop over received data and decide what to do with those requests based on the action clause
 	for _, job := range data {
+		log.WithFields(log.Fields{
+			"Request": job.String(),
+		}).Info("ActionHandler, receive new request")
 		if job.Action == "approve" { // this is action happens on main agent
 			// find out real transfer request
 			err := core.TFC.RetrieveRequest(&job.TransferRequest)
@@ -581,7 +581,8 @@ func ActionHandler(w http.ResponseWriter, r *http.Request) {
 			if err == nil {
 				core.RequestQueue.Delete(job.TransferRequest.Id) // Remove request from heap.
 			}
-		} else { // this actions happens either on source or destination agent
+		} else { // this action happens either on source or destination agent
+			// we put received job into transfer queue
 			core.TransferQueue <- job
 		}
 	}
@@ -936,8 +937,8 @@ func DownloadHandler(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
+			// we don't need to WriteHeader here since it is handled by http.ServeContent
 			http.ServeContent(w, r, fname, time.Now(), fin)
-			w.WriteHeader(http.StatusOK)
 			return
 		}
 		core.AgentStager.Stage(files[0])
