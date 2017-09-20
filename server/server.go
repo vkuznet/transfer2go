@@ -41,7 +41,6 @@ type Config struct {
 	ServerKey     string `json:"serverkey"`   // server key file
 	ServerCrt     string `json:"servercrt"`   // server crt file
 	Type          string `json:"type"`        // Configure server type push/pull
-	Pool          string `json:"pool"`        // server pool area (for staging files)
 	BufferSize    int    `json:"buffersize"`  // Size of buffered channels
 	MonitorTime   int64  `json:"monitorTime"` // Large time interval after which we need to reset monitoring calculation
 	TrainInterval string `json:"trinterval"`  // Time after which we need to retrain main agent
@@ -50,7 +49,7 @@ type Config struct {
 
 // String returns string representation of Config data type
 func (c *Config) String() string {
-	return fmt.Sprintf("<Config: name=%s url=%s port=%d base=%s catalog=%s protocol=%s backend=%s tool=%s opts=%s mfile=%s minterval=%d staticdir=%s workders=%d queuesize=%d register=%s pool=%s type=%s router=%v>", c.Name, c.Url, c.Port, c.Base, c.Catalog, c.Protocol, c.Backend, c.Tool, c.ToolOpts, c.Mfile, c.Minterval, c.Staticdir, c.Workers, c.QueueSize, c.Register, c.Pool, c.Type, c.RouterModel)
+	return fmt.Sprintf("<Config: name=%s url=%s port=%d base=%s catalog=%s protocol=%s backend=%s tool=%s opts=%s mfile=%s minterval=%d staticdir=%s workders=%d queuesize=%d register=%s type=%s router=%v>", c.Name, c.Url, c.Port, c.Base, c.Catalog, c.Protocol, c.Backend, c.Tool, c.ToolOpts, c.Mfile, c.Minterval, c.Staticdir, c.Workers, c.QueueSize, c.Register, c.Type, c.RouterModel)
 }
 
 // AgentInfo data type
@@ -173,6 +172,7 @@ func Server(config Config) {
 
 	// register self agent URI in remote agent and vice versa
 	registerAtAgents(config.Register)
+	core.MainAgent = config.Register
 
 	// define catalog
 	c, e := ioutil.ReadFile(config.Catalog)
@@ -244,7 +244,7 @@ func Server(config Config) {
 	transporter.TransferRunner()
 
 	// initialize stager
-	core.AgentStager = core.NewStager(config.Pool, core.TFC)
+	core.AgentStager = core.NewStager(config.Backend, core.TFC)
 
 	log.WithFields(log.Fields{
 		"Workers":       config.Workers,

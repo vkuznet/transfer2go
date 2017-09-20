@@ -204,7 +204,7 @@ func TestApproval(t *testing.T) {
 	var job []core.Job
 	id := data[0].Id
 	req := core.TransferRequest{Id: data[0].Id}
-	action := core.Job{TransferRequest: req, Action: "pulltransfer"}
+	action := core.Job{TransferRequest: req, Action: "transfer"}
 	furl := url + "/action"
 	job = append(job, action)
 	d, err := json.Marshal(job)

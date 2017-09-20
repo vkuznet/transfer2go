@@ -378,8 +378,8 @@ func Register(agent, fname string) {
 	}).Info("Registered records in")
 }
 
-// ProcessAction performs request approval in given agent (PULL mode)
-func ProcessAction(agent string, jsonString string) {
+// ProcessAction performs request approval in given agent
+func ProcessAction(agent, jsonString string) {
 	var req ActionRequest
 	err := json.Unmarshal([]byte(jsonString), &req)
 	if err != nil {
@@ -394,34 +394,22 @@ func ProcessAction(agent string, jsonString string) {
 		log.WithFields(log.Fields{
 			"JSON":  jsonString,
 			"Error": err,
-		}).Error("Error unknown request Id")
+		}).Error("unknown request Id")
 		return
 	}
-	if req.Action == "approve" {
-		ApproveRequest(agent, rid)
-	} else if req.Action == "delete" {
+	if req.Action != "approve" && req.Action != "delete" {
 		log.WithFields(log.Fields{
-			"JSON":  jsonString,
-			"Error": err,
-		}).Warn("Not yet implemented")
-		return
-	} else {
-		log.WithFields(log.Fields{
-			"JSON":  jsonString,
-			"Error": err,
-		}).Error("Error unknown action")
+			"JSON":   jsonString,
+			"Action": req.Action,
+		}).Error("unknown action")
 		return
 	}
-}
-
-// ApproveRequest performs request approval in given agent (PULL mode)
-func ApproveRequest(agent string, rid int64) {
-	var job []core.Job
-	req := core.TransferRequest{Id: rid}
-	action := core.Job{TransferRequest: req, Action: "pulltransfer"}
-	furl := agent + "/action"
-	job = append(job, action)
-	d, e := json.Marshal(job)
+	furl := fmt.Sprintf("%s/action", agent)
+	var jobs []core.Job
+	r := core.TransferRequest{Id: rid}
+	job := core.Job{TransferRequest: r, Action: req.Action}
+	jobs = append(jobs, job)
+	d, e := json.Marshal(jobs)
 	if e != nil {
 		log.WithFields(log.Fields{
 			"Url":   furl,
@@ -437,13 +425,14 @@ func ApproveRequest(agent string, rid int64) {
 			"Url":   furl,
 			"Id":    rid,
 			"Error": resp.Error,
-		}).Error("Error while approving request in main agent")
+		}).Error("Error while fetching response from main agent")
 		return
 	}
 	log.WithFields(log.Fields{
-		"Url": furl,
-		"Id":  rid,
-	}).Info("successfully approved request")
+		"Url":    furl,
+		"Id":     rid,
+		"Action": req.Action,
+	}).Info("successfully process the action")
 }
 
 // ShowRequests list request of a given type from an agent

@@ -81,10 +81,10 @@ cat > $wdir/catalog/main.json << EOF
 EOF
 cp test/data/history.csv $wdir/model/
 cat $wdir/config/main.json | \
-    sed -e "s,main,source,g" -e "s,8989,8000,g" -e "s,pull,push,g" -e "s,true,false,g" \
+    sed -e "s,main,source,g" -e "s,8989,8000,g" -e "s,true,false,g" \
     > $wdir/config/source.json 
 cat $wdir/config/main.json | \
-    sed -e "s,main,destination,g" -e "s,8989,9000,g" -e "s,pull,push,g" -e "s,true,false,g"\
+    sed -e "s,main,destination,g" -e "s,8989,9000,g" -e "s,true,false,g"\
     > $wdir/config/destination.json 
 cat $wdir/catalog/main.json | sed -e "s,main,source,g" > $wdir/catalog/source.json 
 cat $wdir/catalog/main.json | sed -e "s,main,destination,g" > $wdir/catalog/destination.json 

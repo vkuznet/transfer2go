@@ -12,6 +12,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -120,6 +121,8 @@ func AuthHandler(w http.ResponseWriter, r *http.Request) {
 		AgentsHandler(w, r)
 	case "files":
 		FilesHandler(w, r)
+	case "records":
+		RecordsHandler(w, r)
 	case "reset":
 		ResetHandler(w, r)
 	case "tfc":
@@ -229,6 +232,30 @@ func FilesHandler(w http.ResponseWriter, r *http.Request) {
 		log.WithFields(log.Fields{
 			"Error": err,
 		}).Error("AgentsHandler", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	} else {
+		w.WriteHeader(http.StatusOK)
+	}
+	w.Write(data)
+}
+
+// RecordsHandler provides information about files in catalog
+func RecordsHandler(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != "GET" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	lfn := r.FormValue("lfn")
+	dataset := r.FormValue("dataset")
+	block := r.FormValue("block")
+	req := core.TransferRequest{File: lfn, Block: block, Dataset: dataset}
+	records := core.TFC.Records(req)
+	data, err := json.Marshal(records)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"Error": err,
+		}).Error("Recordsandler", err)
 		w.WriteHeader(http.StatusInternalServerError)
 	} else {
 		w.WriteHeader(http.StatusOK)
@@ -408,7 +435,7 @@ func PullHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	var jobs []core.Job
 	for _, req := range data {
-		jobs = append(jobs, core.Job{TransferRequest: req, Action: "pulltransfer"})
+		jobs = append(jobs, core.Job{TransferRequest: req, Action: "transfer"})
 	}
 	body, err := json.Marshal(jobs)
 	if err != nil {
@@ -454,7 +481,7 @@ func PushHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	var jobs []core.Job
 	for _, req := range data {
-		jobs = append(jobs, core.Job{TransferRequest: req, Action: "pushtransfer"})
+		jobs = append(jobs, core.Job{TransferRequest: req, Action: "transfer"})
 	}
 	body, err := json.Marshal(jobs)
 	if err != nil {
@@ -499,10 +526,64 @@ func ActionHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	log.WithFields(log.Fields{
+		"Data": data,
+	}).Info("ActionHandler, receive new request")
 
 	for _, job := range data {
-		// Push the job onto the queue.
-		core.TransferQueue <- job
+		if job.Action == "approve" { // this is action happens on main agent
+			// find out real transfer request
+			err := core.TFC.RetrieveRequest(&job.TransferRequest)
+			if err != nil {
+				log.WithFields(log.Fields{
+					"Job":   job,
+					"Error": err,
+				}).Error("ActionHandler, unable to find a request")
+				continue
+			}
+			// change it action to transfer and get destination agent url
+			job.Action = "transfer"
+			job.TransferRequest.Status = "processing"
+			agent := job.TransferRequest.DstUrl
+			if agent == "" {
+				log.WithFields(log.Fields{
+					"Job": job,
+				}).Error("ActionHandler, undefined agent")
+				continue
+			}
+			var jobs4Agent []core.Job
+			jobs4Agent = append(jobs4Agent, job)
+			furl := fmt.Sprintf("%s/action", agent)
+			d, err := json.Marshal(jobs4Agent)
+			if err != nil {
+				log.WithFields(log.Fields{
+					"Error": err,
+				}).Error("ActionHandler unable to marshal jobs4Agent")
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			// send request to destination agent
+			resp := utils.FetchResponse(furl, d)
+			if resp.StatusCode != 200 {
+				log.WithFields(log.Fields{
+					"Error": err,
+					"Agent": agent,
+				}).Error("ActionHandler unable to send transfer request to agent")
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			log.WithFields(log.Fields{
+				"Job":   job.String(),
+				"Agent": agent,
+			}).Info("ActionHandler, successfully send request to agent")
+		} else if job.Action == "update" { // this happens on main agent
+			err := core.TFC.UpdateRequest(job.TransferRequest.Id, job.TransferRequest.Status)
+			if err == nil {
+				core.RequestQueue.Delete(job.TransferRequest.Id) // Remove request from heap.
+			}
+		} else { // this actions happens either on source or destination agent
+			core.TransferQueue <- job
+		}
 	}
 	w.WriteHeader(http.StatusOK)
 }
@@ -649,7 +730,58 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) {
 	// go through each request and queue items individually to run job over the given request
 	for _, r := range *requests {
 
-		// let's create a job with the payload
+		// let's create a job with payload
+		// find out missing parts (if any) in transfer request
+		// - send request to source agent and find out dataset/block/files
+		vals := url.Values{}
+		if r.File != "" {
+			vals.Add("lfn", r.File)
+		}
+		if r.Block != "" {
+			vals.Add("block", r.Block)
+		}
+		if r.Dataset != "" {
+			vals.Add("dataset", r.Dataset)
+		}
+		args := vals.Encode()
+		furl := fmt.Sprintf("%s/records?%s", r.SrcUrl, args)
+		resp := utils.FetchResponse(furl, []byte{})
+		if resp.Error != nil {
+			log.WithFields(log.Fields{
+				"Error": resp.Error,
+				"Url":   furl,
+			}).Error("Unable to fetch response")
+			continue
+		}
+		var records []core.CatalogEntry
+		err := json.Unmarshal(resp.Data, &records)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"Error": resp.Error,
+				"Url":   furl,
+			}).Error("Unable to unmarshal catalog entry records")
+			continue
+		}
+		// TODO: I think I need a loop here across all catalog entries
+		// e.g. if I gave block then I'll get back dataset/block/files tripets
+		if len(records) > 0 {
+			// TMP: so far I take first entry
+			rec := records[0]
+			if r.File == "" {
+				r.File = rec.Lfn
+			}
+			if r.Block == "" {
+				r.Block = rec.Block
+			}
+			if r.Dataset == "" {
+				r.Dataset = rec.Dataset
+			}
+		}
+		log.WithFields(log.Fields{
+			"Record": r,
+		}).Info("store record")
+
+		// this action will cause main agent to store given request in heap and persistent storage (REQUEST table)
 		work := core.Job{TransferRequest: r, Action: "store"}
 
 		// Push the work onto the queue.

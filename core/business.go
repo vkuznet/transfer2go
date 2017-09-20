@@ -5,6 +5,7 @@ package core
 
 import (
 	"container/heap"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -48,8 +49,8 @@ type TransferRequest struct {
 
 // Job represents the job to be run
 type Job struct {
-	TransferRequest TransferRequest `json:"request"`
-	Action          string          `json:"action"`
+	TransferRequest TransferRequest `json:"request"` // TransferRequest
+	Action          string          `json:"action"`  // Action to apply to TransferRequest, e.g. delete or transfer
 }
 
 // Worker represents the worker that executes the job
@@ -82,6 +83,9 @@ var TransferQueue chan Job
 
 // TransferType decides which pull or push based model is used
 var TransferType string
+
+// MainAgent url
+var MainAgent string
 
 // Param to enable the router
 var routerModel bool
@@ -162,28 +166,42 @@ func (j *Job) String() string {
 	return fmt.Sprintf("<Job TransferRequest=%s action=%s>", j.TransferRequest.String(), j.Action)
 }
 
+// helper function to send request to main agent to update request status in its persistent store (REQUESTS table)
+func (j *Job) UpdateRequest(status string) {
+	furl := fmt.Sprintf("%s/action", MainAgent)
+	var jobs []Job
+	job := Job{TransferRequest: j.TransferRequest, Action: "update"}
+	job.TransferRequest.Status = status
+	jobs = append(jobs, job)
+	data, err := json.Marshal(jobs)
+	if err != nil {
+		logs.WithFields(logs.Fields{
+			"Error": err,
+			"jobs":  jobs,
+		}).Error("UpdateRequest unable to marshall jobs")
+		return
+	}
+	resp := utils.FetchResponse(furl, data) // POST request
+	// Check return status code
+	if resp.StatusCode != 200 {
+		logs.WithFields(logs.Fields{
+			"Error": err,
+		}).Error("UpdateRequest unable to send transfer request to main agent")
+		return
+	}
+}
+
 // RequestFails function to handle failed jobs
 func (j *Job) RequestFails() {
 	switch j.Action {
 	case "store":
 		// TODO: notify client about error
 	case "delete":
-		// TODO: notify client about error
-		err := TFC.UpdateRequest(j.TransferRequest.Id, "pending")
-		if err != nil {
-
-		}
-	case "pulltransfer":
-		// If transfer process fails update request status in DB
-		// Also delete that request from heap
-		err := TFC.UpdateRequest(j.TransferRequest.Id, "error")
-		if err == nil {
-			RequestQueue.Delete(j.TransferRequest.Id) // Remove request from heap.
-		} else {
-			// Could not updat status in DB
-		}
-	case "pushtransfer":
-		// Send error message to destination
+		// update main agent
+		j.UpdateRequest("deleted")
+	case "transfer":
+		// update main agent
+		j.UpdateRequest("error")
 	}
 }
 
@@ -191,18 +209,13 @@ func (j *Job) RequestFails() {
 func (j *Job) RequestSuccess() {
 	switch j.Action {
 	case "store":
-		// TODO: notify client about error
+		// we stored request in a system, so do nothing here
 	case "delete":
-		// TODO: notify client about error
-	case "pulltransfer":
-		err := TFC.UpdateRequest(j.TransferRequest.Id, "finished")
-		if err == nil {
-			RequestQueue.Delete(j.TransferRequest.Id) // Remove request from heap.
-		} else {
-			// Could not updat status in DB
-		}
-	case "pushtransfer":
-		// Send success message to destination
+		// update main agent
+		j.UpdateRequest("deleted")
+	case "transfer":
+		// update main agent
+		j.UpdateRequest("finished")
 	}
 }
 
@@ -235,10 +248,12 @@ func (w Worker) Start() {
 					err = job.TransferRequest.Store()
 				case "delete":
 					err = job.TransferRequest.Delete()
-				case "pushtransfer":
-					err = job.TransferRequest.RunPush()
-				case "pulltransfer":
-					err = job.TransferRequest.RunPull()
+				case "transfer":
+					if TransferType == "push" {
+						err = job.TransferRequest.RunPush()
+					} else {
+						err = job.TransferRequest.RunPull()
+					}
 				default:
 					logs.WithFields(logs.Fields{
 						"Action": job.Action,
@@ -250,6 +265,7 @@ func (w Worker) Start() {
 					// and put back to job channel
 					if job.TransferRequest.Delay > 300 {
 						logs.WithFields(logs.Fields{
+							"Action":  job.Action,
 							"Request": job.TransferRequest.String(),
 						}).Error("Exceed number of iteration, discard request")
 						job.RequestFails()
@@ -259,6 +275,7 @@ func (w Worker) Start() {
 						job.TransferRequest.Delay *= 2
 						logs.WithFields(logs.Fields{
 							"Error":   err.Error(),
+							"Action":  job.Action,
 							"Request": job.TransferRequest.String(),
 						}).Warn("put on hold")
 						w.JobChannel <- job
@@ -266,6 +283,7 @@ func (w Worker) Start() {
 						job.TransferRequest.Delay = 60
 						logs.WithFields(logs.Fields{
 							"Error":   err.Error(),
+							"Action":  job.Action,
 							"Request": job.TransferRequest.String(),
 						}).Warn("put on hold")
 						w.JobChannel <- job
@@ -273,9 +291,11 @@ func (w Worker) Start() {
 				} else if job.TransferRequest.Status != "" {
 					// we got record which still in progress, e.g. agent stager is staging data
 					// let's delay its processing and put it back to the job queue
-					msg := fmt.Sprintf("WARNING %s put on hold", job.TransferRequest.String())
 					job.TransferRequest.Delay = 60
-					logs.Warn(msg)
+					logs.WithFields(logs.Fields{
+						"Action":  job.Action,
+						"Request": job.TransferRequest.String(),
+					}).Warn("put on hold")
 					w.JobChannel <- job
 				} else {
 					job.RequestSuccess()
@@ -351,23 +371,23 @@ func InitQueue(transferQueueSize int, storageQueueSize int, mfile string, minter
 		defer f.Close()
 		metrics.Log(r, time.Duration(minterval)*time.Second, log.New(f, "metrics: ", log.Lmicroseconds))
 	}()
-	//metrics.Log(r, time.Duration(minterval)*time.Second, log.New(f, "metrics: ", log.Lmicroseconds))
-	if TransferType == "pull" {
-		StorageQueue = make(chan Job, storageQueueSize)
-		RequestQueue = make(PriorityQueue, 0) // Create a priority queue
-		// Load pending requests from DB
-		heap.Init(&RequestQueue)
-		requests, err := TFC.ListRequest("pending") // Load requests from database
-		check("Unable To fetch data", err)
-		for i := 0; i < len(requests); i++ {
-			heap.Push(&RequestQueue, &Item{Value: requests[i], priority: requests[i].Priority})
-		}
-		if router == true {
-			routerModel = router
-			AgentRouter.InitialTrain()
-		}
-		logs.Println("Requests restored from db")
+
+	// initialize Storage and Request queues
+	StorageQueue = make(chan Job, storageQueueSize)
+	RequestQueue = make(PriorityQueue, 0) // Create a priority queue
+
+	// Load pending requests from DB
+	heap.Init(&RequestQueue)
+	requests, err := TFC.ListRequest("pending") // Load requests from persistent store (REQUESTS table)
+	check("Unable To fetch data", err)
+	for i := 0; i < len(requests); i++ {
+		heap.Push(&RequestQueue, &Item{Value: requests[i], priority: requests[i].Priority})
 	}
+	if router == true {
+		routerModel = router
+		AgentRouter.InitialTrain()
+	}
+	logs.Println("Requests restored from db")
 	TransferQueue = make(chan Job, transferQueueSize)
 }
 
@@ -418,7 +438,8 @@ func (d *Dispatcher) dispatchToTransfer() {
 		case job := <-TransferQueue:
 			// a job request has been received
 			go func(job Job) {
-				if TransferType == "pull" {
+				/*
+					//                 if TransferType == "pull" {
 					status, err := TFC.GetStatus(job.TransferRequest.Id)
 					if err != nil {
 						logs.WithFields(logs.Fields{
@@ -451,7 +472,15 @@ func (d *Dispatcher) dispatchToTransfer() {
 						return
 					}
 					job.TransferRequest.Status = "processing"
-				}
+					//                 }
+					// try to obtain a worker job channel that is available.
+					// this will block until a worker is idle
+					jobChannel := <-d.JobPool
+
+					// dispatch the job to the worker job channel
+					jobChannel <- job
+				*/
+
 				// try to obtain a worker job channel that is available.
 				// this will block until a worker is idle
 				jobChannel := <-d.JobPool

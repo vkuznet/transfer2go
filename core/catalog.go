@@ -344,9 +344,12 @@ func (c *Catalog) GetTransfers(time0, time1 string) ([]TransferData, error) {
 func (c *Catalog) InsertRequest(request TransferRequest) error {
 	stm := getSQL("insert_request")
 	_, e := DB.Exec(stm, request.Id, request.File, request.Block, request.Dataset, request.SrcUrl, request.DstUrl, "pending", request.Priority)
+	log.WithFields(log.Fields{
+		"Request": request,
+	}).Info("Catalog: InsertRequest")
 	if e != nil {
 		if !strings.Contains(e.Error(), "UNIQUE") {
-			check("Unable to insert into datasets table", e)
+			check("Unable to insert into REQUESTS table", e)
 		}
 	}
 	return e

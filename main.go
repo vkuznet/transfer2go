@@ -42,8 +42,8 @@ func main() {
 	flag.StringVar(&register, "register", "", "File with meta-data of records in JSON data format to register at remote agent [CLIENT]")
 	var approve int64
 	flag.Int64Var(&approve, "approve", 0, "Approve given request id to initiate the transfer [CLIENT]")
-	var model string
-	flag.StringVar(&model, "model", "pull", "Transfer model: pull (data transfer through main agent), push (data transfer from src to dst directly) [CLIENT]")
+	//     var model string
+	//     flag.StringVar(&model, "model", "pull", "Transfer model: pull (data transfer through main agent), push (data transfer from src to dst directly) [CLIENT]")
 	var requests string
 	flag.StringVar(&requests, "requests", "", "Show given type of requests (pending, transfer) [CLIENT]")
 
@@ -105,6 +105,9 @@ func main() {
 		if agent != "" {
 			config.Register = agent
 		}
+		if config.Type == "" {
+			config.Type = "pull" // default value
+		}
 		if config.Register == "" {
 			log.Warn("WARNING this agent is not registered with remote ones, either provide register in your config or invoke register API call")
 		}
@@ -117,23 +120,23 @@ func main() {
 		} else if action != "" { // perform action on main agent
 			client.ProcessAction(agent, action)
 			//             core.AuthzDecorator(client.ProcessAction, "admin")(agent, action)
-		} else if approve != 0 { // approve transfer request
-			client.ApproveRequest(agent, approve)
-			//             core.AuthzDecorator(client.ApproveRequest, "admin")(agent, approve)
 		} else if requests != "" { // show requests from the agent
 			client.ShowRequests(agent, requests)
 		} else if src == "" { // no transfer request
 			client.Agent(agent)
 		} else {
-			if model == "pull" {
-				client.RegisterRequest(agent, src, dst)
-				//                 core.AuthzDecorator(client.RegisterRequest, "admin")(agent, src, dst)
-			} else if model == "push" {
-				client.Transfer(agent, src, dst)
-				//                 core.AuthzDecorator(client.Transfer, "cms")(agent, src, dst)
-			} else {
-				log.Fatal("Unknown transfer model")
-			}
+			client.RegisterRequest(agent, src, dst)
+			/*
+				if model == "pull" {
+					client.RegisterRequest(agent, src, dst)
+					//                 core.AuthzDecorator(client.RegisterRequest, "admin")(agent, src, dst)
+				} else if model == "push" {
+					client.Transfer(agent, src, dst)
+					//                 core.AuthzDecorator(client.Transfer, "cms")(agent, src, dst)
+				} else {
+					log.Fatal("Unknown transfer model")
+				}
+			*/
 		}
 	}
 }

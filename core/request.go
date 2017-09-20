@@ -310,7 +310,7 @@ func PullTransfer() Decorator {
 		return RequestFunc(func(t *TransferRequest) error {
 			log.WithFields(log.Fields{
 				"Request": t.String(),
-			}).Println("Request Transfer (pull model)")
+			}).Info("Request Transfer (pull model)")
 			// obtain information about destination agents
 			var err error
 			err = checkAgent(t.DstUrl)
@@ -326,19 +326,37 @@ func PullTransfer() Decorator {
 			// check if record exists in TFC
 			existingRecords := TFC.Records(*t)
 			if len(existingRecords) > 0 {
-				return nil // nothing to do since we have this record in TFC
+				log.WithFields(log.Fields{
+					"Request": t.String(),
+				}).Info("Request Transfer (pull model), no existing records in local TFC")
+				return r.Process(t) // nothing to do since we have this record in TFC
 			}
 
 			// try to download a file from remote agent
 			time0 := time.Now().Unix()
 			url := fmt.Sprintf("%s/download?lfn=%s", t.SrcUrl, t.File)
 			resp := utils.FetchResponse(url, []byte{})
+			log.WithFields(log.Fields{
+				"Request":             t.String(),
+				"Response.Error":      resp.Error,
+				"Response.Status":     resp.Status,
+				"Response.StatusCode": resp.StatusCode,
+			}).Info("Request Transfer (pull model), no existing records in local TFC")
 			if resp.Error != nil {
+				log.WithFields(log.Fields{
+					"Request":             t.String(),
+					"Response.Error":      resp.Error,
+					"Response.Status":     resp.Status,
+					"Response.StatusCode": resp.StatusCode,
+				}).Error("Request Transfer (pull model), response error")
 				return resp.Error
 			}
 			if resp.StatusCode == 204 {
 				// transfer was put into stager but not yet finished
 				t.Status = "processing"
+				log.WithFields(log.Fields{
+					"Request": t.String(),
+				}).Info("Request Transfer (pull model), received 204 status code, set processing")
 			}
 			if resp.StatusCode == 200 {
 				// we got data add record into local catalog
@@ -346,12 +364,22 @@ func PullTransfer() Decorator {
 				// call local stager to put data into local pool and/or tape system
 				pfn, bytes, hash, err := AgentStager.Write(data, t.File)
 				if err != nil {
+					log.WithFields(log.Fields{
+						"Request": t.String(),
+						"Error":   err,
+					}).Error("Request Transfer (pull model), AgentStager.Write error")
 					return err
 				}
 				// create catalog entry for this data
 				entry := CatalogEntry{Lfn: t.File, Pfn: pfn, Dataset: t.Dataset, Block: t.Block, Bytes: bytes, Hash: hash, TransferTime: (time.Now().Unix() - time0), Timestamp: time.Now().Unix()}
 				// update local TFC with new catalog entry
 				TFC.Add(entry)
+				log.WithFields(log.Fields{
+					"Request": t.String(),
+					"Entry":   entry,
+				}).Info("Request Transfer (pull model), successfully added to this agent")
+				// change status of the processed request
+				t.Status = ""
 				// record how much we transferred
 				AgentMetrics.TotalBytes.Inc(bytes) // keep growing
 				AgentMetrics.Total.Inc(1)          // keep growing
