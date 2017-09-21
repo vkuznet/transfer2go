@@ -23,7 +23,7 @@ func main() {
 
 	// server options
 	var agent string
-	flag.StringVar(&agent, "agent", "", "Remote agent (registration) end-point [SERVER|CLIENT]")
+	flag.StringVar(&agent, "agent", "", "Registration agent URL [SERVER|CLIENT]")
 	var configFile string
 	flag.StringVar(&configFile, "config", "", "Agent configuration file [SERVER]")
 	var verbose int

@@ -343,7 +343,7 @@ func (c *Catalog) GetTransfers(time0, time1 string) ([]TransferData, error) {
 // InsertRequest inserts new request
 func (c *Catalog) InsertRequest(r TransferRequest) error {
 	stm := getSQL("insert_request")
-	_, e := DB.Exec(stm, r.Id, r.File, r.Block, r.Dataset, r.SrcUrl, r.DstUrl, r.RegUrl, "pending", r.Priority)
+	_, e := DB.Exec(stm, r.Id, r.File, r.Block, r.Dataset, r.SrcUrl, r.SrcAlias, r.DstUrl, r.DstAlias, r.RegUrl, r.RegAlias, "pending", r.Priority)
 	log.WithFields(log.Fields{
 		"Request": r,
 	}).Info("Catalog: InsertRequest")
@@ -384,7 +384,7 @@ func (c *Catalog) RetrieveRequest(r *TransferRequest) error {
 	}
 	defer rows.Close()
 	for rows.Next() {
-		if err := rows.Scan(&r.File, &r.Block, &r.Dataset, &r.SrcUrl, &r.DstUrl, &r.RegUrl, &r.Priority); err != nil {
+		if err := rows.Scan(&r.File, &r.Block, &r.Dataset, &r.SrcUrl, &r.SrcAlias, &r.DstUrl, &r.DstAlias, &r.RegUrl, &r.RegAlias, &r.Priority); err != nil {
 			r.Status = err.Error()
 			return err
 		}
@@ -457,18 +457,18 @@ func (c *Catalog) ListRequest(query string) ([]TransferRequest, error) {
 		pointers[i] = &con[i]
 	}
 
-	// Sqlite columns => 0:request-id 1:file 2:block 3:dataset 4:srcurl 5:dsturl 6:regurl 7:status 8:priority
+	// Sqlite columns => 0:request-id 1:file 2:block 3:dataset 4:srcurl 5:srcalias 6:dsturl 7:dstalias 8:regurl 9:regalias 10:status 11:priority
 	for rows.Next() {
 		rows.Scan(pointers...)
 		id, err := strconv.ParseInt(con[0], 10, 64)
 		if err != nil {
 			return nil, err
 		}
-		priority, err := strconv.Atoi(con[8])
+		priority, err := strconv.Atoi(con[11])
 		if err != nil {
 			return nil, err
 		}
-		r := TransferRequest{SrcUrl: con[4], DstUrl: con[5], RegUrl: con[6], File: con[1], Block: con[2], Dataset: con[3], Id: id, Priority: priority, Status: con[7]}
+		r := TransferRequest{SrcUrl: con[4], SrcAlias: con[5], DstUrl: con[6], DstAlias: con[7], RegUrl: con[8], RegAlias: con[9], File: con[1], Block: con[2], Dataset: con[3], Id: id, Priority: priority, Status: con[10]}
 		requests = append(requests, r)
 	}
 	return requests, err

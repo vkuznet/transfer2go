@@ -41,7 +41,8 @@ type TransferRequest struct {
 	SrcAlias  string `json:"srcAlias"` // source agent name
 	DstUrl    string `json:"dstUrl"`   // destination agent URL which will consume the transfer
 	DstAlias  string `json:"dstAlias"` // destination agent name
-	RegUrl    string `json:"regUrl"`   // registration url (main agent)
+	RegUrl    string `json:"regUrl"`   // registration agent url (main agent)
+	RegAlias  string `json:"regAlias"` // registration agent name
 	Delay     int    `json:"delay"`    // transfer delay time, i.e. post-pone transfer
 	Id        int64  `json:"id"`       // unique id of each request
 	Priority  int    `json:"priority"` // priority of request
@@ -116,7 +117,7 @@ func (m *Metrics) ToDict() map[string]int64 {
 
 // String method return string representation of transfer request
 func (t *TransferRequest) String() string {
-	return fmt.Sprintf("<TransferRequest id=%d priority=%d status=%s ts=%d file=%s block=%s dataset=%s srcUrl=%s srcAlias=%s dstUrl=%s dstAlias=%s delay=%d regUrl=%s>", t.Id, t.Priority, t.Status, t.TimeStamp, t.File, t.Block, t.Dataset, t.SrcUrl, t.SrcAlias, t.DstUrl, t.DstAlias, t.Delay, t.RegUrl)
+	return fmt.Sprintf("<TransferRequest id=%d priority=%d status=%s ts=%d file=%s block=%s dataset=%s srcUrl=%s srcAlias=%s dstUrl=%s dstAlias=%s regUrl=%s regAlias=%s delay=%d>", t.Id, t.Priority, t.Status, t.TimeStamp, t.File, t.Block, t.Dataset, t.SrcUrl, t.SrcAlias, t.DstUrl, t.DstAlias, t.RegUrl, t.RegAlias, t.Delay)
 }
 
 // RunPush method perform a job on transfer request. It will use push model

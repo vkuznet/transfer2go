@@ -1,1 +1,1 @@
-SELECT file, block, dataset, srcurl, dsturl, regurl, priority INTEGER FROM REQUESTS WHERE id=?
+SELECT file, block, dataset, srcurl, srcalias, dsturl, dstalias, regurl, regalias, priority INTEGER FROM REQUESTS WHERE id=?

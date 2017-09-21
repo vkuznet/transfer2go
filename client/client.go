@@ -153,9 +153,11 @@ func Agent(agent string) error {
 }
 
 // helper function to parse source and destination parameters
+// here anent represent registration agent url while src and dst may be
+// in a form of alias:data or url:data
 func parseRequest(agent, src, dst string) (core.TransferRequest, error) {
 	var req core.TransferRequest
-	var dstUrl, srcUrl string
+	var agentAlias, srcUrl, srcAlias, dstUrl, dstAlias string
 
 	// resolve source agent name/alias and identify file to transfer
 	var data string
@@ -171,25 +173,35 @@ func parseRequest(agent, src, dst string) (core.TransferRequest, error) {
 		}).Error("Unable to resolve destination")
 		return req, fmt.Errorf("No data is specified to transfer")
 	}
+	// resolve all information about agents
 	remoteAgents := findAgents(agent)
-	dstUrl, dok := remoteAgents[dst]
-	if !dok {
+	for k, rurl := range remoteAgents {
+		if rurl == agent {
+			agentAlias = k
+		}
+		if k == src || rurl == src {
+			srcUrl = rurl
+			srcAlias = k
+		}
+		if k == dst || rurl == dst {
+			dstUrl = rurl
+			dstAlias = k
+		}
+	}
+	if agentAlias == "" || srcAlias == "" || srcUrl == "" || dstAlias == "" || dstUrl == "" {
 		log.WithFields(log.Fields{
+			"Agent":       agent,
 			"Source":      src,
 			"Destination": dst,
-		}).Error("Unable to resolve destination")
-		return req, fmt.Errorf("Unknown destination")
+			"AgentAlias":  agentAlias,
+			"SrcAlias":    srcAlias,
+			"SrcUrl":      srcUrl,
+			"DstAlias":    dstAlias,
+			"DstUrl":      dstUrl,
+		}).Error("Unable to resolve agent urls|names")
+		return req, fmt.Errorf("Name resolution problem")
 	}
-	srcUrl, sok := remoteAgents[src]
-	if !sok {
-		log.WithFields(log.Fields{
-			"Source":      src,
-			"Destination": dst,
-		}).Error("Unable to resolve source url")
-		return req, fmt.Errorf("Unknown source url")
-	}
-	// TODO: resolve src and dst aliases properly, don't assume that src/dst are alias names
-	req = core.TransferRequest{RegUrl: agent, SrcUrl: srcUrl, SrcAlias: src, DstUrl: dstUrl, DstAlias: dst}
+	req = core.TransferRequest{RegUrl: agent, RegAlias: agentAlias, SrcUrl: srcUrl, SrcAlias: srcAlias, DstUrl: dstUrl, DstAlias: dstAlias}
 	if strings.Contains(data, "#") { // it is a block name, e.g. /a/b/c#123
 		req.Block = data
 	} else if strings.Count(data, "/") == 3 { // it is a dataset
