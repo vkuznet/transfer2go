@@ -1,1 +1,1 @@
-INSERT INTO REQUESTS(id, file, block, dataset, srcurl, dsturl, status, priority) VALUES(?,?,?,?,?,?,?,?)
+INSERT INTO REQUESTS(id, file, block, dataset, srcurl, dsturl, regurl, status, priority) VALUES(?,?,?,?,?,?,?,?,?)

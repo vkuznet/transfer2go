@@ -341,11 +341,11 @@ func (c *Catalog) GetTransfers(time0, time1 string) ([]TransferData, error) {
 }
 
 // InsertRequest inserts new request
-func (c *Catalog) InsertRequest(request TransferRequest) error {
+func (c *Catalog) InsertRequest(r TransferRequest) error {
 	stm := getSQL("insert_request")
-	_, e := DB.Exec(stm, request.Id, request.File, request.Block, request.Dataset, request.SrcUrl, request.DstUrl, "pending", request.Priority)
+	_, e := DB.Exec(stm, r.Id, r.File, r.Block, r.Dataset, r.SrcUrl, r.DstUrl, r.RegUrl, "pending", r.Priority)
 	log.WithFields(log.Fields{
-		"Request": request,
+		"Request": r,
 	}).Info("Catalog: InsertRequest")
 	if e != nil {
 		if !strings.Contains(e.Error(), "UNIQUE") {
@@ -375,17 +375,17 @@ func (c *Catalog) UpdateRequest(id int64, status string) error {
 }
 
 // RetrieveRequest gets the request details based on request id
-func (c *Catalog) RetrieveRequest(request *TransferRequest) error {
+func (c *Catalog) RetrieveRequest(r *TransferRequest) error {
 	stm := getSQL("request_by_id")
-	rows, err := DB.Query(stm, request.Id)
+	rows, err := DB.Query(stm, r.Id)
 	if err != nil {
-		request.Status = err.Error()
+		r.Status = err.Error()
 		return err
 	}
 	defer rows.Close()
 	for rows.Next() {
-		if err := rows.Scan(&request.File, &request.Block, &request.Dataset, &request.SrcUrl, &request.DstUrl, &request.Priority); err != nil {
-			request.Status = err.Error()
+		if err := rows.Scan(&r.File, &r.Block, &r.Dataset, &r.SrcUrl, &r.DstUrl, &r.RegUrl, &r.Priority); err != nil {
+			r.Status = err.Error()
 			return err
 		}
 	}
@@ -450,25 +450,25 @@ func (c *Catalog) ListRequest(query string) ([]TransferRequest, error) {
 	}
 
 	pointers := make([]interface{}, len(cols))
-	container := make([]string, len(cols)) // A pointer to Columns of db
+	con := make([]string, len(cols)) // A pointer to Columns of db
 	var requests []TransferRequest
 
 	for i := range pointers {
-		pointers[i] = &container[i]
+		pointers[i] = &con[i]
 	}
 
+	// Sqlite columns => 0:request-id 1:file 2:block 3:dataset 4:srcurl 5:dsturl 6:regurl 7:status 8:priority
 	for rows.Next() {
 		rows.Scan(pointers...)
-		id, err := strconv.ParseInt(container[0], 10, 64)
+		id, err := strconv.ParseInt(con[0], 10, 64)
 		if err != nil {
 			return nil, err
 		}
-		priority, err := strconv.Atoi(container[7])
+		priority, err := strconv.Atoi(con[8])
 		if err != nil {
 			return nil, err
 		}
-		// Sqlite columns => 0:request-id 1:file 2:block 3:dataset 4:srcurl 5:dsturl 6:status 7:Request priority
-		r := TransferRequest{SrcUrl: container[4], DstUrl: container[5], File: container[1], Block: container[2], Dataset: container[3], Id: id, Priority: priority, Status: container[6]}
+		r := TransferRequest{SrcUrl: con[4], DstUrl: con[5], RegUrl: con[6], File: con[1], Block: con[2], Dataset: con[3], Id: id, Priority: priority, Status: con[7]}
 		requests = append(requests, r)
 	}
 	return requests, err

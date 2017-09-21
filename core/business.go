@@ -41,6 +41,7 @@ type TransferRequest struct {
 	SrcAlias  string `json:"srcAlias"` // source agent name
 	DstUrl    string `json:"dstUrl"`   // destination agent URL which will consume the transfer
 	DstAlias  string `json:"dstAlias"` // destination agent name
+	RegUrl    string `json:"regUrl"`   // registration url (main agent)
 	Delay     int    `json:"delay"`    // transfer delay time, i.e. post-pone transfer
 	Id        int64  `json:"id"`       // unique id of each request
 	Priority  int    `json:"priority"` // priority of request
@@ -84,9 +85,6 @@ var TransferQueue chan Job
 // TransferType decides which pull or push based model is used
 var TransferType string
 
-// MainAgent url
-var MainAgent string
-
 // Param to enable the router
 var routerModel bool
 
@@ -118,7 +116,7 @@ func (m *Metrics) ToDict() map[string]int64 {
 
 // String method return string representation of transfer request
 func (t *TransferRequest) String() string {
-	return fmt.Sprintf("<TransferRequest id=%d priority=%d status=%s ts=%d file=%s block=%s dataset=%s srcUrl=%s srcAlias=%s dstUrl=%s dstAlias=%s delay=%d>", t.Id, t.Priority, t.Status, t.TimeStamp, t.File, t.Block, t.Dataset, t.SrcUrl, t.SrcAlias, t.DstUrl, t.DstAlias, t.Delay)
+	return fmt.Sprintf("<TransferRequest id=%d priority=%d status=%s ts=%d file=%s block=%s dataset=%s srcUrl=%s srcAlias=%s dstUrl=%s dstAlias=%s delay=%d regUrl=%s>", t.Id, t.Priority, t.Status, t.TimeStamp, t.File, t.Block, t.Dataset, t.SrcUrl, t.SrcAlias, t.DstUrl, t.DstAlias, t.Delay, t.RegUrl)
 }
 
 // RunPush method perform a job on transfer request. It will use push model
@@ -168,7 +166,7 @@ func (j *Job) String() string {
 
 // helper function to send request to main agent to update request status in its persistent store (REQUESTS table)
 func (j *Job) UpdateRequest(status string) {
-	furl := fmt.Sprintf("%s/action", MainAgent)
+	furl := fmt.Sprintf("%s/action", j.TransferRequest.RegUrl)
 	var jobs []Job
 	job := Job{TransferRequest: j.TransferRequest, Action: "update"}
 	job.TransferRequest.Status = status

@@ -172,7 +172,6 @@ func Server(config Config) {
 
 	// register self agent URI in remote agent and vice versa
 	registerAtAgents(config.Register)
-	core.MainAgent = config.Register
 
 	// define catalog
 	c, e := ioutil.ReadFile(config.Catalog)

@@ -189,12 +189,13 @@ func parseRequest(agent, src, dst string) (core.TransferRequest, error) {
 		return req, fmt.Errorf("Unknown source url")
 	}
 	// TODO: resolve src and dst aliases properly, don't assume that src/dst are alias names
+	req = core.TransferRequest{RegUrl: agent, SrcUrl: srcUrl, SrcAlias: src, DstUrl: dstUrl, DstAlias: dst}
 	if strings.Contains(data, "#") { // it is a block name, e.g. /a/b/c#123
-		req = core.TransferRequest{SrcUrl: srcUrl, SrcAlias: src, DstUrl: dstUrl, DstAlias: dst, Block: data}
+		req.Block = data
 	} else if strings.Count(data, "/") == 3 { // it is a dataset
-		req = core.TransferRequest{SrcUrl: srcUrl, SrcAlias: src, DstUrl: dstUrl, DstAlias: dst, Dataset: data}
+		req.Dataset = data
 	} else { // it is lfn
-		req = core.TransferRequest{SrcUrl: srcUrl, SrcAlias: src, DstUrl: dstUrl, DstAlias: dst, File: data}
+		req.File = data
 	}
 	log.Info(req.String())
 	return req, nil
