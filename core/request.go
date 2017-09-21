@@ -440,7 +440,7 @@ func PushTransfer() Decorator {
 				if srcAgent.Protocol == "" || srcAgent.Protocol == "http" {
 					log.WithFields(log.Fields{
 						"dstAgent": dstAgent.String(),
-					}).Println("Transfer via HTTP protocol to", dstAgent.String())
+					}).Info("Transfer via HTTP protocol to")
 					rpfn, throughput, err = httpTransfer(rec, t)
 					if err != nil {
 						log.WithFields(log.Fields{
@@ -468,7 +468,7 @@ func PushTransfer() Decorator {
 					}
 					log.WithFields(log.Fields{
 						"Command": cmd,
-					}).Println("Transfer command")
+					}).Info("Transfer command")
 					err = cmd.Run()
 					if err != nil {
 						log.WithFields(log.Fields{

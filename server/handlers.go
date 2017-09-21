@@ -544,7 +544,10 @@ func ActionHandler(w http.ResponseWriter, r *http.Request) {
 			// change it action to transfer and get destination agent url
 			job.Action = "transfer"
 			job.TransferRequest.Status = "processing"
-			agent := job.TransferRequest.DstUrl
+			agent := job.TransferRequest.DstUrl // pull model
+			if _config.Type == "push" {
+				agent = job.TransferRequest.SrcUrl // push model
+			}
 			if agent == "" {
 				log.WithFields(log.Fields{
 					"Job": job,

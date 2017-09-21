@@ -18,6 +18,8 @@ psgrep ()
     ps axu | grep -v grep | grep "$@" -i --color=auto
 }
 
+model="pull"
+
 if [ "$1" == "-h" ] || [ "$1" == "-help" ] || [ "$1" == "--help" ]; then
     echo "Usage: run.sh"
     echo "Perform transfer2go test among 3 agents: main|source|destination"
@@ -25,6 +27,11 @@ if [ "$1" == "-h" ] || [ "$1" == "-help" ] || [ "$1" == "--help" ]; then
     echo "approve request in main agent and transfer the file from source to destination"
     exit
 fi
+if [ $# -eq 1 ]; then
+    model=$1
+fi
+
+echo "### Perform test of $model model"
 
 echo "Kill previous transfer2go processes (if any)"
 pskill transfer2go
@@ -67,7 +74,7 @@ cat > $wdir/config/main.json << EOF
     "verbose":0,
     "name":"mainAgent",
     "staticdir":"static",
-    "type":"pull",
+    "type":"$model",
     "MonitorTime":3600,
     "trinterval": "24h",
     "router":true
@@ -187,10 +194,29 @@ echo
 if cmp -s "$wdir/source/file.root" "$wdir/destination/file.root"
 then
     echo "The files match"
-    exit 0
+    status=0
 else
     echo "The files at source and destination are different"
     echo "list all files in $wdir"
     ls -alR $wdir
+    status=1
+fi
+echo
+echo "Main agent REQUEST table"
+echo "select * from REQUESTS" | sqlite3 $wdir/catalog/main.db
+echo
+echo "Source agent tables"
+echo "select * from files" | sqlite3 $wdir/catalog/source.db
+echo "select * from blocks" | sqlite3 $wdir/catalog/source.db
+echo "select * from datasets" | sqlite3 $wdir/catalog/source.db
+echo
+echo "Destination agent tables"
+echo "select * from files" | sqlite3 $wdir/catalog/destination.db
+echo "select * from blocks" | sqlite3 $wdir/catalog/destination.db
+echo "select * from datasets" | sqlite3 $wdir/catalog/destination.db
+echo
+if [ $status -eq 1 ]; then
+    echo "Test failed"
     exit 1
 fi
+echo "Test OK"

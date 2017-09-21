@@ -168,6 +168,7 @@ func Server(config Config) {
 	log.WithFields(log.Fields{
 		"Config": config.String(),
 		"Auth":   authVar,
+		"Model":  config.Type,
 	}).Println("Agent")
 
 	// register self agent URI in remote agent and vice versa
