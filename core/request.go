@@ -256,12 +256,13 @@ func compareRecords(requestedCatalog []CatalogEntry, remoteCatalog []CatalogEntr
 func Store() Decorator {
 	return func(r Request) Request {
 		return RequestFunc(func(t *TransferRequest) error {
-			t.Id = time.Now().Unix()
+			if t.Id == 0 {
+				t.Id = time.Now().UnixNano()
+			}
 			item := &Item{
 				Value:    *t,
 				priority: t.Priority,
 			}
-			fmt.Println(*t)
 			err := TFC.InsertRequest(*t)
 			if err != nil {
 				return err

@@ -10,9 +10,11 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"math/big"
 	"os"
 	"time"
 
+	"github.com/fgrid/uuid"
 	"github.com/rcrowley/go-metrics"
 	logs "github.com/sirupsen/logrus"
 	"github.com/vkuznet/transfer2go/utils"
@@ -118,6 +120,16 @@ func (m *Metrics) ToDict() map[string]int64 {
 // String method return string representation of transfer request
 func (t *TransferRequest) String() string {
 	return fmt.Sprintf("<TransferRequest id=%d priority=%d status=%s ts=%d file=%s block=%s dataset=%s srcUrl=%s srcAlias=%s dstUrl=%s dstAlias=%s regUrl=%s regAlias=%s delay=%d>", t.Id, t.Priority, t.Status, t.TimeStamp, t.File, t.Block, t.Dataset, t.SrcUrl, t.SrcAlias, t.DstUrl, t.DstAlias, t.RegUrl, t.RegAlias, t.Delay)
+}
+
+// UUID generates unique id for transfer request
+func (t *TransferRequest) UUID() int64 {
+	text := fmt.Sprintf("%s-%s-%s-%d", t.File, t.Block, t.Dataset, time.Now().UnixNano())
+	namespace := uuid.NewNamespaceUUID("transfer2go")
+	uhash := uuid.NewV5(namespace, []byte(text))
+	z := new(big.Int)
+	z.SetBytes([]byte(uhash.String()))
+	return z.Int64()
 }
 
 // RunPush method perform a job on transfer request. It will use push model

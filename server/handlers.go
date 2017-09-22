@@ -713,11 +713,6 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer r.Body.Close()
-	if utils.VERBOSE > 0 {
-		log.WithFields(log.Fields{
-			"Request": r,
-		}).Println("RequestHandler received request")
-	}
 
 	// Read the body into a string for json decoding
 	var requests = &[]core.TransferRequest{}
@@ -733,6 +728,9 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) {
 
 	// go through each request and queue items individually to run job over the given request
 	for _, r := range *requests {
+		log.WithFields(log.Fields{
+			"Request": r,
+		}).Info("RequestHandler received request")
 
 		// let's create a job with payload
 		// find out missing parts (if any) in transfer request
@@ -766,30 +764,22 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) {
 			}).Error("Unable to unmarshal catalog entry records")
 			continue
 		}
-		// TODO: I think I need a loop here across all catalog entries
-		// e.g. if I gave block then I'll get back dataset/block/files tripets
-		if len(records) > 0 {
-			// TMP: so far I take first entry
-			rec := records[0]
-			if r.File == "" {
-				r.File = rec.Lfn
-			}
-			if r.Block == "" {
-				r.Block = rec.Block
-			}
-			if r.Dataset == "" {
-				r.Dataset = rec.Dataset
-			}
+		// loop over found records, form transfer request ones and put them into StorageQueue
+		for _, rec := range records {
+			r.File = rec.Lfn
+			r.Block = rec.Block
+			r.Dataset = rec.Dataset
+			r.Id = r.UUID()
+			log.WithFields(log.Fields{
+				"Record": r.String(),
+			}).Info("store record")
+
+			// this action will cause main agent to store given request in heap and persistent storage (REQUEST table)
+			work := core.Job{TransferRequest: r, Action: "store"}
+
+			// Push the work onto the queue.
+			core.StorageQueue <- work
 		}
-		log.WithFields(log.Fields{
-			"Record": r,
-		}).Info("store record")
-
-		// this action will cause main agent to store given request in heap and persistent storage (REQUEST table)
-		work := core.Job{TransferRequest: r, Action: "store"}
-
-		// Push the work onto the queue.
-		core.StorageQueue <- work
 	}
 
 	w.WriteHeader(http.StatusOK)

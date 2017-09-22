@@ -17,18 +17,36 @@ psgrep ()
 {
     ps axu | grep -v grep | grep "$@" -i --color=auto
 }
+usage ()
+{
+    echo "Usage: run.sh <pull|push> <file|block|dataset>"
+    echo "Perform transfer2go test among 3 agents: main|source|destination"
+    echo "pull|push defines a model to use"
+    echo "file|block|dataset defines what to transfer"
+    echo 
+    echo "- test creates dummy file"
+    echo "- register it in source agent under /a/b/c and /a/b/c#123 dataset and block, respectively"
+    echo "- place request to main agent"
+    echo "- approve request in main agent"
+    echo "- transfer the file from source to destination"
+    exit
+}
 
 model="pull"
+data="file"
 
-if [ "$1" == "-h" ] || [ "$1" == "-help" ] || [ "$1" == "--help" ]; then
-    echo "Usage: run.sh"
-    echo "Perform transfer2go test among 3 agents: main|source|destination"
-    echo "Test creates dummy file; register it in source agent; place request to main agent"
-    echo "approve request in main agent and transfer the file from source to destination"
-    exit
-fi
-if [ $# -eq 1 ]; then
+if [ $# -eq 2 ]; then
     model=$1
+    data=$2
+else
+    usage
+fi
+dataToTransfer="/a/b/c" # dataset name
+if [ $data == "file" ]; then
+    dataToTransfer="file.root"
+fi
+if [ $data == "block" ]; then
+    dataToTransfer="/a/b/c#123"
 fi
 
 echo "### Perform test of $model model"
@@ -55,6 +73,10 @@ cat > $wdir/records.json << EOF
     {"lfn":"file.root",
      "pfn":"$wdir/source/file.root",
      "block":"/a/b/c#123",
+     "dataset":"/a/b/c"},
+    {"lfn":"file2.root",
+     "pfn":"$wdir/source/file2.root",
+     "block":"/a/b/c#987",
      "dataset":"/a/b/c"}
 ]
 EOF
@@ -121,6 +143,7 @@ echo "destination agent: $dstAgentName ($dstAgentUrl)"
 
 echo "create large file in source area"
 dd if=/dev/zero of=$wdir/source/file.root bs=1024 count=0 seek=1024
+dd if=/dev/zero of=$wdir/source/file2.root bs=1024 count=0 seek=1024
 # 100MB file
 #dd if=/dev/zero of=$wdir/source/file.root bs=1024 count=0 seek=$[1024*100]
 # 1GB file
@@ -173,30 +196,43 @@ echo "list records at $dstAgentUrl"
 curl $dstAgentUrl/tfc
 echo
 echo "Transfer file from $srcAgentName ($srcAgentUrl) to $dstAgentName ($dstAgentUrl)"
-$exe -agent=$mainAgentUrl -src=${srcAgentName}:file.root -dst=$dstAgentName -verbose 1
+$exe -agent=$mainAgentUrl -src=${srcAgentName}:$dataToTransfer -dst=$dstAgentName -verbose 1
+sleep 3
 echo
 echo "list known requests on $mainAgentName"
 requests=`curl -s "$mainAgentUrl/list?type=pending"`
-echo $requests
-rid=`echo $requests | python -c "import sys, json; print(json.load(sys.stdin)[0]['id'])"`
+echo "requests=$requests"
+rids=`echo $requests | python -c "import sys, json; ids=[str(i['id']) for i in json.load(sys.stdin)]; print(' '.join(ids))"`
 echo
 echo "list know requests on $mainAgentName via requests API"
 $exe -agent=$mainAgentUrl -requests=pending
 echo "You may visit $mainAgentUrl/html/main.html to view and/or approve requests"
 echo
-#echo "approve request id:$rid"
-#$exe -agent=$mainAgentUrl -approve=$rid
-echo "approve request via action"
-action="{\"id\":$rid,\"action\":\"approve\"}"
-$exe -agent=$mainAgentUrl -action=$action
-sleep 2
+for rid in $rids; do
+    echo "approve request $rid"
+    action="{\"id\":$rid,\"action\":\"approve\"}"
+    $exe -agent=$mainAgentUrl -action=$action
+    sleep 1
+done
+sleep 1
 echo
-if cmp -s "$wdir/source/file.root" "$wdir/destination/file.root"
-then
-    echo "The files match"
+sFiles=`echo "select lfn from files where lfn='$dataToTransfer'" | sqlite3 $wdir/catalog/source.db | tr '\n' ' '`
+dFiles=`echo "select lfn from files where lfn='$dataToTransfer'" | sqlite3 $wdir/catalog/destination.db | tr '\n' ' '`
+sBlocks=`echo "select block from blocks where block='$dataToTransfer'" | sqlite3 $wdir/catalog/source.db | tr '\n' ' '`
+dBlocks=`echo "select block from blocks where block='$dataToTransfer'" | sqlite3 $wdir/catalog/destination.db | tr '\n' ' '`
+sDatasets=`echo "select dataset from datasets where dataset='$dataToTransfer'" | sqlite3 $wdir/catalog/source.db | tr '\n' ' '`
+dDatasets=`echo "select dataset from datasets where dataset='$dataToTransfer'" | sqlite3 $wdir/catalog/destination.db | tr '\n' ' '`
+if [ "$data" == "file" ] && [ "$sFiles" == "$dFiles" ]; then
+    echo "Files at source and destination matched"
+    status=0
+elif [ "$data" == "block" ] && [ "$sBlocks" == "$dBlocks" ]; then
+    echo "Blocks at source and destination matched"
+    status=0
+elif [ "$data" == "dataset" ] && [ "$sDatasets" == "$dDatasets" ]; then
+    echo "Datasets at source and destination matched"
     status=0
 else
-    echo "The files at source and destination are different"
+    echo "Source and destination are different"
     echo "list all files in $wdir"
     ls -alR $wdir
     status=1
