@@ -210,7 +210,7 @@ echo "You may visit $mainAgentUrl/html/main.html to view and/or approve requests
 echo
 for rid in $rids; do
     echo "approve request $rid"
-    action="{\"id\":$rid,\"action\":\"approve\"}"
+    action="{\"id\":\"$rid\",\"action\":\"approve\"}"
     $exe -agent=$mainAgentUrl -action=$action
     sleep 1
 done

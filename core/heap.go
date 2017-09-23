@@ -55,10 +55,10 @@ func (pq *PriorityQueue) Pop() interface{} {
 }
 
 // Delete request from PriorityQueue. The complexity is O(n) where n = heap.Len()
-func (pq *PriorityQueue) Delete(id int64) bool {
+func (pq *PriorityQueue) Delete(rid string) bool {
 	index := -1
 	for _, item := range *pq {
-		if item.Value.Id == id {
+		if item.Value.Id == rid {
 			index = item.index
 			break
 		}

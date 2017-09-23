@@ -24,7 +24,7 @@ import (
 // ActionRequest provides structure submitted by clients to perform certain action on main agent
 type ActionRequest struct {
 	Delay    int    `json:"delay"`    // transfer delay time, i.e. post-pone transfer
-	Id       int64  `json:"id"`       // unique id of each request
+	Id       string `json:"id"`       // unique id of each request
 	Priority int    `json:"priority"` // priority of request
 	Action   string `json:"action"`   // which action to apply
 }
@@ -403,7 +403,7 @@ func ProcessAction(agent, jsonString string) {
 		return
 	}
 	rid := req.Id
-	if rid == 0 {
+	if rid == "" {
 		log.WithFields(log.Fields{
 			"JSON":  jsonString,
 			"Error": err,

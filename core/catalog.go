@@ -356,11 +356,11 @@ func (c *Catalog) InsertRequest(r TransferRequest) error {
 }
 
 // Exec method update db upto three times
-func (c *Catalog) Exec(stm string, status string, id int64) error {
+func (c *Catalog) Exec(stm, status, rid string) error {
 	count := 0
-	_, err := DB.Exec(stm, status, id)
+	_, err := DB.Exec(stm, status, rid)
 	for err != nil && count < 3 {
-		_, err = DB.Exec(stm, status, id)
+		_, err = DB.Exec(stm, status, rid)
 		count += 1
 		time.Sleep(time.Second * 1)
 	}
@@ -368,9 +368,9 @@ func (c *Catalog) Exec(stm string, status string, id int64) error {
 }
 
 // UpdateRequest updates the status of request
-func (c *Catalog) UpdateRequest(id int64, status string) error {
+func (c *Catalog) UpdateRequest(rid string, status string) error {
 	stm := getSQL("update_request")
-	err := c.Exec(stm, status, id)
+	err := c.Exec(stm, status, rid)
 	return err
 }
 
@@ -393,10 +393,10 @@ func (c *Catalog) RetrieveRequest(r *TransferRequest) error {
 }
 
 // GetStatus gets the status of request
-func (c *Catalog) GetStatus(id int64) (string, error) {
+func (c *Catalog) GetStatus(rid string) (string, error) {
 	var status string
 	stm := getSQL("get_status")
-	rows, err := DB.Query(stm, id)
+	rows, err := DB.Query(stm, rid)
 
 	if err != nil {
 		return "", err
@@ -457,18 +457,14 @@ func (c *Catalog) ListRequest(query string) ([]TransferRequest, error) {
 		pointers[i] = &con[i]
 	}
 
-	// Sqlite columns => 0:request-id 1:file 2:block 3:dataset 4:srcurl 5:srcalias 6:dsturl 7:dstalias 8:regurl 9:regalias 10:status 11:priority
+	// Sqlite columns => 0:id 1:rid 2:file 3:block 4:dataset 5:srcurl 6:srcalias 7:dsturl 8:dstalias 9:regurl 10:regalias 11:status 12:priority
 	for rows.Next() {
 		rows.Scan(pointers...)
-		id, err := strconv.ParseInt(con[0], 10, 64)
+		priority, err := strconv.Atoi(con[12])
 		if err != nil {
 			return nil, err
 		}
-		priority, err := strconv.Atoi(con[11])
-		if err != nil {
-			return nil, err
-		}
-		r := TransferRequest{SrcUrl: con[4], SrcAlias: con[5], DstUrl: con[6], DstAlias: con[7], RegUrl: con[8], RegAlias: con[9], File: con[1], Block: con[2], Dataset: con[3], Id: id, Priority: priority, Status: con[10]}
+		r := TransferRequest{SrcUrl: con[5], SrcAlias: con[6], DstUrl: con[7], DstAlias: con[8], RegUrl: con[9], RegAlias: con[10], File: con[2], Block: con[3], Dataset: con[4], Id: con[1], Priority: priority, Status: con[11]}
 		requests = append(requests, r)
 	}
 	return requests, err

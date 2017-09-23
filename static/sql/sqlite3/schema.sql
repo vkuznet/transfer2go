@@ -1,5 +1,5 @@
 CREATE TABLE FILES(id INTEGER PRIMARY KEY, lfn TEXT UNIQUE, pfn TEXT, blockid INTEGER, datasetid INTEGER, bytes INTEGER, hash TEXT, transfertime INTEGER, timestamp INTEGER, FOREIGN KEY(blockid) REFERENCES BLOCKS(id), FOREIGN KEY(datasetid) REFERENCES DATASETS(id));
 CREATE TABLE DATASETS(id INTEGER PRIMARY KEY, dataset TEXT UNIQUE);
 CREATE TABLE BLOCKS(id INTEGER PRIMARY KEY, block TEXT UNIQUE, datasetid INTEGER, FOREIGN KEY(datasetid) REFERENCES DATASETS(id));
-CREATE TABLE REQUESTS(id INTEGER PRIMARY KEY, file TEXT, block TEXT, dataset TEXT, srcurl TEXT, srcalias TEXT, dsturl TEXT, dstalias TEXT, regurl TEXT, regalias TEXT, status TEXT, priority INTEGER);
+CREATE TABLE REQUESTS(id INTEGER PRIMARY KEY, rid TEXT, file TEXT, block TEXT, dataset TEXT, srcurl TEXT, srcalias TEXT, dsturl TEXT, dstalias TEXT, regurl TEXT, regalias TEXT, status TEXT, priority INTEGER);
 CREATE TABLE TRANSFERS(timestamp INTEGER PRIMARY KEY, cpu REAL, ram REAL, throughput REAL);

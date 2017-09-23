@@ -256,8 +256,8 @@ func compareRecords(requestedCatalog []CatalogEntry, remoteCatalog []CatalogEntr
 func Store() Decorator {
 	return func(r Request) Request {
 		return RequestFunc(func(t *TransferRequest) error {
-			if t.Id == 0 {
-				t.Id = time.Now().UnixNano()
+			if t.Id == "" {
+				t.Id = fmt.Sprintf("%d", time.Now().UnixNano())
 			}
 			item := &Item{
 				Value:    *t,

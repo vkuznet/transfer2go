@@ -1,1 +1,1 @@
-UPDATE REQUESTS SET status = ? WHERE id = ?;
+UPDATE REQUESTS SET status = ? WHERE rid = ?;
