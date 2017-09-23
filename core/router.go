@@ -216,8 +216,8 @@ func (r *Router) FindSource(tr *TransferRequest) ([]SourceStats, int, error) {
 	for ; index >= 0 && unionSet.Size() > 0; index-- {
 		commonFiles := set.Intersection(filteredAgent[index].catalogSet, unionSet)
 		requests := make([]TransferRequest, 0)
-		for _, file := range commonFiles.List() {
-			requests = append(requests, TransferRequest{File: file.(string), SrcUrl: filteredAgent[index].SrcUrl, SrcAlias: filteredAgent[index].SrcAlias, DstUrl: tr.DstUrl, DstAlias: tr.DstAlias})
+		for _, lfn := range commonFiles.List() {
+			requests = append(requests, TransferRequest{Lfn: lfn.(string), SrcUrl: filteredAgent[index].SrcUrl, SrcAlias: filteredAgent[index].SrcAlias, DstUrl: tr.DstUrl, DstAlias: tr.DstAlias})
 		}
 		filteredAgent[index].Requests = requests
 		unionSet.Separate(commonFiles)

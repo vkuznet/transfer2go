@@ -207,7 +207,7 @@ func parseRequest(agent, src, dst string) (core.TransferRequest, error) {
 	} else if strings.Count(data, "/") == 3 { // it is a dataset
 		req.Dataset = data
 	} else { // it is lfn
-		req.File = data
+		req.Lfn = data
 	}
 	log.Info(req.String())
 	return req, nil

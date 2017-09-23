@@ -35,7 +35,7 @@ type Metrics struct {
 // TransferRequest data type
 type TransferRequest struct {
 	TimeStamp int64  `json:"ts"`       // timestamp of the request
-	File      string `json:"file"`     // LFN name to be transferred
+	Lfn       string `json:"file"`     // LFN name to be transferred
 	Block     string `json:"block"`    // block name to be transferred
 	Dataset   string `json:"dataset"`  // dataset name to be transferred
 	SrcUrl    string `json:"srcUrl"`   // source agent URL which initiate the transfer
@@ -118,12 +118,12 @@ func (m *Metrics) ToDict() map[string]int64 {
 
 // String method return string representation of transfer request
 func (t *TransferRequest) String() string {
-	return fmt.Sprintf("<TransferRequest id=%s priority=%d status=%s ts=%d file=%s block=%s dataset=%s srcUrl=%s srcAlias=%s dstUrl=%s dstAlias=%s regUrl=%s regAlias=%s delay=%d>", t.Id, t.Priority, t.Status, t.TimeStamp, t.File, t.Block, t.Dataset, t.SrcUrl, t.SrcAlias, t.DstUrl, t.DstAlias, t.RegUrl, t.RegAlias, t.Delay)
+	return fmt.Sprintf("<TransferRequest id=%s priority=%d status=%s ts=%d lfn=%s block=%s dataset=%s srcUrl=%s srcAlias=%s dstUrl=%s dstAlias=%s regUrl=%s regAlias=%s delay=%d>", t.Id, t.Priority, t.Status, t.TimeStamp, t.Lfn, t.Block, t.Dataset, t.SrcUrl, t.SrcAlias, t.DstUrl, t.DstAlias, t.RegUrl, t.RegAlias, t.Delay)
 }
 
 // UUID generates unique id for transfer request
 func (t *TransferRequest) UUID() string {
-	text := fmt.Sprintf("%s-%s-%s-%d", t.File, t.Block, t.Dataset, time.Now().UnixNano())
+	text := fmt.Sprintf("%s-%s-%s-%d", t.Lfn, t.Block, t.Dataset, time.Now().UnixNano())
 	namespace := uuid.NewNamespaceUUID("transfer2go")
 	uhash := uuid.NewV5(namespace, []byte(text))
 	return uhash.String()

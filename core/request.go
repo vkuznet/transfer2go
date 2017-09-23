@@ -329,7 +329,7 @@ func PullTransfer() Decorator {
 
 			// try to download a file from remote agent
 			time0 := time.Now().Unix()
-			url := fmt.Sprintf("%s/download?lfn=%s", t.SrcUrl, t.File)
+			url := fmt.Sprintf("%s/download?lfn=%s", t.SrcUrl, t.Lfn)
 			resp := utils.FetchResponse(url, []byte{})
 			if resp.Error != nil {
 				log.WithFields(log.Fields{
@@ -351,7 +351,7 @@ func PullTransfer() Decorator {
 				// we got data add record into local catalog
 				data := resp.Data
 				// call local stager to put data into local pool and/or tape system
-				pfn, bytes, hash, err := AgentStager.Write(data, t.File)
+				pfn, bytes, hash, err := AgentStager.Write(data, t.Lfn)
 				if err != nil {
 					log.WithFields(log.Fields{
 						"Request": t.String(),
@@ -360,7 +360,7 @@ func PullTransfer() Decorator {
 					return err
 				}
 				// create catalog entry for this data
-				entry := CatalogEntry{Lfn: t.File, Pfn: pfn, Dataset: t.Dataset, Block: t.Block, Bytes: bytes, Hash: hash, TransferTime: (time.Now().Unix() - time0), Timestamp: time.Now().Unix()}
+				entry := CatalogEntry{Lfn: t.Lfn, Pfn: pfn, Dataset: t.Dataset, Block: t.Block, Bytes: bytes, Hash: hash, TransferTime: (time.Now().Unix() - time0), Timestamp: time.Now().Unix()}
 				// update local TFC with new catalog entry
 				TFC.Add(entry)
 				log.WithFields(log.Fields{

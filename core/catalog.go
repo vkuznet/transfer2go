@@ -205,7 +205,7 @@ func (c *Catalog) Add(entry CatalogEntry) error {
 // Files returns list of files for specified conditions
 func (c *Catalog) Files(dataset, block, lfn string) []string {
 	var files []string
-	req := TransferRequest{Dataset: dataset, Block: block, File: lfn}
+	req := TransferRequest{Dataset: dataset, Block: block, Lfn: lfn}
 	for _, rec := range c.Records(req) {
 		files = append(files, rec.Lfn)
 	}
@@ -215,7 +215,7 @@ func (c *Catalog) Files(dataset, block, lfn string) []string {
 // PfnFiles returns list of files for specified conditions
 func (c *Catalog) PfnFiles(dataset, block, lfn string) []string {
 	var files []string
-	req := TransferRequest{Dataset: dataset, Block: block, File: lfn}
+	req := TransferRequest{Dataset: dataset, Block: block, Lfn: lfn}
 	for _, rec := range c.Records(req) {
 		files = append(files, rec.Pfn)
 	}
@@ -227,9 +227,9 @@ func (c *Catalog) Records(req TransferRequest) []CatalogEntry {
 	stm := getSQL("files_blocks_datasets")
 	var cond []string
 	var vals []interface{}
-	if req.File != "" {
+	if req.Lfn != "" {
 		cond = append(cond, fmt.Sprintf("F.LFN=%s", placeholder("lfn")))
-		vals = append(vals, req.File)
+		vals = append(vals, req.Lfn)
 	}
 	if req.Block != "" {
 		cond = append(cond, fmt.Sprintf("B.BLOCK=%s", placeholder("block")))
@@ -343,7 +343,7 @@ func (c *Catalog) GetTransfers(time0, time1 string) ([]TransferData, error) {
 // InsertRequest inserts new request
 func (c *Catalog) InsertRequest(r TransferRequest) error {
 	stm := getSQL("insert_request")
-	_, e := DB.Exec(stm, r.Id, r.File, r.Block, r.Dataset, r.SrcUrl, r.SrcAlias, r.DstUrl, r.DstAlias, r.RegUrl, r.RegAlias, "pending", r.Priority)
+	_, e := DB.Exec(stm, r.Id, r.Lfn, r.Block, r.Dataset, r.SrcUrl, r.SrcAlias, r.DstUrl, r.DstAlias, r.RegUrl, r.RegAlias, "pending", r.Priority)
 	log.WithFields(log.Fields{
 		"Request": r,
 	}).Info("Catalog: InsertRequest")
@@ -384,7 +384,7 @@ func (c *Catalog) RetrieveRequest(r *TransferRequest) error {
 	}
 	defer rows.Close()
 	for rows.Next() {
-		if err := rows.Scan(&r.File, &r.Block, &r.Dataset, &r.SrcUrl, &r.SrcAlias, &r.DstUrl, &r.DstAlias, &r.RegUrl, &r.RegAlias, &r.Priority); err != nil {
+		if err := rows.Scan(&r.Lfn, &r.Block, &r.Dataset, &r.SrcUrl, &r.SrcAlias, &r.DstUrl, &r.DstAlias, &r.RegUrl, &r.RegAlias, &r.Priority); err != nil {
 			r.Status = err.Error()
 			return err
 		}
@@ -464,7 +464,7 @@ func (c *Catalog) ListRequest(query string) ([]TransferRequest, error) {
 		if err != nil {
 			return nil, err
 		}
-		r := TransferRequest{SrcUrl: con[5], SrcAlias: con[6], DstUrl: con[7], DstAlias: con[8], RegUrl: con[9], RegAlias: con[10], File: con[2], Block: con[3], Dataset: con[4], Id: con[1], Priority: priority, Status: con[11]}
+		r := TransferRequest{SrcUrl: con[5], SrcAlias: con[6], DstUrl: con[7], DstAlias: con[8], RegUrl: con[9], RegAlias: con[10], Lfn: con[2], Block: con[3], Dataset: con[4], Id: con[1], Priority: priority, Status: con[11]}
 		requests = append(requests, r)
 	}
 	return requests, err

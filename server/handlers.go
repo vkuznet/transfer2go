@@ -249,7 +249,7 @@ func RecordsHandler(w http.ResponseWriter, r *http.Request) {
 	lfn := r.FormValue("lfn")
 	dataset := r.FormValue("dataset")
 	block := r.FormValue("block")
-	req := core.TransferRequest{File: lfn, Block: block, Dataset: dataset}
+	req := core.TransferRequest{Lfn: lfn, Block: block, Dataset: dataset}
 	records := core.TFC.Records(req)
 	data, err := json.Marshal(records)
 	if err != nil {
@@ -399,10 +399,10 @@ func MetaHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	lfn := request.File
+	lfn := request.Lfn
 	block := request.Block
 	dataset := request.Dataset
-	records := core.TFC.Records(core.TransferRequest{File: lfn, Dataset: dataset, Block: block})
+	records := core.TFC.Records(core.TransferRequest{Lfn: lfn, Dataset: dataset, Block: block})
 	data, err := json.Marshal(records)
 	if err != nil {
 		log.WithFields(log.Fields{
@@ -736,8 +736,8 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) {
 		// find out missing parts (if any) in transfer request
 		// - send request to source agent and find out dataset/block/files
 		vals := url.Values{}
-		if r.File != "" {
-			vals.Add("lfn", r.File)
+		if r.Lfn != "" {
+			vals.Add("lfn", r.Lfn)
 		}
 		if r.Block != "" {
 			vals.Add("block", r.Block)
@@ -766,7 +766,7 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		// loop over found records, form transfer request ones and put them into StorageQueue
 		for _, rec := range records {
-			r.File = rec.Lfn
+			r.Lfn = rec.Lfn
 			r.Block = rec.Block
 			r.Dataset = rec.Dataset
 			r.Id = r.UUID()
