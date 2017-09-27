@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -220,6 +221,79 @@ func (c *Catalog) PfnFiles(dataset, block, lfn string) []string {
 		files = append(files, rec.Pfn)
 	}
 	return files
+}
+
+// helper function to convert interface into string representation
+func asString(src interface{}) string {
+	switch v := src.(type) {
+	case string:
+		return v
+	case []byte:
+		return string(v)
+	}
+	rv := reflect.ValueOf(src)
+	switch rv.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return strconv.FormatInt(rv.Int(), 10)
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return strconv.FormatUint(rv.Uint(), 10)
+	case reflect.Float64:
+		return strconv.FormatFloat(rv.Float(), 'g', -1, 64)
+	case reflect.Float32:
+		return strconv.FormatFloat(rv.Float(), 'g', -1, 32)
+	case reflect.Bool:
+		return strconv.FormatBool(rv.Bool())
+	}
+	return fmt.Sprintf("%v", src)
+}
+
+// Snapshot returns a snapshot of the TFC catalog and return it as a map
+// which holds table names and list of rows where each row is represented
+// as a comma separated values
+func (c *Catalog) Snapshot() map[string][]string {
+	maps := make(map[string][]string)
+	snapshots := []string{"files", "blocks", "datasets", "requests", "transfers"}
+	for _, name := range snapshots {
+		stm := getSQL(fmt.Sprintf("snapshot_%s", name))
+		// fetch data from DB
+		rows, err := DB.Query(stm)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"Query": stm,
+				"Error": err,
+			}).Error("DB.Query")
+			return maps
+		}
+		defer rows.Close()
+		cols, err := rows.Columns() // Remember to check err afterwards
+		if err != nil {
+			log.WithFields(log.Fields{
+				"Error": err,
+			}).Error("Unable to get column names")
+			return maps
+		}
+		values := make([]interface{}, len(cols))
+		args := make([]interface{}, len(values))
+		for i := range values {
+			args[i] = &values[i]
+		}
+		var out []string
+		for rows.Next() {
+			err := rows.Scan(args...)
+			if err != nil {
+				log.WithFields(log.Fields{
+					"Err": err,
+				}).Error("rows.Scan")
+			}
+			var rowValues []string
+			for i, _ := range cols {
+				rowValues = append(rowValues, asString(values[i]))
+			}
+			out = append(out, strings.Join(rowValues, ","))
+		}
+		maps[name] = out
+	}
+	return maps
 }
 
 // Records returns catalog records for a given transfer request

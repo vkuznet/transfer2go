@@ -127,6 +127,10 @@ func AuthHandler(w http.ResponseWriter, r *http.Request) {
 		ResetHandler(w, r)
 	case "tfc":
 		TFCHandler(w, r)
+	case "snapshot":
+		SnapshotHandler(w, r)
+	case "catalog":
+		CentralCatalogHandler(w, r)
 	case "upload":
 		UploadDataHandler(w, r)
 	case "download":
@@ -592,6 +596,45 @@ func ActionHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// SnapshotHandler return all records in our catalog
+func SnapshotHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	defer r.Body.Close()
+	records := core.TFC.Snapshot()
+	data, err := json.Marshal(records)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"Error": err,
+		}).Error("SnapshotHandler unable to marshal records")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write(data)
+}
+
+// CentralCatalogHandler return all records in our catalog
+func CentralCatalogHandler(w http.ResponseWriter, r *http.Request) {
+	if !(r.Method == "POST" || r.Method == "GET") {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	defer r.Body.Close()
+	if r.Method == "GET" {
+		// should return records from central catalog or its subset
+	} else if r.Method == "POST" {
+		// should put snapshot of agent catalog into central catalog
+
+	} else {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
 // TFCHandler registers given record in local TFC
 func TFCHandler(w http.ResponseWriter, r *http.Request) {
 	if !(r.Method == "POST" || r.Method == "GET") {
@@ -605,9 +648,8 @@ func TFCHandler(w http.ResponseWriter, r *http.Request) {
 		data, err := json.Marshal(records)
 		if err != nil {
 			log.WithFields(log.Fields{
-				"Records": records,
-				"Error":   err,
-			}).Error("TFCHandler unable to marshal", records, err)
+				"Error": err,
+			}).Error("TFCHandler unable to marshal records")
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
