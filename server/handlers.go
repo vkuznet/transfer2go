@@ -596,7 +596,10 @@ func ActionHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// SnapshotHandler return all records in our catalog
+// SnapshotHandler return all records in our catalog as JSON structure
+// the JSON is a map of table names and rows where each row is represented
+// as comma separated list of values. This handler can be used by CentralCatalog
+// to fetch data from individual agents
 func SnapshotHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
 		w.WriteHeader(http.StatusMethodNotAllowed)
