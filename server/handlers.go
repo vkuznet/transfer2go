@@ -626,16 +626,51 @@ func CentralCatalogHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer r.Body.Close()
-	if r.Method == "GET" {
-		// should return records from central catalog or its subset
-	} else if r.Method == "POST" {
-		// should put snapshot of agent catalog into central catalog
-
-	} else {
-		w.WriteHeader(http.StatusMethodNotAllowed)
+	if core.CC.Path == "" {
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
+	if r.Method == "GET" {
+		// should return records from central catalog or its subset
+		table := r.FormValue("table")
+		data, err := core.CC.Get(table)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"Table": table,
+				"Error": err,
+			}).Error("CentralCatalogHandler unable to read table")
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write(data)
+	} else if r.Method == "POST" {
+		// should put snapshot of agent catalog into central catalog
+		var maps map[string][]string
+		err := json.NewDecoder(r.Body).Decode(&maps)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"Request Body": r.Body,
+				"Error":        err,
+			}).Error("RegisterAgentHandler unable to decode")
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		for table, records := range maps {
+			err := core.CC.Put(table, records)
+			if err != nil {
+				log.WithFields(log.Fields{
+					"Error": err,
+					"Table": table,
+				}).Error("CentralCatalogHandler unable to insert records into table")
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+		}
+		w.WriteHeader(http.StatusOK)
+	} else {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}
 }
 
 // TFCHandler registers given record in local TFC

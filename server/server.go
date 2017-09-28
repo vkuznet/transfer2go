@@ -22,29 +22,30 @@ import (
 
 // Config type holds server configuration
 type Config struct {
-	Name          string `json:"name"`        // agent name, aka site name
-	Url           string `json:"url"`         // agent url
-	Catalog       string `json:"catalog"`     // catalog file name, e.g. catalog.db
-	Protocol      string `json:"protocol"`    // backend protocol, e.g. srmv2
-	Backend       string `json:"backend"`     // backend, e.g. srm
-	Tool          string `json:"tool"`        // backend tool, e.g. srmcp
-	ToolOpts      string `json:"toolopts"`    // options for backend tool
-	Mfile         string `json:"mfile"`       // metrics file name
-	Cfile         string `json:"csvfile"`     // historical data file
-	Minterval     int64  `json:"minterval"`   // metrics interval
-	Staticdir     string `json:"staticdir"`   // static dir defines location of static files, e.g. sql,js templates
-	Workers       int    `json:"workers"`     // number of workers
-	QueueSize     int    `json:"queuesize"`   // total size of the queue
-	Port          int    `json:"port"`        // port number given server runs on, default 8989
-	Base          string `json:"base"`        // URL base path for agent server, it will be extracted from Url
-	Register      string `json:"register"`    // remote agent URL to register
-	ServerKey     string `json:"serverkey"`   // server key file
-	ServerCrt     string `json:"servercrt"`   // server crt file
-	Type          string `json:"type"`        // Configure server type push/pull
-	BufferSize    int    `json:"buffersize"`  // Size of buffered channels
-	MonitorTime   int64  `json:"monitorTime"` // Large time interval after which we need to reset monitoring calculation
-	TrainInterval string `json:"trinterval"`  // Time after which we need to retrain main agent
-	RouterModel   bool   `json:"router"`      // Variable to enable the router model
+	Name           string `json:"name"`           // agent name, aka site name
+	Url            string `json:"url"`            // agent url
+	Catalog        string `json:"catalog"`        // catalog file name, e.g. catalog.json
+	CentralCatalog string `json:"centralCatalog"` // central catalog file name, e.g. cc.json
+	Protocol       string `json:"protocol"`       // backend protocol, e.g. srmv2
+	Backend        string `json:"backend"`        // backend, e.g. srm
+	Tool           string `json:"tool"`           // backend tool, e.g. srmcp
+	ToolOpts       string `json:"toolopts"`       // options for backend tool
+	Mfile          string `json:"mfile"`          // metrics file name
+	Cfile          string `json:"csvfile"`        // historical data file
+	Minterval      int64  `json:"minterval"`      // metrics interval
+	Staticdir      string `json:"staticdir"`      // static dir defines location of static files, e.g. sql,js templates
+	Workers        int    `json:"workers"`        // number of workers
+	QueueSize      int    `json:"queuesize"`      // total size of the queue
+	Port           int    `json:"port"`           // port number given server runs on, default 8989
+	Base           string `json:"base"`           // URL base path for agent server, it will be extracted from Url
+	Register       string `json:"register"`       // remote agent URL to register
+	ServerKey      string `json:"serverkey"`      // server key file
+	ServerCrt      string `json:"servercrt"`      // server crt file
+	Type           string `json:"type"`           // Configure server type push/pull
+	BufferSize     int    `json:"buffersize"`     // Size of buffered channels
+	MonitorTime    int64  `json:"monitorTime"`    // Large time interval after which we need to reset monitoring calculation
+	TrainInterval  string `json:"trinterval"`     // Time after which we need to retrain main agent
+	RouterModel    bool   `json:"router"`         // Variable to enable the router model
 }
 
 // String returns string representation of Config data type
@@ -211,6 +212,20 @@ func Server(config Config) {
 	log.WithFields(log.Fields{
 		"Catalog": core.TFC,
 	}).Println("")
+
+	// Define CentralCatalog
+	c, e = ioutil.ReadFile(config.CentralCatalog)
+	if e != nil {
+		log.WithFields(log.Fields{
+			"Error": e,
+		}).Fatal("Unable to read central catalog file")
+	}
+	err = json.Unmarshal([]byte(c), &core.CC)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"Error": err,
+		}).Fatal("Unable to parse central catalog JSON file")
+	}
 
 	// define handlers
 	http.HandleFunc(fmt.Sprintf("%s/", base), AuthHandler)
