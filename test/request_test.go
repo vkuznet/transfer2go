@@ -91,7 +91,7 @@ func TestRegister(t *testing.T) {
 	}
 
 	var requests []core.TransferRequest
-	req := core.TransferRequest{SrcUrl: "http://localhost:8000", SrcAlias: "Test", File: "file.root", DstUrl: "http://localhost:9000", DstAlias: "Test2", Priority: 1}
+	req := core.TransferRequest{SrcUrl: "http://localhost:8000", SrcAlias: "Test", Lfn: "file.root", DstUrl: "http://localhost:9000", DstAlias: "Test2", Priority: 1}
 	furl := url + "/request"
 	requests = append(requests, req)
 	d, err := json.Marshal(requests)

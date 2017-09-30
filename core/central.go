@@ -57,6 +57,10 @@ func findLatestSnapshot(path, table string) string {
 
 // Get method gets records from Central Catalog for a given table
 func (c *CentralCatalog) Get(table string) ([]byte, error) {
+	if c.Path == "" {
+		return []byte{}, nil
+	}
+
 	fname := findLatestSnapshot(c.Path, table)
 	data, err := ioutil.ReadFile(fname)
 	if err != nil {
@@ -71,6 +75,9 @@ func (c *CentralCatalog) Get(table string) ([]byte, error) {
 
 // Put method puts given table-records into Central Catalog
 func (c *CentralCatalog) Put(table string, records []string) error {
+	if c.Path == "" {
+		return nil
+	}
 	t := time.Now()
 	path := fmt.Sprintf("%s/%d/%d/%d/%d", c.Path, t.Year(), t.Month(), t.Day(), t.Unix())
 	err := os.MkdirAll(path, os.ModePerm)

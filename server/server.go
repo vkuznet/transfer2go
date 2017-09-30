@@ -214,18 +214,7 @@ func Server(config Config) {
 	}).Println("")
 
 	// Define CentralCatalog
-	c, e = ioutil.ReadFile(config.CentralCatalog)
-	if e != nil {
-		log.WithFields(log.Fields{
-			"Error": e,
-		}).Fatal("Unable to read central catalog file")
-	}
-	err = json.Unmarshal([]byte(c), &core.CC)
-	if err != nil {
-		log.WithFields(log.Fields{
-			"Error": err,
-		}).Fatal("Unable to parse central catalog JSON file")
-	}
+	core.CC = core.CentralCatalog{Path: config.CentralCatalog}
 
 	// define handlers
 	http.HandleFunc(fmt.Sprintf("%s/", base), AuthHandler)
