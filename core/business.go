@@ -257,10 +257,56 @@ func (w Worker) Start() {
 				case "delete":
 					err = job.TransferRequest.Delete()
 				case "transfer":
-					if TransferType == "push" {
-						err = job.TransferRequest.RunPush()
+					// use router if possible
+					if routerModel == true {
+						tr := job.TransferRequest
+						selectedAgents, index, err := AgentRouter.FindSource(&tr)
+						if err != nil {
+							logs.WithFields(logs.Fields{
+								"Action":  job.Action,
+								"Request": job.TransferRequest.String(),
+								"Error":   err,
+							}).Error("Unable to find source from the router")
+						}
+						transferCount := 0
+						for i := len(selectedAgents) - 1; i > index; i-- {
+							err := checkAgent(selectedAgents[i].SrcUrl)
+							if err != nil {
+								logs.WithFields(logs.Fields{
+									"Error":  err,
+									"Source": selectedAgents[i].SrcUrl,
+								}).Println("Unable to contact source agent")
+								continue
+							}
+							// modify source agent part in our request based on router prediction
+							job.TransferRequest.SrcUrl = selectedAgents[i].SrcUrl
+							job.TransferRequest.SrcAlias = selectedAgents[i].SrcAlias
+							if TransferType == "push" {
+								err = job.TransferRequest.RunPush()
+							} else {
+								err = job.TransferRequest.RunPull()
+							}
+							transferCount += 1
+							// TODO: I don't know what to do if we'll get multiple sources
+							// should we send request to all of them, then how in pull model
+							// a destination will handle the same request from multiple sources
+							// therefore so far we break here
+							break
+						}
+						if transferCount == 0 {
+							// if we didn't send anything in a router block send request as is
+							if TransferType == "push" {
+								err = job.TransferRequest.RunPush()
+							} else {
+								err = job.TransferRequest.RunPull()
+							}
+						}
 					} else {
-						err = job.TransferRequest.RunPull()
+						if TransferType == "push" {
+							err = job.TransferRequest.RunPush()
+						} else {
+							err = job.TransferRequest.RunPull()
+						}
 					}
 				default:
 					logs.WithFields(logs.Fields{
