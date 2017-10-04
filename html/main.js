@@ -37,13 +37,13 @@ $(document).ready(function () {
 			console.log("action" + action)
 			if(action=="transfer"){
 				actionArr.push({
-          action: "pull" + action,  // TODO: make it configurable.
-          request: {id: parseInt(id)}
-        });
+          				action: "approve", 
+          				request: {id: id}
+        			});
 			}else if(action=="delete"){
 				actionArr.push({
           action: action,
-          request: {id: parseInt(id)}
+          request: {id: id}
         });
 			}else{
 				console.log(action);
