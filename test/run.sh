@@ -242,13 +242,19 @@ echo "Main agent REQUEST table"
 echo "select * from REQUESTS" | sqlite3 $wdir/catalog/main.db
 echo
 echo "Source agent tables"
+echo "Files table:"
 echo "select * from files" | sqlite3 $wdir/catalog/source.db
+echo "Blocks table:"
 echo "select * from blocks" | sqlite3 $wdir/catalog/source.db
+echo "Datasets table:"
 echo "select * from datasets" | sqlite3 $wdir/catalog/source.db
 echo
 echo "Destination agent tables"
+echo "Files table:"
 echo "select * from files" | sqlite3 $wdir/catalog/destination.db
+echo "Blocks table:"
 echo "select * from blocks" | sqlite3 $wdir/catalog/destination.db
+echo "Datasets table:"
 echo "select * from datasets" | sqlite3 $wdir/catalog/destination.db
 echo
 if [ $status -eq 1 ]; then
