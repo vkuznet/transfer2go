@@ -11,6 +11,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -329,7 +330,7 @@ func PullTransfer() Decorator {
 
 			// try to download a file from remote agent
 			time0 := time.Now().Unix()
-			url := fmt.Sprintf("%s/download?lfn=%s", t.SrcUrl, t.Lfn)
+			url := fmt.Sprintf("%s/download?lfn=%s", t.SrcUrl, url.QueryEscape(t.Lfn))
 			resp := utils.FetchResponse(url, []byte{})
 			if resp.Error != nil {
 				log.WithFields(log.Fields{

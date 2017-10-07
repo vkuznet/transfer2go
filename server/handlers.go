@@ -168,7 +168,8 @@ func HistoricalHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	duration, err := time.ParseDuration(r.FormValue("duration"))
+	d, _ := url.QueryUnescape(r.FormValue("duration"))
+	duration, err := time.ParseDuration(d)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"Error": err,
@@ -205,8 +206,8 @@ func TransfersHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	time0 := r.FormValue("time0")
-	time1 := r.FormValue("time1")
+	time0, _ := url.QueryUnescape(r.FormValue("time0"))
+	time1, _ := url.QueryUnescape(r.FormValue("time1"))
 	transfers := core.TFC.Transfers(time0, time1)
 	data, err := json.Marshal(transfers)
 	if err != nil {
@@ -227,9 +228,9 @@ func FilesHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	lfn := r.FormValue("lfn")
-	dataset := r.FormValue("dataset")
-	block := r.FormValue("block")
+	lfn, _ := url.QueryUnescape(r.FormValue("lfn"))
+	block, _ := url.QueryUnescape(r.FormValue("block"))
+	dataset, _ := url.QueryUnescape(r.FormValue("dataset"))
 	files := core.TFC.Files(dataset, block, lfn)
 	data, err := json.Marshal(files)
 	if err != nil {
@@ -250,9 +251,9 @@ func RecordsHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	lfn := r.FormValue("lfn")
-	dataset := r.FormValue("dataset")
-	block := r.FormValue("block")
+	lfn, _ := url.QueryUnescape(r.FormValue("lfn"))
+	block, _ := url.QueryUnescape(r.FormValue("block"))
+	dataset, _ := url.QueryUnescape(r.FormValue("dataset"))
 	req := core.TransferRequest{Lfn: lfn, Block: block, Dataset: dataset}
 	records := core.TFC.Records(req)
 	data, err := json.Marshal(records)
@@ -632,7 +633,7 @@ func CentralCatalogHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.Method == "GET" {
 		// should return records from central catalog or its subset
-		table := r.FormValue("table")
+		table, _ := url.QueryUnescape(r.FormValue("table"))
 		data, err := core.CC.Get(table)
 		if err != nil {
 			log.WithFields(log.Fields{
@@ -812,54 +813,12 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) {
 			"Request": r,
 		}).Info("RequestHandler received request")
 
-		// let's create a job with payload
-		// find out missing parts (if any) in transfer request
-		// - send request to source agent and find out dataset/block/files
-		vals := url.Values{}
-		if r.Lfn != "" {
-			vals.Add("lfn", r.Lfn)
-		}
-		if r.Block != "" {
-			vals.Add("block", r.Block)
-		}
-		if r.Dataset != "" {
-			vals.Add("dataset", r.Dataset)
-		}
-		args := vals.Encode()
-		furl := fmt.Sprintf("%s/records?%s", r.SrcUrl, args)
-		resp := utils.FetchResponse(furl, []byte{})
-		if resp.Error != nil {
-			log.WithFields(log.Fields{
-				"Error": resp.Error,
-				"Url":   furl,
-			}).Error("Unable to fetch response")
-			continue
-		}
-		var records []core.CatalogEntry
-		err := json.Unmarshal(resp.Data, &records)
-		if err != nil {
-			log.WithFields(log.Fields{
-				"Error": resp.Error,
-				"Url":   furl,
-			}).Error("Unable to unmarshal catalog entry records")
-			continue
-		}
-		// loop over found records, form transfer request ones and put them into StorageQueue
-		for _, rec := range records {
-			r.Lfn = rec.Lfn
-			r.Block = rec.Block
-			r.Dataset = rec.Dataset
-			r.Id = r.UUID()
-			log.WithFields(log.Fields{
-				"Record": r.String(),
-			}).Info("store record")
+		// this action will cause main agent to store given request in heap and persistent storage (REQUEST table)
+		r.Id = r.UUID()
+		work := core.Job{TransferRequest: r, Action: "store"}
 
-			// this action will cause main agent to store given request in heap and persistent storage (REQUEST table)
-			work := core.Job{TransferRequest: r, Action: "store"}
-
-			// Push the work onto the queue.
-			core.StorageQueue <- work
-		}
+		// Push the work onto the queue.
+		core.StorageQueue <- work
 	}
 
 	w.WriteHeader(http.StatusOK)

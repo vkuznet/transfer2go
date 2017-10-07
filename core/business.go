@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"net/url"
 	"os"
 	"time"
 
@@ -236,6 +237,46 @@ func NewWorker(wid int, bufferSize int, jobPool chan chan Job) Worker {
 		quit:       make(chan bool)}
 }
 
+// helper function which resolve input transfer request into catalog entries
+func resolveRequest(t TransferRequest) []TransferRequest {
+	var out []TransferRequest
+	url := fmt.Sprintf("%s/records?dataset=%s&block=%s&lfn=%s", t.SrcUrl, url.QueryEscape(t.Dataset), url.QueryEscape(t.Block), url.QueryEscape(t.Lfn))
+	resp := utils.FetchResponse(url, []byte{})
+	if resp.Error != nil {
+		logs.WithFields(logs.Fields{
+			"Request":             t.String(),
+			"Response.Error":      resp.Error,
+			"Response.Status":     resp.Status,
+			"Response.StatusCode": resp.StatusCode,
+		}).Error("resolve Request (pull model), response error")
+		return out
+	}
+	if resp.StatusCode != 200 {
+		logs.WithFields(logs.Fields{
+			"Request":             t.String(),
+			"Response.Error":      resp.Error,
+			"Response.Status":     resp.Status,
+			"Response.StatusCode": resp.StatusCode,
+		}).Error("resolve Request (pull model), response is not complete")
+		return out
+	}
+	var records []CatalogEntry
+	err := json.Unmarshal(resp.Data, &records)
+	if err != nil {
+		logs.WithFields(logs.Fields{
+			"Request": t.String(),
+			"Error":   err,
+		}).Error("resolve Request (pull model), unable to unmarshl records")
+		return out
+	}
+	for _, r := range records {
+		tr := TransferRequest{TimeStamp: t.TimeStamp, Lfn: r.Lfn, Block: r.Block, Dataset: r.Dataset, SrcUrl: t.SrcUrl, SrcAlias: t.SrcAlias, DstUrl: t.DstUrl, DstAlias: t.DstAlias, RegUrl: t.RegUrl, RegAlias: t.RegAlias, Delay: t.Delay, Priority: t.Priority, Status: t.Status}
+		tr.Id = tr.UUID()
+		out = append(out, tr)
+	}
+	return out
+}
+
 // Start method starts the run loop for the worker, listening for a quit channel in
 // case we need to stop it
 func (w Worker) Start() {
@@ -257,6 +298,19 @@ func (w Worker) Start() {
 				case "delete":
 					err = job.TransferRequest.Delete()
 				case "transfer":
+					// check if input request either dataset or block, if so we resolve it
+					// into file requests
+					if job.TransferRequest.Lfn == "" {
+						logs.WithFields(logs.Fields{
+							"Action":  job.Action,
+							"Request": job.TransferRequest.String(),
+						}).Info("Resolve request")
+						for _, tr := range resolveRequest(job.TransferRequest) {
+							j := Job{TransferRequest: tr, Action: job.Action}
+							w.JobChannel <- j
+						}
+						continue
+					}
 					// use router if possible
 					if routerModel == true {
 						tr := job.TransferRequest
