@@ -12,6 +12,7 @@ import (
 	"hash/adler32"
 	"io"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -450,7 +451,7 @@ func ProcessAction(agent, jsonString string) {
 
 // ShowRequests list request of a given type from an agent
 func ShowRequests(agent, rtype string) {
-	furl := fmt.Sprintf("%s/list?type=%s", agent, rtype)
+	furl := fmt.Sprintf("%s/list?type=%s", agent, url.QueryEscape(rtype))
 	var args []byte
 	resp := utils.FetchResponse(furl, args)
 	if resp.Error != nil || resp.StatusCode != 200 {
