@@ -88,8 +88,8 @@ var TransferQueue chan Job
 // TransferType decides which pull or push based model is used
 var TransferType string
 
-// Param to enable the router
-var routerModel bool
+// RouterModel tells if agent enable router
+var RouterModel bool
 
 // GetUsage method to get cpu and Memory usage
 func (m *Metrics) GetUsage() (float64, float64, error) {
@@ -237,8 +237,9 @@ func NewWorker(wid int, bufferSize int, jobPool chan chan Job) Worker {
 		quit:       make(chan bool)}
 }
 
-// helper function which resolve input transfer request into catalog entries
-func resolveRequest(t TransferRequest) []TransferRequest {
+// ResolveRequest will resolve input transfer request into series of requests with
+// known lfn/block/dataset triplets
+func ResolveRequest(t TransferRequest) []TransferRequest {
 	var out []TransferRequest
 	url := fmt.Sprintf("%s/records?dataset=%s&block=%s&lfn=%s", t.SrcUrl, url.QueryEscape(t.Dataset), url.QueryEscape(t.Block), url.QueryEscape(t.Lfn))
 	resp := utils.FetchResponse(url, []byte{})
@@ -298,69 +299,10 @@ func (w Worker) Start() {
 				case "delete":
 					err = job.TransferRequest.Delete()
 				case "transfer":
-					// check if input request either dataset or block, if so we resolve it
-					// into file requests
-					if job.TransferRequest.Lfn == "" {
-						logs.WithFields(logs.Fields{
-							"Action":  job.Action,
-							"Request": job.TransferRequest.String(),
-						}).Info("Resolve request")
-						for _, tr := range resolveRequest(job.TransferRequest) {
-							j := Job{TransferRequest: tr, Action: job.Action}
-							w.JobChannel <- j
-						}
-						continue
-					}
-					// use router if possible
-					if routerModel == true {
-						tr := job.TransferRequest
-						selectedAgents, index, err := AgentRouter.FindSource(&tr)
-						if err != nil {
-							logs.WithFields(logs.Fields{
-								"Action":  job.Action,
-								"Request": job.TransferRequest.String(),
-								"Error":   err,
-							}).Error("Unable to find source from the router")
-						}
-						transferCount := 0
-						for i := len(selectedAgents) - 1; i > index; i-- {
-							err := checkAgent(selectedAgents[i].SrcUrl)
-							if err != nil {
-								logs.WithFields(logs.Fields{
-									"Error":  err,
-									"Source": selectedAgents[i].SrcUrl,
-								}).Println("Unable to contact source agent")
-								continue
-							}
-							// modify source agent part in our request based on router prediction
-							job.TransferRequest.SrcUrl = selectedAgents[i].SrcUrl
-							job.TransferRequest.SrcAlias = selectedAgents[i].SrcAlias
-							if TransferType == "push" {
-								err = job.TransferRequest.RunPush()
-							} else {
-								err = job.TransferRequest.RunPull()
-							}
-							transferCount += 1
-							// TODO: I don't know what to do if we'll get multiple sources
-							// should we send request to all of them, then how in pull model
-							// a destination will handle the same request from multiple sources
-							// therefore so far we break here
-							break
-						}
-						if transferCount == 0 {
-							// if we didn't send anything in a router block send request as is
-							if TransferType == "push" {
-								err = job.TransferRequest.RunPush()
-							} else {
-								err = job.TransferRequest.RunPull()
-							}
-						}
+					if TransferType == "push" {
+						err = job.TransferRequest.RunPush()
 					} else {
-						if TransferType == "push" {
-							err = job.TransferRequest.RunPush()
-						} else {
-							err = job.TransferRequest.RunPull()
-						}
+						err = job.TransferRequest.RunPull()
 					}
 				default:
 					logs.WithFields(logs.Fields{
@@ -492,7 +434,7 @@ func InitQueue(transferQueueSize int, storageQueueSize int, mfile string, minter
 		heap.Push(&RequestQueue, &Item{Value: requests[i], priority: requests[i].Priority})
 	}
 	if router == true {
-		routerModel = router
+		RouterModel = router
 		AgentRouter.InitialTrain()
 	}
 	logs.Println("Requests restored from db")

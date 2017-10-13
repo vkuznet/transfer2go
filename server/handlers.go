@@ -546,9 +546,8 @@ func ActionHandler(w http.ResponseWriter, r *http.Request) {
 				}).Error("ActionHandler, unable to find a request")
 				continue
 			}
-			// change it action to transfer and get destination agent url
-			job.Action = "transfer"
-			job.TransferRequest.Status = "processing"
+
+			// find out to which agent we need to send our job
 			agent := job.TransferRequest.DstUrl // pull model
 			if _config.Type == "push" {
 				agent = job.TransferRequest.SrcUrl // push model
@@ -559,8 +558,42 @@ func ActionHandler(w http.ResponseWriter, r *http.Request) {
 				}).Error("ActionHandler, undefined agent")
 				continue
 			}
+
+			// list of jobs we'll send to processing agent
 			var jobs4Agent []core.Job
-			jobs4Agent = append(jobs4Agent, job)
+
+			// resolve input job TransferRequest into request with lfn/block/dataset
+			for _, tr := range core.ResolveRequest(job.TransferRequest) {
+
+				// find out list of agents which can serve this request via its router
+				if core.RouterModel == true {
+					selectedAgents, index, err := core.AgentRouter.FindSource(&tr)
+					if err != nil {
+						log.WithFields(log.Fields{
+							"Action":  job.Action,
+							"Request": job.TransferRequest.String(),
+							"Error":   err,
+						}).Error("Unable to find source from the router")
+					}
+					for i := len(selectedAgents) - 1; i > index; i-- {
+						err := core.CheckAgent(selectedAgents[i].SrcUrl)
+						if err != nil {
+							log.WithFields(log.Fields{
+								"Error":  err,
+								"Source": selectedAgents[i].SrcUrl,
+							}).Println("Unable to contact source agent")
+							continue
+						}
+						// modify source agent part in our request based on router prediction
+						tr.SrcUrl = selectedAgents[i].SrcUrl
+						tr.SrcAlias = selectedAgents[i].SrcAlias
+					}
+				}
+				// create new job request
+				tr.Status = "transferring"
+				j := core.Job{TransferRequest: tr, Action: "transfer"}
+				jobs4Agent = append(jobs4Agent, j)
+			}
 			furl := fmt.Sprintf("%s/action", agent)
 			d, err := json.Marshal(jobs4Agent)
 			if err != nil {

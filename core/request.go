@@ -178,8 +178,8 @@ func GetRemoteFiles(tr TransferRequest, remote string) ([]CatalogEntry, error) {
 	return records, nil
 }
 
-// Get the status of agent
-func checkAgent(agentUrl string) error {
+// CheckAgent get status of the agent
+func CheckAgent(agentUrl string) error {
 	url := fmt.Sprintf("%s/status", agentUrl)
 	resp := utils.FetchResponse(url, []byte{})
 	if resp.Error != nil {
@@ -216,7 +216,7 @@ func RedirectRequest(t *TransferRequest, dstUrl string) error {
 	}
 	transferCount := 0
 	for i := len(selectedAgents) - 1; i > index; i-- {
-		err := checkAgent(selectedAgents[i].SrcUrl)
+		err := CheckAgent(selectedAgents[i].SrcUrl)
 		if err != nil {
 			log.WithFields(log.Fields{
 				"Error":  err,
