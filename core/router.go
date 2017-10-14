@@ -36,7 +36,7 @@ type SourceStats struct {
 	SrcAlias   string
 	catalogSet *set.SetNonTS
 	prediction float64
-	Requests   []TransferRequest
+	Jobs       []Job
 }
 
 // AgentRouter helps to call router's methods
@@ -216,11 +216,12 @@ func (r *Router) FindSource(tr *TransferRequest) ([]SourceStats, int, error) {
 	index := len(filteredAgent) - 1
 	for ; index >= 0 && unionSet.Size() > 0; index-- {
 		commonFiles := set.Intersection(filteredAgent[index].catalogSet, unionSet)
-		requests := make([]TransferRequest, 0)
+		requests := make([]Job, 0)
 		for _, lfn := range commonFiles.List() {
-			requests = append(requests, TransferRequest{Lfn: lfn.(string), SrcUrl: filteredAgent[index].SrcUrl, SrcAlias: filteredAgent[index].SrcAlias, DstUrl: tr.DstUrl, DstAlias: tr.DstAlias})
+			tr := TransferRequest{Lfn: lfn.(string), SrcUrl: filteredAgent[index].SrcUrl, SrcAlias: filteredAgent[index].SrcAlias, DstUrl: tr.DstUrl, DstAlias: tr.DstAlias, Status: "transferring"}
+			requests = append(requests, Job{TransferRequest: tr, Action: "transfer"})
 		}
-		filteredAgent[index].Requests = requests
+		filteredAgent[index].Jobs = requests
 		unionSet.Separate(commonFiles)
 	}
 	return filteredAgent, index, nil

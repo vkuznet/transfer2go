@@ -1,7 +1,7 @@
 {
     "catalog":"test/catalog/destination.json",
     "protocol":"http",
-    "backend":"/tmp/transfer2go/destination",
+    "backend":"test/destination",
     "tool":"/bin/cp",
     "url":"http://localhost:9000",
     "port": 9000,
@@ -10,6 +10,6 @@
     "verbose":0,
     "name":"DestinationAgent",
     "staticdir":"static",
-    "type": "push",
+    "type": "pull",
     "MonitorTime":3600
 }

@@ -1,7 +1,7 @@
 {
     "catalog":"test/catalog/source.json",
     "protocol":"http",
-    "backend":"/tmp/transfer2go/source",
+    "backend":"test/source",
     "tool":"",
     "url":"http://localhost:8000",
     "port": 8000,
@@ -10,6 +10,6 @@
     "verbose":0,
     "name":"SourceAgent",
     "staticdir":"static",
-    "type": "push",
+    "type": "pull",
     "MonitorTime":3600
 }

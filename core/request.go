@@ -194,12 +194,17 @@ func CheckAgent(agentUrl string) error {
 }
 
 // SubmitRequest submits request to destination
-func SubmitRequest(t []TransferRequest, dstUrl string) error {
-	body, err := json.Marshal(t)
+func SubmitRequest(j []Job, src string, dst string) error {
+	body, err := json.Marshal(j)
 	if err != nil {
 		return err
 	}
-	url := fmt.Sprintf("%s/pull", dstUrl)
+	var url string
+	if TransferType == "pull" {
+		url = fmt.Sprintf("%s/action", dst)
+	} else {
+		url = fmt.Sprintf("%s/action", src)
+	}
 	resp := utils.FetchResponse(url, body)
 	// check return status code
 	if resp.StatusCode != 200 {
@@ -209,14 +214,43 @@ func SubmitRequest(t []TransferRequest, dstUrl string) error {
 }
 
 // RedirectRequest function to send the request to source
-func RedirectRequest(t *TransferRequest, dstUrl string) error {
-	selectedAgents, index, err := AgentRouter.FindSource(t)
+func RedirectRequest(t *TransferRequest) error {
+	var (
+		selectedAgents []SourceStats
+		index          int
+		err            error
+	)
+	if RouterModel == true {
+		selectedAgents, index, err = AgentRouter.FindSource(t)
+	} else if TransferType == "pull" {
+		var jobs4Agent []Job
+		for _, tr := range ResolveRequest(*t) {
+			tr.Status = "transferring"
+			// create new job request
+			j := Job{TransferRequest: tr, Action: "transfer"}
+			jobs4Agent = append(jobs4Agent, j)
+		}
+		selectedAgents = append(selectedAgents, SourceStats{Jobs: jobs4Agent, SrcUrl: t.SrcUrl, SrcAlias: t.SrcAlias})
+		index = -1
+		if len(jobs4Agent) == 0 {
+			err = errors.New("[Pull Model] can't resolve request")
+		}
+	} else {
+		j := Job{TransferRequest: *t, Action: "transfer"}
+		selectedAgents = append(selectedAgents, SourceStats{Jobs: []Job{j}, SrcUrl: t.SrcUrl, SrcAlias: t.SrcAlias})
+		index = -1
+		if len(selectedAgents) == 0 {
+			err = errors.New("[Push Model] can't resolve request")
+		}
+	}
+
 	if err != nil {
 		return err
 	}
+
 	transferCount := 0
 	for i := len(selectedAgents) - 1; i > index; i-- {
-		err := CheckAgent(selectedAgents[i].SrcUrl)
+		err = CheckAgent(selectedAgents[i].SrcUrl)
 		if err != nil {
 			log.WithFields(log.Fields{
 				"Error":  err,
@@ -224,13 +258,13 @@ func RedirectRequest(t *TransferRequest, dstUrl string) error {
 			}).Println("Unable to connect to source")
 			continue
 		}
-		err = SubmitRequest(selectedAgents[i].Requests, dstUrl)
+		err = SubmitRequest(selectedAgents[i].Jobs, selectedAgents[i].SrcUrl, t.DstUrl)
 		if err == nil {
 			transferCount += 1
 		}
 	}
 	if transferCount == 0 {
-		return errors.New("[Pull Model] Could not submit requests to destination")
+		return errors.New("Could not submit requests to requested agent")
 	}
 	return nil
 }
