@@ -25,7 +25,6 @@ import (
 
 // global variable which we initialize once
 var _userDNs []string
-var authVar bool
 
 func userDNs() []string {
 	var out []string
@@ -71,9 +70,8 @@ func userDNs() []string {
 
 // Init is custom initialization function, we don't use init() because we want
 // control of authentication from command line
-func Init(authArg bool) {
-	authVar = authArg
-	if authVar {
+func Init() {
+	if utils.Auth {
 		_userDNs = userDNs()
 	}
 }
@@ -81,7 +79,7 @@ func Init(authArg bool) {
 // custom logic for CMS authentication, users may implement their own logic here
 func auth(r *http.Request) bool {
 
-	if !authVar {
+	if !utils.Auth {
 		return true
 	}
 
