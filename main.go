@@ -69,6 +69,7 @@ func main() {
 	}
 
 	utils.VERBOSE = verbose
+	utils.AUTH = authVar
 	if configFile != "" {
 		data, err := ioutil.ReadFile(configFile)
 		if err != nil {
