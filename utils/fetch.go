@@ -41,6 +41,9 @@ type UrlRequest struct {
 // VERBOSE variable control verbosity level of client's utilities
 var VERBOSE int
 
+// variable to neglect auth layer
+var Auth bool
+
 // global HTTP client
 var _client = HttpClient()
 
@@ -114,6 +117,9 @@ func tlsCerts() ([]tls.Certificate, error) {
 
 // HttpClient provides HTTP client
 func HttpClient() *http.Client {
+	if Auth == false {
+		return &http.Client{}
+	}
 	// get X509 certs
 	certs, err := tlsCerts()
 	if err != nil {

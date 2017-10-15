@@ -168,7 +168,7 @@ func Server(config Config) {
 	config.Base = base
 	log.WithFields(log.Fields{
 		"Config": config.String(),
-		"Auth":   authVar,
+		"Auth":   utils.Auth,
 		"Model":  config.Type,
 	}).Println("Agent")
 
@@ -256,7 +256,7 @@ func Server(config Config) {
 		"Transfer Type": config.Type,
 	}).Println("Start dispatcher")
 
-	if authVar {
+	if utils.Auth {
 		//start HTTPS server which require user certificates
 		server := &http.Server{
 			Addr: ":" + port,

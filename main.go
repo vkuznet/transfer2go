@@ -47,8 +47,7 @@ func main() {
 	var requests string
 	flag.StringVar(&requests, "requests", "", "Show given type of requests (pending, transfer) [CLIENT]")
 
-	var authVar bool
-	flag.BoolVar(&authVar, "auth", true, "To disable the auth layer [SERVER|CLIENT]")
+	flag.BoolVar(&utils.Auth, "auth", true, "To disable the auth layer [SERVER|CLIENT]")
 
 	flag.Usage = func() {
 		fmt.Println(fmt.Sprintf("Usage of %s", os.Args[0]))
@@ -64,7 +63,7 @@ func main() {
 		os.Exit(0)
 
 	}
-	if authVar {
+	if utils.Auth {
 		utils.CheckX509()
 	}
 
@@ -112,7 +111,7 @@ func main() {
 			log.Warn("WARNING this agent is not registered with remote ones, either provide register in your config or invoke register API call")
 		}
 
-		server.Init(authVar)
+		server.Init()
 		server.Server(config)
 	} else {
 		if register != "" { // register data in agent
