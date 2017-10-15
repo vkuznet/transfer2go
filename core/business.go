@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"log"
 	"math"
-	"net/url"
 	"os"
 	"time"
 
@@ -235,47 +234,6 @@ func NewWorker(wid int, bufferSize int, jobPool chan chan Job) Worker {
 		JobPool:    jobPool,
 		JobChannel: make(chan Job, bufferSize),
 		quit:       make(chan bool)}
-}
-
-// ResolveRequest will resolve input transfer request into series of requests with
-// known lfn/block/dataset triplets
-func ResolveRequest(t TransferRequest) []TransferRequest {
-	var out []TransferRequest
-	url := fmt.Sprintf("%s/records?dataset=%s&block=%s&lfn=%s", t.SrcUrl, url.QueryEscape(t.Dataset), url.QueryEscape(t.Block), url.QueryEscape(t.Lfn))
-	resp := utils.FetchResponse(url, []byte{})
-	if resp.Error != nil {
-		logs.WithFields(logs.Fields{
-			"Request":             t.String(),
-			"Response.Error":      resp.Error,
-			"Response.Status":     resp.Status,
-			"Response.StatusCode": resp.StatusCode,
-		}).Error("resolve Request (pull model), response error")
-		return out
-	}
-	if resp.StatusCode != 200 {
-		logs.WithFields(logs.Fields{
-			"Request":             t.String(),
-			"Response.Error":      resp.Error,
-			"Response.Status":     resp.Status,
-			"Response.StatusCode": resp.StatusCode,
-		}).Error("resolve Request (pull model), response is not complete")
-		return out
-	}
-	var records []CatalogEntry
-	err := json.Unmarshal(resp.Data, &records)
-	if err != nil {
-		logs.WithFields(logs.Fields{
-			"Request": t.String(),
-			"Error":   err,
-		}).Error("resolve Request (pull model), unable to unmarshl records")
-		return out
-	}
-	for _, r := range records {
-		tr := TransferRequest{TimeStamp: t.TimeStamp, Lfn: r.Lfn, Block: r.Block, Dataset: r.Dataset, SrcUrl: t.SrcUrl, SrcAlias: t.SrcAlias, DstUrl: t.DstUrl, DstAlias: t.DstAlias, RegUrl: t.RegUrl, RegAlias: t.RegAlias, Delay: t.Delay, Priority: t.Priority, Status: t.Status}
-		tr.Id = tr.UUID()
-		out = append(out, tr)
-	}
-	return out
 }
 
 // Start method starts the run loop for the worker, listening for a quit channel in
