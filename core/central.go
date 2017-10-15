@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	logs "github.com/sirupsen/logrus"
 )
 
 // CC reprents isntance of CentralCatalog
@@ -64,7 +64,7 @@ func (c *CentralCatalog) Get(table string) ([]byte, error) {
 	fname := findLatestSnapshot(c.Path, table)
 	data, err := ioutil.ReadFile(fname)
 	if err != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"File": fname,
 			"Err":  err,
 		}).Error("CentralCatalog unable to read table")
@@ -82,7 +82,7 @@ func (c *CentralCatalog) Put(table string, records []string) error {
 	path := fmt.Sprintf("%s/%d/%d/%d/%d", c.Path, t.Year(), t.Month(), t.Day(), t.Unix())
 	err := os.MkdirAll(path, os.ModePerm)
 	if err != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Dir": path,
 			"Err": err,
 		}).Error("CentralCatalog unable to create directory")
@@ -92,7 +92,7 @@ func (c *CentralCatalog) Put(table string, records []string) error {
 	file, err := os.Create(fname)
 	defer file.Close()
 	if err != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"File": fname,
 			"Err":  err,
 		}).Error("CentralCatalog unable to create file")
@@ -101,7 +101,7 @@ func (c *CentralCatalog) Put(table string, records []string) error {
 	for _, v := range records {
 		_, err := file.WriteString(v + "\n")
 		if err != nil {
-			log.WithFields(log.Fields{
+			logs.WithFields(logs.Fields{
 				"File":   fname,
 				"Record": v,
 				"Err":    err,
