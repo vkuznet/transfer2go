@@ -12,7 +12,7 @@ import (
 	"os"
 	"path/filepath"
 
-	log "github.com/sirupsen/logrus"
+	logs "github.com/sirupsen/logrus"
 )
 
 // AgentStager represent instance of agent's stager
@@ -44,7 +44,7 @@ func (s *FileSystemStager) Stage(lfn string) error {
 		if err != nil {
 			return err
 		}
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Lfn":  lfn,
 			"Pfn":  pfn,
 			"Pool": s.Pool,
@@ -96,7 +96,7 @@ func (s *FileSystemStager) Write(data []byte, lfn string) (string, int64, string
 	pfn := fmt.Sprintf("%s/%s", s.Pool, filepath.Base(lfn))
 	fin, err := os.Create(pfn)
 	if err != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Error": err,
 			"Pfn":   pfn,
 		}).Error("Unable to create file in local pool", err)
@@ -111,7 +111,7 @@ func (s *FileSystemStager) Write(data []byte, lfn string) (string, int64, string
 	// write data through multi-writer (hasher->writer)
 	bytes, err := mw.Write(data)
 	if err != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Error": err,
 		}).Error("Unable to write data through hasher->writer", err)
 		return "", 0, "", err
