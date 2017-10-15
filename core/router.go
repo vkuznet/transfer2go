@@ -14,7 +14,7 @@ import (
 
 	"github.com/robfig/cron"
 	"github.com/sajari/regression"
-	log "github.com/sirupsen/logrus"
+	logs "github.com/sirupsen/logrus"
 	"github.com/vkuznet/transfer2go/utils"
 	set "gopkg.in/fatih/set.v0"
 )
@@ -80,14 +80,14 @@ func train() {
 		AgentRouter.LinearRegression.Train(regression.DataPoint(obj.Throughput, []float64{obj.CpuUsage, obj.MemUsage}))
 	}
 	AgentRouter.LinearRegression.Run()
-	log.WithFields(log.Fields{
+	logs.WithFields(logs.Fields{
 		"CronInterval": AgentRouter.CronInterval,
 		"Data":         AgentRouter.CSVfile,
 	}).Println("Router successfully retrained")
 
 	err := convertToCSV(dataPoints)
 	if err != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Error": err,
 		}).Println("Error while saving data")
 	}
@@ -132,7 +132,7 @@ func (r *Router) InitialTrain() {
 	if _, err := os.Stat(r.CSVfile); !os.IsNotExist(err) {
 		trainingData, err := readCSVfile(r.CSVfile)
 		if err != nil {
-			log.WithFields(log.Fields{
+			logs.WithFields(logs.Fields{
 				"Error": err,
 			}).Println("Error while training router")
 			return
@@ -141,12 +141,12 @@ func (r *Router) InitialTrain() {
 			r.LinearRegression.Train(regression.DataPoint(row[len(row)-1], row[:len(row)-1]))
 		}
 		r.LinearRegression.Run()
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"TrainInterval": r.CronInterval,
 			"DataFile":      r.CSVfile,
 		}).Println("Router successfully retrained")
 	} else {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"TrainInterval": r.CronInterval,
 			"DataFile":      r.CSVfile,
 			"error":         err,
@@ -220,7 +220,7 @@ func (r *Router) FindSource(tr *TransferRequest) ([]SourceStats, int, error) {
 		requests := make([]Job, 0)
 		for _, lfn := range commonFiles.List() {
 			meta = fileData[lfn.(string)] // 0: dataset, 1: block name
-			requests = append(requests, Job{Action: "transfer", TransferRequest: TransferRequest{Lfn: lfn.(string), Dataset: meta[0], Block: meta[1], SrcUrl: filteredAgent[index].SrcUrl, SrcAlias: filteredAgent[index].SrcAlias, DstUrl: tr.DstUrl, DstAlias: tr.DstAlias, Status: "transferring", Priority: tr.Priority, RegAlias: tr.RegAlias, RegUrl: tr.RegUrl}})
+			requests = append(requests, Job{Action: "transfer", TransferRequest: TransferRequest{Id: tr.Id, Lfn: lfn.(string), Dataset: meta[0], Block: meta[1], SrcUrl: filteredAgent[index].SrcUrl, SrcAlias: filteredAgent[index].SrcAlias, DstUrl: tr.DstUrl, DstAlias: tr.DstAlias, Status: "transferring", Priority: tr.Priority, RegAlias: tr.RegAlias, RegUrl: tr.RegUrl}})
 		}
 		filteredAgent[index].Jobs = requests
 		unionSet.Separate(commonFiles)
@@ -234,7 +234,7 @@ func GetUnionCatalog(tRequest *TransferRequest) (*set.SetNonTS, []SourceStats, m
 	filteredAgent := make([]SourceStats, 0)
 	fileData := make(map[string][]string)
 	for srcAlias, srcUrl := range *AgentRouter.Agents {
-		records, err := GetRemoteFiles(*tRequest, srcUrl)
+		records, err := GetRecords(*tRequest, srcUrl)
 		if err != nil || len(records) <= 0 {
 			continue
 		}
