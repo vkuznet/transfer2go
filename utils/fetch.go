@@ -16,7 +16,7 @@ import (
 	"os/user"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	logs "github.com/sirupsen/logrus"
 	"github.com/vkuznet/x509proxy"
 )
 
@@ -83,19 +83,19 @@ func tlsCerts() ([]tls.Certificate, error) {
 		}
 	}
 	if VERBOSE > 1 {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"uproxy": uproxy,
 		}).Println("")
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"uckey": uckey,
 		}).Println("")
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"ucert": ucert,
 		}).Println("")
 	}
 
 	if uproxy == "" && uckey == "" { // user doesn't have neither proxy or user certs
-		log.Warn("Neither proxy or user certs are found, to proceed use auth=false option otherwise setup X509 environment")
+		logs.Warn("Neither proxy or user certs are found, to proceed use auth=false option otherwise setup X509 environment")
 		return nil, nil
 	}
 	if uproxy != "" {
@@ -157,7 +157,7 @@ func FetchResponse(rurl string, args []byte) ResponseType {
 	} else {
 		req, e = http.NewRequest("GET", rurl, nil)
 		if e != nil {
-			log.WithFields(log.Fields{
+			logs.WithFields(logs.Fields{
 				"Error": e,
 			}).Error("Unable to make GET request")
 		}
@@ -165,7 +165,7 @@ func FetchResponse(rurl string, args []byte) ResponseType {
 	}
 	if VERBOSE > 1 {
 		dump1, err1 := httputil.DumpRequestOut(req, true)
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Request": req,
 			"Dump":    string(dump1),
 			"Error":   err1,
@@ -173,7 +173,7 @@ func FetchResponse(rurl string, args []byte) ResponseType {
 	}
 	resp, err := _client.Do(req)
 	if err != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Error": err,
 		}).Error("HTTP", err)
 		response.Error = err
@@ -183,14 +183,14 @@ func FetchResponse(rurl string, args []byte) ResponseType {
 	response.StatusCode = resp.StatusCode
 	if VERBOSE > 0 {
 		if len(args) > 0 {
-			log.WithFields(log.Fields{
+			logs.WithFields(logs.Fields{
 				"URL":   rurl,
 				"Args":  string(args),
 				"Error": err,
 				"Time":  time.Now().Sub(startTime),
 			}).Println("HTTP POST")
 		} else {
-			log.WithFields(log.Fields{
+			logs.WithFields(logs.Fields{
 				"URL":   rurl,
 				"Args":  string(args),
 				"Error": err,
@@ -200,7 +200,7 @@ func FetchResponse(rurl string, args []byte) ResponseType {
 	}
 	if VERBOSE > 1 {
 		dump2, err2 := httputil.DumpResponse(resp, true)
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Dump":  string(dump2),
 			"Error": err2,
 		}).Println("HTTP response")
@@ -223,7 +223,7 @@ func Fetch(rurl string, args []byte, ch chan<- ResponseType) {
 	var resp, r ResponseType
 	resp = FetchResponse(rurl, args)
 	if resp.Error != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"URL":   rurl,
 			"Error": resp.Error,
 		}).Warn("Fail to fetch data")
@@ -234,7 +234,7 @@ func Fetch(rurl string, args []byte, ch chan<- ResponseType) {
 			if r.Error == nil {
 				break
 			}
-			log.WithFields(log.Fields{
+			logs.WithFields(logs.Fields{
 				"URL":   rurl,
 				"retry": i,
 				"Error": r.Error,
@@ -243,7 +243,7 @@ func Fetch(rurl string, args []byte, ch chan<- ResponseType) {
 		resp = r
 	}
 	if resp.Error != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"URL":   rurl,
 			"Retry": urlRetry,
 			"Error": resp.Error,
@@ -258,7 +258,7 @@ func validateUrl(rurl string) bool {
 		if PatternUrl.MatchString(rurl) {
 			return true
 		}
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"URL": rurl,
 		}).Error("Invalid URL:", rurl)
 	}
