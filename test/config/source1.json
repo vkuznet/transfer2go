@@ -1,0 +1,15 @@
+{
+    "catalog":"test/catalog/source1.json",
+    "protocol":"http",
+    "backend":"/tmp/transfer2go/source1",
+    "tool":"",
+    "url":"http://localhost:8001",
+    "port": 8001,
+    "mfile":"SourceAgentmetrics1.log",
+    "minterval":60,
+    "verbose":0,
+    "name":"SourceAgent1",
+    "staticdir":"static",
+    "type": "pull",
+    "MonitorTime":3600
+}

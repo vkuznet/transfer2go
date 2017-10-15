@@ -532,11 +532,11 @@ func ActionHandler(w http.ResponseWriter, r *http.Request) {
 	// loop over received data and decide what to do with those requests based on the action clause
 	for _, job := range data {
 		log.WithFields(log.Fields{
-			"Request": job.String(),
+			"Job": job.String(),
 		}).Info("ActionHandler, receive new request")
 		if job.Action == "approve" { // this is action happens on main agent
 			// find out real transfer request
-			err := core.TFC.RetrieveRequest(&job.TransferRequest)
+			err = core.TFC.RetrieveRequest(&job.TransferRequest)
 			if err != nil {
 				log.WithFields(log.Fields{
 					"Job":   job,
@@ -544,77 +544,20 @@ func ActionHandler(w http.ResponseWriter, r *http.Request) {
 				}).Error("ActionHandler, unable to find a request")
 				continue
 			}
-
-			// find out to which agent we need to send our job
-			agent := job.TransferRequest.DstUrl // pull model
-			if _config.Type == "push" {
-				agent = job.TransferRequest.SrcUrl // push model
-			}
-			if agent == "" {
-				log.WithFields(log.Fields{
-					"Job": job,
-				}).Error("ActionHandler, undefined agent")
-				continue
-			}
-
-			// list of jobs we'll send to processing agent
-			var jobs4Agent []core.Job
-
-			// resolve input job TransferRequest into request with lfn/block/dataset
-			for _, tr := range core.ResolveRequest(job.TransferRequest) {
-
-				// find out list of agents which can serve this request via its router
-				if core.RouterModel == true {
-					selectedAgents, index, err := core.AgentRouter.FindSource(&tr)
-					if err != nil {
-						log.WithFields(log.Fields{
-							"Action":  job.Action,
-							"Request": job.TransferRequest.String(),
-							"Error":   err,
-						}).Error("Unable to find source from the router")
-					}
-					for i := len(selectedAgents) - 1; i > index; i-- {
-						err := core.CheckAgent(selectedAgents[i].SrcUrl)
-						if err != nil {
-							log.WithFields(log.Fields{
-								"Error":  err,
-								"Source": selectedAgents[i].SrcUrl,
-							}).Println("Unable to contact source agent")
-							continue
-						}
-						// modify source agent part in our request based on router prediction
-						tr.SrcUrl = selectedAgents[i].SrcUrl
-						tr.SrcAlias = selectedAgents[i].SrcAlias
-					}
-				}
-				// create new job request
-				tr.Status = "transferring"
-				j := core.Job{TransferRequest: tr, Action: "transfer"}
-				jobs4Agent = append(jobs4Agent, j)
-			}
-			furl := fmt.Sprintf("%s/action", agent)
-			d, err := json.Marshal(jobs4Agent)
+			tr := job.TransferRequest
+			// Split the request according to model type and router
+			err = core.RedirectRequest(&tr)
 			if err != nil {
 				log.WithFields(log.Fields{
 					"Error": err,
-				}).Error("ActionHandler unable to marshal jobs4Agent")
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			// send request to destination agent
-			resp := utils.FetchResponse(furl, d)
-			if resp.StatusCode != 200 {
-				log.WithFields(log.Fields{
-					"Error": err,
-					"Agent": agent,
+					"Model": _config.Type,
+					"Job":   job.String(),
 				}).Error("ActionHandler unable to send transfer request to agent")
-				w.WriteHeader(http.StatusInternalServerError)
-				return
+			} else {
+				log.WithFields(log.Fields{
+					"Job": job.String(),
+				}).Info("ActionHandler, successfully send request to agent")
 			}
-			log.WithFields(log.Fields{
-				"Job":   job.String(),
-				"Agent": agent,
-			}).Info("ActionHandler, successfully send request to agent")
 		} else if job.Action == "update" { // this happens on main agent
 			err := core.TFC.UpdateRequest(job.TransferRequest.Id, job.TransferRequest.Status)
 			if err == nil {
