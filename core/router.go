@@ -183,7 +183,7 @@ func readCSVfile(path string) ([][]float64, error) {
 // FindSource function to get the appropriate source agent
 func (r *Router) FindSource(tr *TransferRequest) ([]SourceStats, int, error) {
 	// Find the union of files and files stored per agent
-	unionSet, filteredAgent := GetUnionCatalog(tr)
+	unionSet, filteredAgent, fileData := GetUnionCatalog(tr)
 	if len(filteredAgent) <= 0 {
 		return nil, 0, errors.New("Couldn't find appropriate agent")
 	}
@@ -214,12 +214,13 @@ func (r *Router) FindSource(tr *TransferRequest) ([]SourceStats, int, error) {
 		return filteredAgent[i].prediction < filteredAgent[j].prediction
 	})
 	index := len(filteredAgent) - 1
+	var meta []string
 	for ; index >= 0 && unionSet.Size() > 0; index-- {
 		commonFiles := set.Intersection(filteredAgent[index].catalogSet, unionSet)
 		requests := make([]Job, 0)
 		for _, lfn := range commonFiles.List() {
-			tr := TransferRequest{Lfn: lfn.(string), SrcUrl: filteredAgent[index].SrcUrl, SrcAlias: filteredAgent[index].SrcAlias, DstUrl: tr.DstUrl, DstAlias: tr.DstAlias, Status: "transferring"}
-			requests = append(requests, Job{TransferRequest: tr, Action: "transfer"})
+			meta = fileData[lfn.(string)] // 0: dataset, 1: block name
+			requests = append(requests, Job{Action: "transfer", TransferRequest: TransferRequest{Lfn: lfn.(string), Dataset: meta[0], Block: meta[1], SrcUrl: filteredAgent[index].SrcUrl, SrcAlias: filteredAgent[index].SrcAlias, DstUrl: tr.DstUrl, DstAlias: tr.DstAlias, Status: "transferring", Priority: tr.Priority, RegAlias: tr.RegAlias, RegUrl: tr.RegUrl}})
 		}
 		filteredAgent[index].Jobs = requests
 		unionSet.Separate(commonFiles)
@@ -228,9 +229,10 @@ func (r *Router) FindSource(tr *TransferRequest) ([]SourceStats, int, error) {
 }
 
 // GetUnionCatalog function to get the union of files
-func GetUnionCatalog(tRequest *TransferRequest) (*set.SetNonTS, []SourceStats) {
+func GetUnionCatalog(tRequest *TransferRequest) (*set.SetNonTS, []SourceStats, map[string][]string) {
 	unionSet := set.NewNonTS()
 	filteredAgent := make([]SourceStats, 0)
+	fileData := make(map[string][]string)
 	for srcAlias, srcUrl := range *AgentRouter.Agents {
 		records, err := GetRemoteFiles(*tRequest, srcUrl)
 		if err != nil || len(records) <= 0 {
@@ -239,10 +241,11 @@ func GetUnionCatalog(tRequest *TransferRequest) (*set.SetNonTS, []SourceStats) {
 		agentSet := set.NewNonTS()
 		for _, catalog := range records {
 			agentSet.Add(catalog.Lfn)
+			fileData[catalog.Lfn] = []string{catalog.Dataset, catalog.Block}
 		}
 		unionSet.Merge(agentSet)
 		agentStat := SourceStats{SrcUrl: srcUrl, SrcAlias: srcAlias, catalogSet: agentSet}
 		filteredAgent = append(filteredAgent, agentStat)
 	}
-	return unionSet, filteredAgent
+	return unionSet, filteredAgent, fileData
 }
