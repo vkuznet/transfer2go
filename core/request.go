@@ -17,7 +17,7 @@ import (
 	"path/filepath"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	logs "github.com/sirupsen/logrus"
 	"github.com/vkuznet/transfer2go/utils"
 )
 
@@ -159,9 +159,9 @@ func httpTransfer(c CatalogEntry, t *TransferRequest) (string, float64, error) {
 	return r.Pfn, throughput, nil
 }
 
-// GetRemoteFiles checks destination catalog
-func GetRemoteFiles(tr TransferRequest, remote string) ([]CatalogEntry, error) {
-	url := fmt.Sprintf("%s/meta", remote)
+// GetRecords get catalog entries from given agent
+func GetRecords(tr TransferRequest, agent string) ([]CatalogEntry, error) {
+	url := fmt.Sprintf("%s/records", agent)
 	d, err := json.Marshal(tr)
 	if err != nil {
 		return nil, err
@@ -176,6 +176,26 @@ func GetRemoteFiles(tr TransferRequest, remote string) ([]CatalogEntry, error) {
 		return nil, err
 	}
 	return records, nil
+}
+
+// ResolveRequest will resolve input transfer request into series of requests with
+// known lfn/block/dataset triplets
+func ResolveRequest(t TransferRequest) []TransferRequest {
+	var out []TransferRequest
+	records, err := GetRecords(t, t.SrcUrl)
+	if err != nil {
+		logs.WithFields(logs.Fields{
+			"Request": t.String(),
+			"Error":   err,
+		}).Error("resolve Request (pull model), unable to unmarshl records")
+		return out
+	}
+	for _, r := range records {
+		tr := TransferRequest{TimeStamp: t.TimeStamp, Lfn: r.Lfn, Block: r.Block, Dataset: r.Dataset, SrcUrl: t.SrcUrl, SrcAlias: t.SrcAlias, DstUrl: t.DstUrl, DstAlias: t.DstAlias, RegUrl: t.RegUrl, RegAlias: t.RegAlias, Delay: t.Delay, Priority: t.Priority, Status: t.Status}
+		tr.Id = tr.UUID()
+		out = append(out, tr)
+	}
+	return out
 }
 
 // CheckAgent get status of the agent
@@ -213,7 +233,8 @@ func SubmitRequest(j []Job, src string, dst string) error {
 	return nil
 }
 
-// RedirectRequest function to send the request to source
+// RedirectRequest sends request to appropriate agent(s) either based on routing predictions
+// or to src/dst agents for push/pull model
 func RedirectRequest(t *TransferRequest) error {
 	var (
 		selectedAgents []SourceStats
@@ -257,7 +278,7 @@ func RedirectRequest(t *TransferRequest) error {
 	for i := len(selectedAgents) - 1; i > index; i-- {
 		err = CheckAgent(selectedAgents[i].SrcUrl)
 		if err != nil {
-			log.WithFields(log.Fields{
+			logs.WithFields(logs.Fields{
 				"Error":  err,
 				"Source": selectedAgents[i].SrcUrl,
 			}).Println("Unable to connect to source")
@@ -308,7 +329,7 @@ func Store() Decorator {
 				return err
 			}
 			heap.Push(&RequestQueue, item)
-			log.WithFields(log.Fields{
+			logs.WithFields(logs.Fields{
 				"Request": t,
 			}).Println("Request Saved")
 			return r.Process(t)
@@ -326,7 +347,7 @@ func Delete() Decorator {
 			if err == nil {
 				deleted := RequestQueue.Delete(t.Id)
 				if deleted {
-					log.WithFields(log.Fields{
+					logs.WithFields(logs.Fields{
 						"Request": t,
 					}).Println("Request Deleted")
 				} else {
@@ -349,7 +370,7 @@ func Delete() Decorator {
 func PullTransfer() Decorator {
 	return func(r Request) Request {
 		return RequestFunc(func(t *TransferRequest) error {
-			log.WithFields(log.Fields{
+			logs.WithFields(logs.Fields{
 				"Request": t.String(),
 			}).Info("Request Transfer (pull model)")
 			// Here we implement the following logic:
@@ -361,7 +382,7 @@ func PullTransfer() Decorator {
 			// check if record exists in TFC
 			existingRecords := TFC.Records(*t)
 			if len(existingRecords) > 0 {
-				log.WithFields(log.Fields{
+				logs.WithFields(logs.Fields{
 					"Request": t.String(),
 				}).Info("Request Transfer (pull model), no existing records in local TFC")
 				return r.Process(t) // nothing to do since we have this record in TFC
@@ -372,7 +393,7 @@ func PullTransfer() Decorator {
 			url := fmt.Sprintf("%s/download?lfn=%s", t.SrcUrl, url.QueryEscape(t.Lfn))
 			resp := utils.FetchResponse(url, []byte{})
 			if resp.Error != nil {
-				log.WithFields(log.Fields{
+				logs.WithFields(logs.Fields{
 					"Request":             t.String(),
 					"Response.Error":      resp.Error,
 					"Response.Status":     resp.Status,
@@ -383,7 +404,7 @@ func PullTransfer() Decorator {
 			if resp.StatusCode == 204 {
 				// transfer was put into stager but not yet finished
 				t.Status = "processing"
-				log.WithFields(log.Fields{
+				logs.WithFields(logs.Fields{
 					"Request": t.String(),
 				}).Info("Request Transfer (pull model), received 204 status code, set processing")
 			}
@@ -393,7 +414,7 @@ func PullTransfer() Decorator {
 				// call local stager to put data into local pool and/or tape system
 				pfn, bytes, hash, err := AgentStager.Write(data, t.Lfn)
 				if err != nil {
-					log.WithFields(log.Fields{
+					logs.WithFields(logs.Fields{
 						"Request": t.String(),
 						"Error":   err,
 					}).Error("Request Transfer (pull model), AgentStager.Write error")
@@ -403,7 +424,7 @@ func PullTransfer() Decorator {
 				entry := CatalogEntry{Lfn: t.Lfn, Pfn: pfn, Dataset: t.Dataset, Block: t.Block, Bytes: bytes, Hash: hash, TransferTime: (time.Now().Unix() - time0), Timestamp: time.Now().Unix()}
 				// update local TFC with new catalog entry
 				TFC.Add(entry)
-				log.WithFields(log.Fields{
+				logs.WithFields(logs.Fields{
 					"Request": t.String(),
 					"Entry":   entry.String(),
 				}).Info("Request Transfer (pull model), successfully added to this agent")
@@ -422,13 +443,13 @@ func PullTransfer() Decorator {
 func PushTransfer() Decorator {
 	return func(r Request) Request {
 		return RequestFunc(func(t *TransferRequest) error {
-			log.WithFields(log.Fields{
+			logs.WithFields(logs.Fields{
 				"Request": t.String(),
 			}).Println("Request Transfer (push model)")
 			var records []CatalogEntry
 			requestedRecords := TFC.Records(*t)
 			// Check if the requested data is already presented on destination agent.
-			remoteRecords, err := GetRemoteFiles(*t, t.DstUrl)
+			remoteRecords, err := GetRecords(*t, t.DstUrl)
 			if remoteRecords == nil || err != nil {
 				records = requestedRecords
 			} else {
@@ -437,7 +458,7 @@ func PushTransfer() Decorator {
 
 			if len(records) == 0 {
 				// file does not exists in TFC, nothing to do, return immediately
-				log.WithFields(log.Fields{
+				logs.WithFields(logs.Fields{
 					"TransferRequest": t,
 				}).Warn("Does not match anything in TFC of this agent or data already exists in destination\n")
 				return r.Process(t)
@@ -479,12 +500,12 @@ func PushTransfer() Decorator {
 				var rpfn string // remote PFN
 				var throughput float64
 				if srcAgent.Protocol == "" || srcAgent.Protocol == "http" {
-					log.WithFields(log.Fields{
+					logs.WithFields(logs.Fields{
 						"dstAgent": dstAgent.String(),
 					}).Info("Transfer via HTTP protocol to")
 					rpfn, throughput, err = httpTransfer(rec, t)
 					if err != nil {
-						log.WithFields(log.Fields{
+						logs.WithFields(logs.Fields{
 							"TransferRequest": t.String(),
 							"Record":          rec.String(),
 							"Err":             err,
@@ -507,12 +528,12 @@ func PushTransfer() Decorator {
 					} else {
 						cmd = exec.Command(srcAgent.Tool, srcAgent.ToolOpts, rec.Pfn, rpfn)
 					}
-					log.WithFields(log.Fields{
+					logs.WithFields(logs.Fields{
 						"Command": cmd,
 					}).Info("Transfer command")
 					err = cmd.Run()
 					if err != nil {
-						log.WithFields(log.Fields{
+						logs.WithFields(logs.Fields{
 							"Tool":         srcAgent.Tool,
 							"Tool options": srcAgent.ToolOpts,
 							"PFN":          rec.Pfn,
@@ -548,7 +569,7 @@ func PushTransfer() Decorator {
 }
 
 // Logging returns a Decorator that logs client requests
-func Logging(l *log.Logger) Decorator {
+func Logging(l *logs.Logger) Decorator {
 	return func(r Request) Request {
 		return RequestFunc(func(t *TransferRequest) error {
 			l.Println("TransferRequest", t)
@@ -562,7 +583,7 @@ func Pause(interval time.Duration) Decorator {
 	return func(r Request) Request {
 		return RequestFunc(func(t *TransferRequest) error {
 			if interval > 0 {
-				log.WithFields(log.Fields{
+				logs.WithFields(logs.Fields{
 					"Request":  t,
 					"Interval": interval,
 				}).Println("TransferRequest is paused by")
@@ -577,7 +598,7 @@ func Pause(interval time.Duration) Decorator {
 func Tracer() Decorator {
 	return func(r Request) Request {
 		return RequestFunc(func(t *TransferRequest) error {
-			log.WithFields(log.Fields{
+			logs.WithFields(logs.Fields{
 				"TransferRequest": t,
 			}).Println("Trace")
 			return r.Process(t)
