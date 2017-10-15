@@ -12,7 +12,7 @@ import (
 	"net/http"
 	"strings"
 
-	log "github.com/sirupsen/logrus"
+	logs "github.com/sirupsen/logrus"
 	"github.com/vkuznet/transfer2go/core"
 	"github.com/vkuznet/transfer2go/utils"
 
@@ -79,7 +79,7 @@ func init() {
 
 // register a new (alias, agent) pair in agent (register)
 func register(register, alias, agent string) error {
-	log.WithFields(log.Fields{
+	logs.WithFields(logs.Fields{
 		"Agent":    agent,
 		"Alias":    alias,
 		"Register": register,
@@ -88,7 +88,7 @@ func register(register, alias, agent string) error {
 	params := AgentInfo{Agent: _myself, Alias: _alias}
 	data, err := json.Marshal(params)
 	if err != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Params": params,
 		}).Error("Unable to marshal params", params)
 	}
@@ -105,7 +105,7 @@ func register(register, alias, agent string) error {
 func registerAtAgents(aName string) {
 	// register itself
 	if _, ok := _agents[_alias]; ok {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Alias":  _alias,
 			"Agents": _agents,
 		}).Fatal("Unable to register, alias, since this name already exists")
@@ -116,7 +116,7 @@ func registerAtAgents(aName string) {
 	if aName != "" && len(aName) > 0 {
 		err := register(aName, _alias, _myself) // submit remote registration of given agent name
 		if err != nil {
-			log.WithFields(log.Fields{
+			logs.WithFields(logs.Fields{
 				"Alias": _alias,
 				"Self":  _myself,
 				"Name":  aName,
@@ -166,7 +166,7 @@ func Server(config Config) {
 		port = fmt.Sprintf("%d", config.Port)
 	}
 	config.Base = base
-	log.WithFields(log.Fields{
+	logs.WithFields(logs.Fields{
 		"Config": config.String(),
 		"Auth":   utils.Auth,
 		"Model":  config.Type,
@@ -178,13 +178,13 @@ func Server(config Config) {
 	// define catalog
 	c, e := ioutil.ReadFile(config.Catalog)
 	if e != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Error": e,
 		}).Fatal("Unable to read catalog file")
 	}
 	err := json.Unmarshal([]byte(c), &core.TFC)
 	if err != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Error": err,
 		}).Fatal("Unable to parse catalog JSON file")
 	}
@@ -195,13 +195,13 @@ func Server(config Config) {
 	db, dberr := sql.Open(dbtype, dburi)
 	defer db.Close()
 	if dberr != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"DB Error": dberr,
 		}).Fatal("sql.Open")
 	}
 	dberr = db.Ping()
 	if dberr != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"DB Error": dberr,
 		}).Fatal("db.Ping")
 	}
@@ -209,7 +209,7 @@ func Server(config Config) {
 	core.DB = db
 	core.DBTYPE = dbtype
 	core.DBSQL = core.LoadSQL(dbtype, dbowner)
-	log.WithFields(log.Fields{
+	logs.WithFields(logs.Fields{
 		"Catalog": core.TFC,
 	}).Println("")
 
@@ -225,7 +225,7 @@ func Server(config Config) {
 
 	// Check if RouterModel is enabled, then initialize router
 	if config.RouterModel == true {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"TrainInterval": _config.TrainInterval,
 		}).Println("Enabling router model")
 		cronJob := core.NewRouter(config.TrainInterval, &_agents, config.Cfile)
@@ -250,7 +250,7 @@ func Server(config Config) {
 	// initialize stager
 	core.AgentStager = core.NewStager(config.Backend, core.TFC)
 
-	log.WithFields(log.Fields{
+	logs.WithFields(logs.Fields{
 		"Workers":       config.Workers,
 		"QueueSize":     config.QueueSize,
 		"Transfer Type": config.Type,
@@ -270,7 +270,7 @@ func Server(config Config) {
 	}
 
 	if err != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Error": err,
 		}).Fatal("ListenAndServe: ")
 	}
