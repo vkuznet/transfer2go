@@ -221,26 +221,31 @@ func RedirectRequest(t *TransferRequest) error {
 		err            error
 	)
 	if RouterModel == true {
+		// Resolve request through router for both the model (push or pull model), Case: roter = true, model = push or pull
 		selectedAgents, index, err = AgentRouter.FindSource(t)
-	} else if TransferType == "pull" {
-		var jobs4Agent []Job
-		for _, tr := range ResolveRequest(*t) {
-			tr.Status = "transferring"
-			// create new job request
-			j := Job{TransferRequest: tr, Action: "transfer"}
-			jobs4Agent = append(jobs4Agent, j)
-		}
-		selectedAgents = append(selectedAgents, SourceStats{Jobs: jobs4Agent, SrcUrl: t.SrcUrl, SrcAlias: t.SrcAlias})
-		index = -1
-		if len(jobs4Agent) == 0 {
-			err = errors.New("[Pull Model] can't resolve request")
-		}
 	} else {
-		j := Job{TransferRequest: *t, Action: "transfer"}
-		selectedAgents = append(selectedAgents, SourceStats{Jobs: []Job{j}, SrcUrl: t.SrcUrl, SrcAlias: t.SrcAlias})
-		index = -1
-		if len(selectedAgents) == 0 {
-			err = errors.New("[Push Model] can't resolve request")
+		// resolve request and send it to destination, Case: router = false, model = pull
+		if TransferType == "pull" {
+			var jobs4Agent []Job
+			for _, tr := range ResolveRequest(*t) {
+				tr.Status = "transferring"
+				// create new job request
+				j := Job{TransferRequest: tr, Action: "transfer"}
+				jobs4Agent = append(jobs4Agent, j)
+			}
+			selectedAgents = append(selectedAgents, SourceStats{Jobs: jobs4Agent, SrcUrl: t.SrcUrl, SrcAlias: t.SrcAlias})
+			index = -1
+			if len(jobs4Agent) == 0 {
+				err = errors.New("[Pull Model] can't resolve request")
+			}
+		} else {
+			// For the push model do not resolve request directly send it to the source.  // router = false, model = push
+			j := Job{TransferRequest: *t, Action: "transfer"}
+			selectedAgents = append(selectedAgents, SourceStats{Jobs: []Job{j}, SrcUrl: t.SrcUrl, SrcAlias: t.SrcAlias})
+			index = -1
+			if len(selectedAgents) == 0 {
+				err = errors.New("[Push Model] can't resolve request")
+			}
 		}
 	}
 
