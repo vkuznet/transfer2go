@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	logs "github.com/sirupsen/logrus"
 	"github.com/vkuznet/transfer2go/utils"
 
 	// loads sqlite3 database layer
@@ -66,7 +66,7 @@ type Catalog struct {
 
 func check(msg string, err error) {
 	if err != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Message": msg,
 			"Err":     err,
 		}).Fatal("Stop process")
@@ -94,7 +94,7 @@ func getSQL(key string) string {
 	stm, ok := DBSQL[key]
 	if !ok {
 		msg := fmt.Sprintf("Unable to load %s SQL", key)
-		log.Fatal(msg)
+		logs.Fatal(msg)
 	}
 	return stm.(string)
 }
@@ -121,13 +121,13 @@ func (c *Catalog) Dump() []byte {
 		//         cmd := fmt.Sprintf("sqlite3 %s .dump", c.Uri)
 		out, err := exec.Command("sqlite3", c.Uri, ".dump").Output()
 		if err != nil {
-			log.WithFields(log.Fields{
+			logs.WithFields(logs.Fields{
 				"Err": err,
 			}).Error("c.Dump")
 		}
 		return out
 	}
-	log.WithFields(log.Fields{
+	logs.WithFields(logs.Fields{
 		"Type": c.Type,
 	}).Println("Catalog Dump method is not implemented yet for")
 
@@ -193,7 +193,7 @@ func (c *Catalog) Add(entry CatalogEntry) error {
 	tx.Commit()
 
 	if utils.VERBOSE > 0 {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Entry":      entry.String(),
 			"Dataset Id": did,
 			"Block Id":   bid,
@@ -258,7 +258,7 @@ func (c *Catalog) Snapshot() map[string][]string {
 		// fetch data from DB
 		rows, err := DB.Query(stm)
 		if err != nil {
-			log.WithFields(log.Fields{
+			logs.WithFields(logs.Fields{
 				"Query": stm,
 				"Error": err,
 			}).Error("DB.Query")
@@ -267,7 +267,7 @@ func (c *Catalog) Snapshot() map[string][]string {
 		defer rows.Close()
 		cols, err := rows.Columns() // Remember to check err afterwards
 		if err != nil {
-			log.WithFields(log.Fields{
+			logs.WithFields(logs.Fields{
 				"Error": err,
 			}).Error("Unable to get column names")
 			return maps
@@ -281,7 +281,7 @@ func (c *Catalog) Snapshot() map[string][]string {
 		for rows.Next() {
 			err := rows.Scan(args...)
 			if err != nil {
-				log.WithFields(log.Fields{
+				logs.WithFields(logs.Fields{
 					"Err": err,
 				}).Error("rows.Scan")
 			}
@@ -318,7 +318,7 @@ func (c *Catalog) Records(req TransferRequest) []CatalogEntry {
 	}
 
 	if utils.VERBOSE > 0 {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Query": stm,
 			"Value": vals,
 		}).Println("Records query")
@@ -327,7 +327,7 @@ func (c *Catalog) Records(req TransferRequest) []CatalogEntry {
 	// fetch data from DB
 	rows, err := DB.Query(stm, vals...)
 	if err != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Query": stm,
 			"Error": err,
 		}).Error("DB.Query")
@@ -339,7 +339,7 @@ func (c *Catalog) Records(req TransferRequest) []CatalogEntry {
 		rec := CatalogEntry{}
 		err := rows.Scan(&rec.Dataset, &rec.Block, &rec.Lfn, &rec.Pfn, &rec.Bytes, &rec.Hash)
 		if err != nil {
-			log.WithFields(log.Fields{
+			logs.WithFields(logs.Fields{
 				"Err": err,
 			}).Error("rows.Scan")
 		}
@@ -357,7 +357,7 @@ func (c *Catalog) Transfers(time0, time1 string) []CatalogEntry {
 	vals = append(vals, time1)
 
 	if utils.VERBOSE > 0 {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Query": stm,
 			"Value": vals,
 		}).Println("Records query", stm, vals)
@@ -366,7 +366,7 @@ func (c *Catalog) Transfers(time0, time1 string) []CatalogEntry {
 	// fetch data from DB
 	rows, err := DB.Query(stm, vals...)
 	if err != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Query": stm,
 			"Err":   err,
 		}).Error("DB.Query")
@@ -378,7 +378,7 @@ func (c *Catalog) Transfers(time0, time1 string) []CatalogEntry {
 		rec := CatalogEntry{}
 		err := rows.Scan(&rec.Bytes, &rec.TransferTime)
 		if err != nil {
-			log.WithFields(log.Fields{
+			logs.WithFields(logs.Fields{
 				"Err": err,
 			}).Error("rows.Scan")
 		}
@@ -393,7 +393,7 @@ func (c *Catalog) GetTransfers(time0, time1 string) ([]TransferData, error) {
 	// fetch data from DB
 	rows, err := DB.Query(stm, time0, time1)
 	if err != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Query": stm,
 			"Err":   err,
 		}).Error("DB.Query")
@@ -405,7 +405,7 @@ func (c *Catalog) GetTransfers(time0, time1 string) ([]TransferData, error) {
 		rec := TransferData{}
 		err := rows.Scan(&rec.Timestamp, &rec.CpuUsage, &rec.MemUsage, &rec.Throughput)
 		if err != nil {
-			log.WithFields(log.Fields{
+			logs.WithFields(logs.Fields{
 				"Err": err,
 			}).Error("Exec: rows.Scan")
 		}
@@ -418,7 +418,7 @@ func (c *Catalog) GetTransfers(time0, time1 string) ([]TransferData, error) {
 func (c *Catalog) InsertRequest(r TransferRequest) error {
 	stm := getSQL("insert_request")
 	_, e := DB.Exec(stm, r.Id, r.Lfn, r.Block, r.Dataset, r.SrcUrl, r.SrcAlias, r.DstUrl, r.DstAlias, r.RegUrl, r.RegAlias, "pending", r.Priority)
-	log.WithFields(log.Fields{
+	logs.WithFields(logs.Fields{
 		"Request": r,
 	}).Info("Catalog: InsertRequest")
 	if e != nil {
