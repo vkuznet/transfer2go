@@ -18,7 +18,7 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	logs "github.com/sirupsen/logrus"
 	"github.com/vkuznet/transfer2go/core"
 	"github.com/vkuznet/transfer2go/utils"
 )
@@ -31,7 +31,7 @@ func userDNs() []string {
 	rurl := "https://cmsweb.cern.ch/sitedb/data/prod/people"
 	resp := utils.FetchResponse(rurl, []byte{})
 	if resp.Error != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Error": resp.Error,
 		}).Error("Unable to fetch SiteDB records", resp.Error)
 		return out
@@ -39,7 +39,7 @@ func userDNs() []string {
 	var rec map[string]interface{}
 	err := json.Unmarshal(resp.Data, &rec)
 	if err != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Error": err,
 		}).Error("Unable to unmarshal response", err)
 		return out
@@ -85,7 +85,7 @@ func auth(r *http.Request) bool {
 
 	if utils.VERBOSE > 1 {
 		dump, err := httputil.DumpRequest(r, true)
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Request": r,
 			"Dump":    string(dump),
 			"Error":   err,
@@ -94,7 +94,7 @@ func auth(r *http.Request) bool {
 	userDN := utils.UserDN(r)
 	match := utils.InList(userDN, _userDNs)
 	if !match {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"User DN": userDN,
 		}).Error("Auth userDN not found in SiteDB")
 	}
@@ -149,8 +149,6 @@ func AuthHandler(w http.ResponseWriter, r *http.Request) {
 		PullHandler(w, r)
 	case "push":
 		PushHandler(w, r)
-	case "meta":
-		MetaHandler(w, r)
 	case "history":
 		HistoricalHandler(w, r)
 	default:
@@ -169,7 +167,7 @@ func HistoricalHandler(w http.ResponseWriter, r *http.Request) {
 	d, _ := url.QueryUnescape(r.FormValue("duration"))
 	duration, err := time.ParseDuration(d)
 	if err != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Error": err,
 		}).Error("AgentsHandler", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -179,7 +177,7 @@ func HistoricalHandler(w http.ResponseWriter, r *http.Request) {
 	startTime := endTime - int64(duration.Seconds())
 	transfers, err := core.TFC.GetTransfers(strconv.FormatInt(startTime, 10), strconv.FormatInt(endTime, 10))
 	if err != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Error": err,
 		}).Error("AgentsHandler", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -187,7 +185,7 @@ func HistoricalHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	data, err := json.Marshal(transfers)
 	if err != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Error": err,
 		}).Error("AgentsHandler", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -209,7 +207,7 @@ func TransfersHandler(w http.ResponseWriter, r *http.Request) {
 	transfers := core.TFC.Transfers(time0, time1)
 	data, err := json.Marshal(transfers)
 	if err != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Error": err,
 		}).Error("AgentsHandler", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -232,33 +230,9 @@ func FilesHandler(w http.ResponseWriter, r *http.Request) {
 	files := core.TFC.Files(dataset, block, lfn)
 	data, err := json.Marshal(files)
 	if err != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Error": err,
 		}).Error("AgentsHandler", err)
-		w.WriteHeader(http.StatusInternalServerError)
-	} else {
-		w.WriteHeader(http.StatusOK)
-	}
-	w.Write(data)
-}
-
-// RecordsHandler provides information about files in catalog
-func RecordsHandler(w http.ResponseWriter, r *http.Request) {
-
-	if r.Method != "GET" {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
-	lfn, _ := url.QueryUnescape(r.FormValue("lfn"))
-	block, _ := url.QueryUnescape(r.FormValue("block"))
-	dataset, _ := url.QueryUnescape(r.FormValue("dataset"))
-	req := core.TransferRequest{Lfn: lfn, Block: block, Dataset: dataset}
-	records := core.TFC.Records(req)
-	data, err := json.Marshal(records)
-	if err != nil {
-		log.WithFields(log.Fields{
-			"Error": err,
-		}).Error("Recordsandler", err)
 		w.WriteHeader(http.StatusInternalServerError)
 	} else {
 		w.WriteHeader(http.StatusOK)
@@ -285,7 +259,7 @@ func ListHandler(w http.ResponseWriter, r *http.Request) {
 			var err error
 			requests, err = core.TFC.ListRequest(parameter[1])
 			if err != nil {
-				log.WithFields(log.Fields{
+				logs.WithFields(logs.Fields{
 					"Error": err,
 				}).Error("ListRequest handler")
 				w.WriteHeader(http.StatusInternalServerError)
@@ -294,7 +268,7 @@ func ListHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		data, err := json.Marshal(requests)
 		if err != nil {
-			log.WithFields(log.Fields{
+			logs.WithFields(logs.Fields{
 				"Error": err,
 			}).Error("ListRequest handler")
 			w.WriteHeader(http.StatusInternalServerError)
@@ -326,7 +300,7 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 	astats := core.AgentStatus{Addrs: addrs, Catalog: core.TFC.Type, Name: _alias, Url: _myself, Protocol: _protocol, Backend: _backend, Tool: _tool, ToolOpts: _toolOpts, Agents: _agents, TimeStamp: time.Now().Unix(), Metrics: core.AgentMetrics.ToDict(), CpuUsage: cusage, MemUsage: musage}
 	data, err := json.Marshal(astats)
 	if err != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Error": err,
 		}).Error("AgentsHandler")
 		w.WriteHeader(http.StatusInternalServerError)
@@ -345,7 +319,7 @@ func AgentsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	data, err := json.Marshal(_agents)
 	if err != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Error": err,
 		}).Error("AgentsHandler", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -374,7 +348,7 @@ func ResetHandler(w http.ResponseWriter, r *http.Request) {
 	_protocol = "http"
 	_backend = ""
 	_tool = ""
-	log.WithFields(log.Fields{
+	logs.WithFields(logs.Fields{
 		"Protocol": _protocol,
 		"Backend":  _backend,
 		"Tool":     _tool,
@@ -384,8 +358,8 @@ func ResetHandler(w http.ResponseWriter, r *http.Request) {
 
 // POST methods
 
-// MetaHandler gives details about requested dataset/block/files
-func MetaHandler(w http.ResponseWriter, r *http.Request) {
+// RecordsHandler provides records for given dataset/block/file request
+func RecordsHandler(w http.ResponseWriter, r *http.Request) {
 
 	if !(r.Method == "POST") {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -395,9 +369,9 @@ func MetaHandler(w http.ResponseWriter, r *http.Request) {
 	var request = core.TransferRequest{}
 	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Error": err,
-		}).Error("MetaHandler unable to marshal", err)
+		}).Error("RecordsHandler unable to marshal", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -408,10 +382,10 @@ func MetaHandler(w http.ResponseWriter, r *http.Request) {
 	records := core.TFC.Records(core.TransferRequest{Lfn: lfn, Dataset: dataset, Block: block})
 	data, err := json.Marshal(records)
 	if err != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Records": records,
 			"Error":   err,
-		}).Error("MetaHandler unable to marshal", records, err)
+		}).Error("RecordsHandler unable to marshal", records, err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -430,7 +404,7 @@ func PullHandler(w http.ResponseWriter, r *http.Request) {
 	var data []core.TransferRequest
 	err := json.NewDecoder(r.Body).Decode(&data)
 	if err != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Error": err,
 		}).Error("PullHandler unable to parse json body")
 		w.WriteHeader(http.StatusInternalServerError)
@@ -442,7 +416,7 @@ func PullHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	body, err := json.Marshal(jobs)
 	if err != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Error": err,
 			"jobs":  jobs,
 		}).Error("PullHandler unable to marshall jobs")
@@ -454,7 +428,7 @@ func PullHandler(w http.ResponseWriter, r *http.Request) {
 		resp := utils.FetchResponse(url, body)
 		// Check return status code
 		if resp.StatusCode != 200 {
-			log.WithFields(log.Fields{
+			logs.WithFields(logs.Fields{
 				"Error":       err,
 				"Destination": data[0].DstUrl,
 			}).Error("PullHandler unable to send transfer request to destination agent")
@@ -476,7 +450,7 @@ func PushHandler(w http.ResponseWriter, r *http.Request) {
 	var data []core.TransferRequest
 	err := json.NewDecoder(r.Body).Decode(&data)
 	if err != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Error": err,
 		}).Error("PushHandler unable to parse json body")
 		w.WriteHeader(http.StatusInternalServerError)
@@ -488,7 +462,7 @@ func PushHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	body, err := json.Marshal(jobs)
 	if err != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Error": err,
 			"jobs":  jobs,
 		}).Error("PushHandler unable to marshal jobs")
@@ -500,7 +474,7 @@ func PushHandler(w http.ResponseWriter, r *http.Request) {
 		resp := utils.FetchResponse(url, body)
 		// Check return status code
 		if resp.StatusCode != 200 {
-			log.WithFields(log.Fields{
+			logs.WithFields(logs.Fields{
 				"Error":  err,
 				"Source": data[0].SrcUrl,
 			}).Error("PushHandler unable to send transfer request to source agent")
@@ -523,7 +497,7 @@ func ActionHandler(w http.ResponseWriter, r *http.Request) {
 	var data = []core.Job{}
 	err := json.NewDecoder(r.Body).Decode(&data)
 	if err != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Error": err,
 		}).Error("ActionHandler unable to parse json body")
 		w.WriteHeader(http.StatusInternalServerError)
@@ -531,14 +505,14 @@ func ActionHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	// loop over received data and decide what to do with those requests based on the action clause
 	for _, job := range data {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Job": job.String(),
 		}).Info("ActionHandler, receive new request")
 		if job.Action == "approve" { // this is action happens on main agent
 			// find out real transfer request
 			err = core.TFC.RetrieveRequest(&job.TransferRequest)
 			if err != nil {
-				log.WithFields(log.Fields{
+				logs.WithFields(logs.Fields{
 					"Job":   job,
 					"Error": err,
 				}).Error("ActionHandler, unable to find a request")
@@ -548,13 +522,13 @@ func ActionHandler(w http.ResponseWriter, r *http.Request) {
 			// Split the request according to model type and router
 			err = core.RedirectRequest(&tr)
 			if err != nil {
-				log.WithFields(log.Fields{
+				logs.WithFields(logs.Fields{
 					"Error": err,
 					"Model": _config.Type,
 					"Job":   job.String(),
 				}).Error("ActionHandler unable to send transfer request to agent")
 			} else {
-				log.WithFields(log.Fields{
+				logs.WithFields(logs.Fields{
 					"Job": job.String(),
 				}).Info("ActionHandler, successfully send request to agent")
 			}
@@ -584,7 +558,7 @@ func SnapshotHandler(w http.ResponseWriter, r *http.Request) {
 	records := core.TFC.Snapshot()
 	data, err := json.Marshal(records)
 	if err != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Error": err,
 		}).Error("SnapshotHandler unable to marshal records")
 		w.WriteHeader(http.StatusInternalServerError)
@@ -610,7 +584,7 @@ func CentralCatalogHandler(w http.ResponseWriter, r *http.Request) {
 		table, _ := url.QueryUnescape(r.FormValue("table"))
 		data, err := core.CC.Get(table)
 		if err != nil {
-			log.WithFields(log.Fields{
+			logs.WithFields(logs.Fields{
 				"Table": table,
 				"Error": err,
 			}).Error("CentralCatalogHandler unable to read table")
@@ -624,7 +598,7 @@ func CentralCatalogHandler(w http.ResponseWriter, r *http.Request) {
 		var maps map[string][]string
 		err := json.NewDecoder(r.Body).Decode(&maps)
 		if err != nil {
-			log.WithFields(log.Fields{
+			logs.WithFields(logs.Fields{
 				"Request Body": r.Body,
 				"Error":        err,
 			}).Error("RegisterAgentHandler unable to decode")
@@ -634,7 +608,7 @@ func CentralCatalogHandler(w http.ResponseWriter, r *http.Request) {
 		for table, records := range maps {
 			err := core.CC.Put(table, records)
 			if err != nil {
-				log.WithFields(log.Fields{
+				logs.WithFields(logs.Fields{
 					"Error": err,
 					"Table": table,
 				}).Error("CentralCatalogHandler unable to insert records into table")
@@ -660,7 +634,7 @@ func TFCHandler(w http.ResponseWriter, r *http.Request) {
 		records := core.TFC.Records(core.TransferRequest{})
 		data, err := json.Marshal(records)
 		if err != nil {
-			log.WithFields(log.Fields{
+			logs.WithFields(logs.Fields{
 				"Error": err,
 			}).Error("TFCHandler unable to marshal records")
 			w.WriteHeader(http.StatusInternalServerError)
@@ -673,7 +647,7 @@ func TFCHandler(w http.ResponseWriter, r *http.Request) {
 	var records []core.CatalogEntry
 	err := json.NewDecoder(r.Body).Decode(&records)
 	if err != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Request Body": r.Body,
 			"Error":        err,
 		}).Error("TFCHandler unable to decode", r.Body, err)
@@ -682,7 +656,7 @@ func TFCHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, rec := range records {
 		err = core.TFC.Add(rec)
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Record": rec.String(),
 			"Error":  err,
 		}).Println("TFCHandler adds")
@@ -702,7 +676,7 @@ func RegisterAgentHandler(w http.ResponseWriter, r *http.Request) {
 	var agentParams AgentInfo
 	err := json.NewDecoder(r.Body).Decode(&agentParams)
 	if err != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Request Body": r.Body,
 			"Error":        err,
 		}).Error("RegisterAgentHandler unable to decode")
@@ -738,7 +712,7 @@ func RegisterProtocolHandler(w http.ResponseWriter, r *http.Request) {
 	var protocolParams AgentProtocol
 	err := json.NewDecoder(r.Body).Decode(&protocolParams)
 	if err != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Request Body": r.Body,
 			"Error":        err,
 		}).Error("RegisterProtocolHandler unable to decode", r.Body, err)
@@ -751,7 +725,7 @@ func RegisterProtocolHandler(w http.ResponseWriter, r *http.Request) {
 		_backend = protocolParams.Backend
 		_tool = protocolParams.Tool
 		_toolOpts = protocolParams.ToolOpts
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Protocol": _protocol,
 			"Backend":  _backend,
 			"Tool":     _tool,
@@ -773,7 +747,7 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) {
 	var requests = &[]core.TransferRequest{}
 	err := json.NewDecoder(r.Body).Decode(&requests)
 	if err != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Error": err,
 		}).Error("RequestHandler unable to decode []TransferRequest", err)
 		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
@@ -783,7 +757,7 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) {
 
 	// go through each request and queue items individually to run job over the given request
 	for _, r := range *requests {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Request": r,
 		}).Info("RequestHandler received request")
 
@@ -809,14 +783,14 @@ func UploadDataHandler(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	if utils.VERBOSE > 0 {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Header": r.Header,
 		}).Println("HEADER UploadDataHandler", r.Header)
 	}
 	// create multipart reader
 	mr, e := r.MultipartReader()
 	if e != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Error": e,
 		}).Error("UploadDataHandler unable to establish MultipartReader", e)
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -840,7 +814,7 @@ func UploadDataHandler(w http.ResponseWriter, r *http.Request) {
 	file, e := os.Create(pfn)
 	defer file.Close()
 	if e != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"PFN":   pfn,
 			"Error": e,
 		}).Error("ERROR UploadDataHandler unable to open", pfn, e)
@@ -861,7 +835,7 @@ func UploadDataHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if e != nil {
-			log.WithFields(log.Fields{
+			logs.WithFields(logs.Fields{
 				"Error": e,
 			}).Error("UploadDataHandler unable to read chunk from the stream", e)
 			break
@@ -872,7 +846,7 @@ func UploadDataHandler(w http.ResponseWriter, r *http.Request) {
 		// in case we don't need hasher the code would be
 		// b, e := io.Copy(file, p)
 		if e != nil {
-			log.WithFields(log.Fields{
+			logs.WithFields(logs.Fields{
 				"Error": e,
 			}).Error("UploadDataHandler unable to copy chunk", e)
 			break
@@ -880,7 +854,7 @@ func UploadDataHandler(w http.ResponseWriter, r *http.Request) {
 		totBytes += b
 	}
 	if srcBytes != fmt.Sprintf("%d", totBytes) {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Source Bytes": srcBytes,
 			"Total Bytes":  totBytes,
 			"Error":        e,
@@ -891,7 +865,7 @@ func UploadDataHandler(w http.ResponseWriter, r *http.Request) {
 
 	hash := hex.EncodeToString(hasher.Sum(nil))
 	if srcHash != hash {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Source Hash": srcHash,
 			"Hash":        hash,
 			"Error":       e,
@@ -903,7 +877,7 @@ func UploadDataHandler(w http.ResponseWriter, r *http.Request) {
 	// send back catalog entry which can be used for verification
 	// but do not write to catalog since another end should verify first that
 	// data is transferred, then it will update the TFC
-	log.WithFields(log.Fields{
+	logs.WithFields(logs.Fields{
 		"Source Alias": srcAlias,
 		"Fname":        fname,
 		"Dest Alias":   dstAlias,
@@ -912,7 +886,7 @@ func UploadDataHandler(w http.ResponseWriter, r *http.Request) {
 	entry := core.CatalogEntry{Lfn: lfn, Pfn: pfn, Dataset: dataset, Block: block, Bytes: totBytes, Hash: hash, TransferTime: (time.Now().Unix() - time0), Timestamp: time.Now().Unix()}
 	data, e := json.Marshal(entry)
 	if e != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Entry": entry,
 			"Error": e,
 		}).Error("UploadDataHandler unable to marshal catalog entry", entry, e)
@@ -936,7 +910,7 @@ func DownloadHandler(w http.ResponseWriter, r *http.Request) {
 			fname := core.AgentStager.Access(files[0])
 			fin, err := os.Open(fname)
 			if err != nil {
-				log.WithFields(log.Fields{
+				logs.WithFields(logs.Fields{
 					"Error": err,
 					"File":  fname,
 				}).Error("unable to open file in stager")
@@ -967,12 +941,12 @@ func VerboseHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		log.Warn("Unable to parse request body: ", err)
+		logs.Warn("Unable to parse request body: ", err)
 	}
 	var v level
 	err = json.Unmarshal(body, &v)
 	if err == nil {
-		log.Info("Switch to verbose level: ", v.Level)
+		logs.Info("Switch to verbose level: ", v.Level)
 		utils.VERBOSE = v.Level
 	}
 	w.WriteHeader(http.StatusOK)
