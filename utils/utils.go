@@ -19,7 +19,7 @@ import (
 
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/mem"
-	log "github.com/sirupsen/logrus"
+	logs "github.com/sirupsen/logrus"
 )
 
 // STATICDIR defines location of all static files
@@ -38,7 +38,7 @@ func ListFiles(dir string) []string {
 		return nil
 	})
 	if err != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Directory": dir,
 			"Error":     err,
 		}).Println("Unable to read directory")
@@ -72,7 +72,7 @@ func Hash(data []byte) (string, int64) {
 	hasher := adler32.New()
 	b, e := hasher.Write(data)
 	if e != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Error": e,
 		}).Error("Unable to write chunk of data via hasher.Write", e)
 	}
@@ -89,7 +89,7 @@ func Stack() string {
 // ErrPropagate error helper function which can be used in defer ErrPropagate()
 func ErrPropagate(api string) {
 	if err := recover(); err != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"API":   api,
 			"Error": err,
 			"Stack": Stack(),
@@ -106,7 +106,7 @@ func ErrPropagate(api string) {
 // }()
 func ErrPropagate2Channel(api string, ch chan interface{}) {
 	if err := recover(); err != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"API":   api,
 			"Error": err,
 			"Stack": Stack(),
@@ -178,7 +178,7 @@ func HostIP() []string {
 	var out []string
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
-		log.WithFields(log.Fields{
+		logs.WithFields(logs.Fields{
 			"Error": err,
 		}).Error("Unable to resolve net.InterfaceAddrs")
 	}
@@ -219,7 +219,7 @@ func CheckX509() {
 		msg := fmt.Sprintf("Neither X509_USER_PROXY or X509_USER_KEY/X509_USER_CERT are set. ")
 		msg += "In order to run please obtain valid proxy via \"voms-proxy-init -voms cms -rfc\""
 		msg += "and setup X509_USER_PROXY or setup X509_USER_KEY/X509_USER_CERT in your environment"
-		log.Println(msg)
+		logs.Println(msg)
 		os.Exit(-1)
 	}
 }
