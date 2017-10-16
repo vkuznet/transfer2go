@@ -41,7 +41,7 @@ type UrlRequest struct {
 // VERBOSE variable controls verbosity level of client's utilities
 var VERBOSE int
 
-// Ayth variable neglects auth layer
+// Auth variable neglects auth layer
 var Auth bool
 
 // global HTTP client
