@@ -2,7 +2,7 @@ package core
 
 // transfer2go/utils - Go utilities for transfer2go
 // Author - Rishi Shah <rishiloyola98245@gmail.com>
-// Description: the heap class is used to priorotize requests in RequestQueue
+// Description: the heap class is used to prioritize requests in RequestQueue
 // all requests are store into prersistent store (REQUEST table) but also
 // held in RequestQueue which is initialized by this PriorityQueue
 

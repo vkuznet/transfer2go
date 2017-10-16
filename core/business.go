@@ -180,7 +180,7 @@ func (j *Job) String() string {
 	return fmt.Sprintf("<Job TransferRequest=%s action=%s>", j.TransferRequest.String(), j.Action)
 }
 
-// helper function to send request to main agent to update request status in its persistent store (REQUESTS table)
+// UpdateRequest sends request to main agent to update request status in its persistent store (REQUESTS table)
 func (j *Job) UpdateRequest(status string) {
 	furl := fmt.Sprintf("%s/action", j.TransferRequest.RegUrl)
 	var jobs []Job
