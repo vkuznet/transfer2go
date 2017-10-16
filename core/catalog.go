@@ -286,7 +286,7 @@ func (c *Catalog) Snapshot() map[string][]string {
 				}).Error("rows.Scan")
 			}
 			var rowValues []string
-			for i, _ := range cols {
+			for i := range cols {
 				rowValues = append(rowValues, asString(values[i]))
 			}
 			out = append(out, strings.Join(rowValues, ","))
