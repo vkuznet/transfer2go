@@ -19,10 +19,11 @@ psgrep ()
 }
 usage ()
 {
-    echo "Usage: run.sh <pull|push> <file|block|dataset>"
+    echo "Usage: run.sh <model = pull|push> <transfer = file|block|dataset> <router = true|false>"
     echo "Perform transfer2go test among 3 agents: main|source|destination"
     echo "pull|push defines a model to use"
     echo "file|block|dataset defines what to transfer"
+    echo "true|false speficies either to use router or not"
     echo 
     echo "- test creates dummy file"
     echo "- register it in source agent under /a/b/c and /a/b/c#123 dataset and block, respectively"
@@ -34,10 +35,14 @@ usage ()
 
 model="pull"
 data="file"
+router=true
 
-if [ $# -eq 2 ]; then
+if [ $# -eq 2 ] || [ $# -eq 3 ]; then
     model=$1
     data=$2
+    if [ $# -eq 3 ]; then
+        router=$3
+    fi
 else
     usage
 fi
@@ -49,7 +54,7 @@ if [ $data == "block" ]; then
     dataToTransfer="/a/b/c#123"
 fi
 
-echo "### Perform test of $model model"
+echo "### Perform test of $model model, router=$router"
 
 echo "Kill previous transfer2go processes (if any)"
 pskill transfer2go
@@ -99,7 +104,7 @@ cat > $wdir/config/main.json << EOF
     "type":"$model",
     "MonitorTime":3600,
     "trinterval": "24h",
-    "router":true
+    "router":$router
 }
 EOF
 cat > $wdir/catalog/main.json << EOF
