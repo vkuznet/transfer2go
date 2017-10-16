@@ -191,7 +191,11 @@ func ResolveRequest(t TransferRequest) []TransferRequest {
 		return out
 	}
 	for _, r := range records {
-		tr := TransferRequest{TimeStamp: t.TimeStamp, Lfn: r.Lfn, Block: r.Block, Dataset: r.Dataset, SrcUrl: t.SrcUrl, SrcAlias: t.SrcAlias, DstUrl: t.DstUrl, DstAlias: t.DstAlias, RegUrl: t.RegUrl, RegAlias: t.RegAlias, Delay: t.Delay, Priority: t.Priority, Status: t.Status}
+		// create copy of input transfer request and replace lfn/block/dataset parts from found record
+		tr := t.Clone()
+		tr.Lfn = r.Lfn
+		tr.Block = r.Block
+		tr.Dataset = r.Dataset
 		tr.Id = tr.UUID()
 		out = append(out, tr)
 	}
@@ -241,6 +245,11 @@ func RedirectRequest(t *TransferRequest) error {
 		index          int
 		err            error
 	)
+	logs.WithFields(logs.Fields{
+		"TransferRequest": t.String(),
+		"Router":          RouterModel,
+		"TransferType":    TransferType,
+	}).Info("RedirectRequest")
 	if RouterModel == true {
 		// Resolve request through router for both the model (push or pull model), Case: roter = true, model = push or pull
 		selectedAgents, index, err = AgentRouter.FindSource(t)
@@ -281,7 +290,7 @@ func RedirectRequest(t *TransferRequest) error {
 			logs.WithFields(logs.Fields{
 				"Error":  err,
 				"Source": selectedAgents[i].SrcUrl,
-			}).Println("Unable to connect to source")
+			}).Info("Unable to connect to source")
 			continue
 		}
 		err = SubmitRequest(selectedAgents[i].Jobs, selectedAgents[i].SrcUrl, t.DstUrl)

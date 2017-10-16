@@ -121,6 +121,12 @@ func (t *TransferRequest) String() string {
 	return fmt.Sprintf("<TransferRequest id=%s priority=%d status=%s ts=%d lfn=%s block=%s dataset=%s srcUrl=%s srcAlias=%s dstUrl=%s dstAlias=%s regUrl=%s regAlias=%s delay=%d>", t.Id, t.Priority, t.Status, t.TimeStamp, t.Lfn, t.Block, t.Dataset, t.SrcUrl, t.SrcAlias, t.DstUrl, t.DstAlias, t.RegUrl, t.RegAlias, t.Delay)
 }
 
+// Clone provides copy of transfer request
+func (t *TransferRequest) Clone() TransferRequest {
+	tr := TransferRequest{TimeStamp: t.TimeStamp, Lfn: t.Lfn, Block: t.Block, Dataset: t.Dataset, SrcUrl: t.SrcUrl, SrcAlias: t.SrcAlias, DstUrl: t.DstUrl, DstAlias: t.DstAlias, RegUrl: t.RegUrl, RegAlias: t.RegAlias, Delay: t.Delay, Id: t.Id, Priority: t.Priority, Status: t.Status}
+	return tr
+}
+
 // UUID generates unique id for transfer request
 func (t *TransferRequest) UUID() string {
 	text := fmt.Sprintf("%s-%s-%s-%d", t.Lfn, t.Block, t.Dataset, time.Now().UnixNano())

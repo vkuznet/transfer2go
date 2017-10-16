@@ -180,7 +180,7 @@ func readCSVfile(path string) ([][]float64, error) {
 	return nil, errors.New("The length of past data is 0")
 }
 
-// FindSource function to get the appropriate source agent
+// FindSource finds appropriate source agent(s) for given transfer request
 func (r *Router) FindSource(tr *TransferRequest) ([]SourceStats, int, error) {
 	// Find the union of files and files stored per agent
 	unionSet, filteredAgent, fileData := GetUnionCatalog(tr)
@@ -217,12 +217,20 @@ func (r *Router) FindSource(tr *TransferRequest) ([]SourceStats, int, error) {
 	var meta []string
 	for ; index >= 0 && unionSet.Size() > 0; index-- {
 		commonFiles := set.Intersection(filteredAgent[index].catalogSet, unionSet)
-		requests := make([]Job, 0)
+		jobs := make([]Job, 0)
 		for _, lfn := range commonFiles.List() {
 			meta = fileData[lfn.(string)] // 0: dataset, 1: block name
-			requests = append(requests, Job{Action: "transfer", TransferRequest: TransferRequest{Id: tr.Id, Lfn: lfn.(string), Dataset: meta[0], Block: meta[1], SrcUrl: filteredAgent[index].SrcUrl, SrcAlias: filteredAgent[index].SrcAlias, DstUrl: tr.DstUrl, DstAlias: tr.DstAlias, Status: "transferring", Priority: tr.Priority, RegAlias: tr.RegAlias, RegUrl: tr.RegUrl}})
+			// create a new cloned copy of transfer request and replace its attributes from router predictions
+			t := tr.Clone()
+			t.Lfn = lfn.(string)
+			t.Dataset = meta[0]
+			t.Block = meta[1]
+			t.SrcUrl = filteredAgent[index].SrcUrl
+			t.SrcAlias = filteredAgent[index].SrcAlias
+			t.Status = "transferring"
+			jobs = append(jobs, Job{Action: "transfer", TransferRequest: t})
 		}
-		filteredAgent[index].Jobs = requests
+		filteredAgent[index].Jobs = jobs
 		unionSet.Separate(commonFiles)
 	}
 	return filteredAgent, index, nil
