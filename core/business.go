@@ -274,7 +274,7 @@ func (w Worker) Start() {
 					}).Error("Can't perform requested action")
 				}
 
-				if err != nil || job.TransferRequest.Status == "error" {
+				if err != nil || job.TransferRequest.Status == "error" || job.TransferRequest.Status == "notfound" {
 					// decide if we'll drop the request or put it on hold by increasing its delay
 					// and put back to job channel
 					if job.TransferRequest.Delay > 300 {
@@ -288,7 +288,7 @@ func (w Worker) Start() {
 					} else if job.TransferRequest.Delay > 0 {
 						job.TransferRequest.Delay *= 2
 						logs.WithFields(logs.Fields{
-							"Error":   err.Error(),
+							"Error":   err,
 							"Action":  job.Action,
 							"Request": job.TransferRequest.String(),
 						}).Warn("put on hold")
@@ -296,7 +296,7 @@ func (w Worker) Start() {
 					} else {
 						job.TransferRequest.Delay = 60
 						logs.WithFields(logs.Fields{
-							"Error":   err.Error(),
+							"Error":   err,
 							"Action":  job.Action,
 							"Request": job.TransferRequest.String(),
 						}).Warn("put on hold")

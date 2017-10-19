@@ -412,7 +412,7 @@ func PullTransfer() Decorator {
 			}
 			if resp.StatusCode == 204 {
 				// transfer was put into stager but not yet finished
-				t.Status = "processing"
+				t.Status = "notfound"
 				logs.WithFields(logs.Fields{
 					"Request": t.String(),
 				}).Info("Request Transfer (pull model), received 204 status code, set processing")
