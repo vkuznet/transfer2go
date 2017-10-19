@@ -46,6 +46,7 @@ type Config struct {
 	MonitorTime    int64  `json:"monitorTime"`    // Large time interval after which we need to reset monitoring calculation
 	TrainInterval  string `json:"trinterval"`     // Time after which we need to retrain main agent
 	RouterModel    bool   `json:"router"`         // Variable to enable the router model
+	TransferDelay  int    `json:"transferDelay"`  // Transfer delay threshold in seconds
 }
 
 // String returns string representation of Config data type
@@ -220,8 +221,13 @@ func Server(config Config) {
 	http.HandleFunc(fmt.Sprintf("%s/", base), AuthHandler)
 	http.Handle("/html/", http.StripPrefix("/html/", http.FileServer(http.Dir("html"))))
 
-	// initialize transfer model
+	// initialize transfer model and transfer delay
 	core.TransferType = config.Type
+	if config.TransferDelay != 0 {
+		core.TransferDelayThreshold = config.TransferDelay
+	} else {
+		core.TransferDelayThreshold = 300 // seconds
+	}
 
 	// Check if RouterModel is enabled, then initialize router
 	if config.RouterModel == true {

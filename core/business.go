@@ -87,6 +87,9 @@ var TransferQueue chan Job
 // TransferType decides which pull or push based model is used
 var TransferType string
 
+// TransferDelayThreshold controls maximum threshold in seconds TransferRequest will wait before giving up
+var TransferDelayThreshold int
+
 // RouterModel tells if agent enable router
 var RouterModel bool
 
@@ -274,10 +277,10 @@ func (w Worker) Start() {
 					}).Error("Can't perform requested action")
 				}
 
-				if err != nil || job.TransferRequest.Status == "error" {
+				if err != nil || job.TransferRequest.Status == "error" || job.TransferRequest.Status == "processing" {
 					// decide if we'll drop the request or put it on hold by increasing its delay
 					// and put back to job channel
-					if job.TransferRequest.Delay > 300 {
+					if job.TransferRequest.Delay > TransferDelayThreshold {
 						logs.WithFields(logs.Fields{
 							"Action":  job.Action,
 							"Request": job.TransferRequest.String(),
@@ -288,7 +291,7 @@ func (w Worker) Start() {
 					} else if job.TransferRequest.Delay > 0 {
 						job.TransferRequest.Delay *= 2
 						logs.WithFields(logs.Fields{
-							"Error":   err.Error(),
+							"Error":   err,
 							"Action":  job.Action,
 							"Request": job.TransferRequest.String(),
 						}).Warn("put on hold")
@@ -296,7 +299,7 @@ func (w Worker) Start() {
 					} else {
 						job.TransferRequest.Delay = 60
 						logs.WithFields(logs.Fields{
-							"Error":   err.Error(),
+							"Error":   err,
 							"Action":  job.Action,
 							"Request": job.TransferRequest.String(),
 						}).Warn("put on hold")

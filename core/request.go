@@ -415,7 +415,7 @@ func PullTransfer() Decorator {
 				t.Status = "processing"
 				logs.WithFields(logs.Fields{
 					"Request": t.String(),
-				}).Info("Request Transfer (pull model), received 204 status code, set processing")
+				}).Info("Request Transfer (pull model), received 204 status code, set processing status")
 			}
 			if resp.StatusCode == 200 {
 				// we got data add record into local catalog
