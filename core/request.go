@@ -429,8 +429,9 @@ func PullTransfer() Decorator {
 					}).Error("Request Transfer (pull model), AgentStager.Write error")
 					return err
 				}
+				time1 := time.Now().Unix()
 				// create catalog entry for this data
-				entry := CatalogEntry{Lfn: t.Lfn, Pfn: pfn, Dataset: t.Dataset, Block: t.Block, Bytes: bytes, Hash: hash, TransferTime: (time.Now().Unix() - time0), Timestamp: time.Now().Unix()}
+				entry := CatalogEntry{Lfn: t.Lfn, Pfn: pfn, Dataset: t.Dataset, Block: t.Block, Bytes: bytes, Hash: hash, TransferTime: (time1 - time0), Timestamp: time.Now().Unix()}
 				// update local TFC with new catalog entry
 				TFC.Add(entry)
 				logs.WithFields(logs.Fields{
@@ -442,6 +443,11 @@ func PullTransfer() Decorator {
 				// record how much we transferred
 				AgentMetrics.TotalBytes.Inc(bytes) // keep growing
 				AgentMetrics.Total.Inc(1)          // keep growing
+				mbytes := float64(bytes) / 1048576
+				throughput := mbytes / float64(time1-time0)
+				cusage, memUsage, err := AgentMetrics.GetUsage()
+				// store data in table
+				TFC.InsertTransfers(time.Now().Unix(), cusage, memUsage, throughput)
 			}
 			return r.Process(t)
 		})
