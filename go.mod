@@ -11,8 +11,8 @@ require (
 	github.com/robfig/cron v1.2.0
 	github.com/sajari/regression v1.0.0
 	github.com/shirou/gopsutil v2.19.9+incompatible
-	github.com/sirupsen/logrus v1.4.2
-	github.com/stretchr/testify v1.4.0
+	github.com/sirupsen/logrus v1.8.3
+	github.com/stretchr/testify v1.7.0
 	github.com/vkuznet/x509proxy v0.0.0-20191014143623-163039704c67
 	gonum.org/v1/gonum v0.0.0-20191013192725-1459092b91f2 // indirect
 	gopkg.in/fatih/set.v0 v0.2.1
